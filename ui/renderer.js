@@ -123,6 +123,14 @@ async function init() {
   });
   $btnTestSound.addEventListener('click', () => playNotificationSound());
 
+  // Shortcuts modal
+  const $shortcutsModal = document.getElementById('shortcutsModal');
+  const $shortcutsClose = document.getElementById('shortcutsClose');
+  $shortcutsClose.addEventListener('click', () => $shortcutsModal.style.display = 'none');
+  $shortcutsModal.addEventListener('click', (e) => {
+    if (e.target === $shortcutsModal) $shortcutsModal.style.display = 'none';
+  });
+
   // Search input
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchQuery = e.target.value.toLowerCase();
@@ -176,12 +184,20 @@ async function init() {
       }
     }
 
+    // Cmd+? or Cmd+/: show shortcuts
+    if (e.metaKey && (e.key === '?' || e.key === '/')) {
+      e.preventDefault();
+      document.getElementById('shortcutsModal').style.display = 'flex';
+    }
+
     // Escape: close modals/dropdowns
     if (e.key === 'Escape') {
       closeDropdown();
       closeAddModal();
       const settingsModal = document.getElementById('settingsModal');
       if (settingsModal) settingsModal.style.display = 'none';
+      const shortcutsModal = document.getElementById('shortcutsModal');
+      if (shortcutsModal) shortcutsModal.style.display = 'none';
     }
   });
 

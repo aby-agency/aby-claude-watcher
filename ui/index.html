@@ -134,6 +134,28 @@
     <span class="status-item" id="statCost">$0.00</span>
   </div>
 
+  <!-- Shortcuts modal -->
+  <div class="modal-backdrop" id="shortcutsModal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Raccourcis clavier</h3>
+        <button class="modal-close" id="shortcutsClose">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="shortcuts-list">
+        <div class="shortcut-row"><kbd>&#8984;1</kbd> — <kbd>&#8984;9</kbd><span>Focus session 1-9</span></div>
+        <div class="shortcut-row"><kbd>&#8984;G</kbd><span>Basculer grille / liste</span></div>
+        <div class="shortcut-row"><kbd>&#8984;P</kbd><span>Always on top (pin)</span></div>
+        <div class="shortcut-row"><kbd>&#8984;F</kbd><span>Rechercher</span></div>
+        <div class="shortcut-row"><kbd>&#8984;?</kbd><span>Raccourcis clavier</span></div>
+        <div class="shortcut-row"><kbd>Esc</kbd><span>Fermer modale / dropdown</span></div>
+      </div>
+    </div>
+  </div>
+
   <script src="renderer.js"></script>
 </body>
 </html>

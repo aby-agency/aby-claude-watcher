@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#0d1117"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <!-- Monitor body -->
+  <rect x="96" y="96" width="320" height="224" rx="16" fill="none" stroke="#e6edf3" stroke-width="16"/>
+  <!-- Screen glow -->
+  <rect x="112" y="112" width="288" height="192" rx="8" fill="#161b22"/>
+  <!-- Status dots on screen -->
+  <circle cx="196" cy="188" r="16" fill="#22c55e" opacity="0.9"/>
+  <circle cx="256" cy="188" r="16" fill="#3b82f6" opacity="0.9"/>
+  <circle cx="316" cy="188" r="16" fill="#a78bfa" opacity="0.9"/>
+  <!-- Lines representing sessions -->
+  <rect x="160" y="228" width="192" height="8" rx="4" fill="#30363d"/>
+  <rect x="160" y="248" width="144" height="8" rx="4" fill="#30363d"/>
+  <rect x="160" y="268" width="168" height="8" rx="4" fill="#30363d"/>
+  <!-- Monitor stand -->
+  <rect x="224" y="320" width="64" height="32" fill="#e6edf3"/>
+  <rect x="176" y="352" width="160" height="16" rx="8" fill="#e6edf3"/>
+  <!-- Clock overlay (top right) -->
+  <circle cx="380" cy="140" r="40" fill="#0d1117" stroke="#3b82f6" stroke-width="6"/>
+  <line x1="380" y1="140" x2="380" y2="116" stroke="#e6edf3" stroke-width="5" stroke-linecap="round"/>
+  <line x1="380" y1="140" x2="396" y2="148" stroke="#e6edf3" stroke-width="4" stroke-linecap="round"/>
+</svg>

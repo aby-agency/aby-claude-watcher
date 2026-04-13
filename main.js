@@ -250,31 +250,55 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-function setupTray() {
-  // Create a 16x16 template icon (monochrome for macOS menu bar)
-  const iconSize = 16;
-  const canvas = Buffer.alloc(iconSize * iconSize * 4); // RGBA
-  // Draw a simple monitor icon
-  for (let y = 2; y <= 11; y++) {
-    for (let x = 2; x <= 13; x++) {
-      const isBorder = y === 2 || y === 11 || x === 2 || x === 13;
-      if (isBorder) {
-        const idx = (y * iconSize + x) * 4;
-        canvas[idx] = 0; canvas[idx+1] = 0; canvas[idx+2] = 0; canvas[idx+3] = 255;
-      }
+function generateTrayIcon() {
+  // 32x32 retina icon (displayed as 16x16) — monitor with clock
+  const s = 32;
+  const buf = Buffer.alloc(s * s * 4);
+  const px = (x, y, a = 255) => {
+    if (x < 0 || x >= s || y < 0 || y >= s) return;
+    const i = (y * s + x) * 4;
+    buf[i] = 0; buf[i+1] = 0; buf[i+2] = 0; buf[i+3] = a;
+  };
+  const line = (x0, y0, x1, y1, a = 255) => {
+    const dx = Math.abs(x1-x0), dy = Math.abs(y1-y0);
+    const sx = x0<x1?1:-1, sy = y0<y1?1:-1;
+    let err = dx-dy;
+    while(true) {
+      px(x0,y0,a);
+      if(x0===x1&&y0===y1) break;
+      const e2=2*err;
+      if(e2>-dy){err-=dy;x0+=sx;}
+      if(e2<dx){err+=dx;y0+=sy;}
     }
-  }
+  };
+  const rect = (x, y, w, h, a = 255) => {
+    for(let i=x;i<x+w;i++){px(i,y,a);px(i,y+h-1,a);}
+    for(let j=y;j<y+h;j++){px(x,j,a);px(x+w-1,j,a);}
+  };
+  // Monitor
+  rect(3, 4, 26, 18);
+  rect(4, 5, 24, 16);
   // Stand
-  for (let x = 6; x <= 9; x++) {
-    const idx = (12 * iconSize + x) * 4;
-    canvas[idx] = 0; canvas[idx+1] = 0; canvas[idx+2] = 0; canvas[idx+3] = 255;
+  for(let x=13;x<=18;x++) px(x,22);
+  for(let x=10;x<=21;x++) px(x,23);
+  // Clock circle (top-right)
+  const cx=24,cy=9,r=5;
+  for(let a=0;a<360;a+=8){
+    px(cx+Math.round(r*Math.cos(a*Math.PI/180)),cy+Math.round(r*Math.sin(a*Math.PI/180)));
   }
-  for (let x = 4; x <= 11; x++) {
-    const idx = (13 * iconSize + x) * 4;
-    canvas[idx] = 0; canvas[idx+1] = 0; canvas[idx+2] = 0; canvas[idx+3] = 255;
-  }
+  // Clock hands
+  line(cx,cy,cx,cy-3); // hour
+  line(cx,cy,cx+2,cy+1); // minute
+  // Dots inside monitor (sessions)
+  px(10,13,180);px(11,13,180);
+  px(15,13,180);px(16,13,180);
+  px(20,13,180);px(21,13,180);
 
-  const icon = nativeImage.createFromBuffer(canvas, { width: iconSize, height: iconSize });
+  return nativeImage.createFromBuffer(buf, { width: s, height: s, scaleFactor: 2 });
+}
+
+function setupTray() {
+  const icon = generateTrayIcon();
   icon.setTemplateImage(true);
   tray = new Tray(icon);
   tray.setToolTip('Claude Watch');

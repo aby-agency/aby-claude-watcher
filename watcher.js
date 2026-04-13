@@ -54,6 +54,7 @@ class SessionWatcher extends EventEmitter {
           state,
           lastTool: data.lastTool || null,
           model: data.model || null,
+          lastMessage: data.lastMessage || null,
           gitBranch: data.gitBranch || null,
           startedAt: data.startedAt || new Date().toISOString(),
           endedAt: data.endedAt || null,
@@ -120,6 +121,7 @@ class SessionWatcher extends EventEmitter {
               state: STATES.IDLE,
               lastTool: null,
               model: null,
+              lastMessage: null,
               gitBranch: null,
               startedAt: startedAtISO,
               endedAt: null,
@@ -488,6 +490,10 @@ class SessionWatcher extends EventEmitter {
 
     // Determine state from content
     const content = message.content || [];
+    const textBlock = content.find(c => c.type === 'text' && c.text);
+    if (textBlock) {
+      session.lastMessage = textBlock.text.slice(0, 120);
+    }
     const hasThinking = content.some(c => c.type === 'thinking');
     const hasToolUse = content.some(c => c.type === 'tool_use');
     const lastToolUse = [...content].reverse().find(c => c.type === 'tool_use');
@@ -615,6 +621,7 @@ class SessionWatcher extends EventEmitter {
       startedAt: session.startedAt,
       endedAt: session.endedAt,
       tokens: session.tokens,
+      lastMessage: session.lastMessage,
       remoteUrl: session.remoteUrl,
       terminalApp: session.terminalApp,
       terminalId: session.terminalId,

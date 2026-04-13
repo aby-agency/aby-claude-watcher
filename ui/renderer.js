@@ -292,6 +292,7 @@ function cardHTML(s) {
         <span class="dot"></span>
         ${stateLabel}
       </div>
+      ${s.lastMessage ? `<div class="card-preview">${esc(s.lastMessage)}</div>` : ''}
       <div class="card-details">
         <div class="detail">
           <span class="detail-label">Outil</span>

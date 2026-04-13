@@ -129,6 +129,37 @@ async function init() {
     }
   });
 
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Cmd+1-9: focus nth active session
+    if (e.metaKey && e.key >= '1' && e.key <= '9') {
+      e.preventDefault();
+      const sorted = getSortedSessions().filter(s => s.state.name !== 'completed');
+      const idx = parseInt(e.key) - 1;
+      if (sorted[idx]) handleFocus(sorted[idx].sessionId);
+    }
+
+    // Cmd+G: toggle grid/list view
+    if (e.metaKey && e.key === 'g') {
+      e.preventDefault();
+      setView(viewMode === 'grid' ? 'list' : 'grid');
+    }
+
+    // Cmd+P: toggle always-on-top (pin)
+    if (e.metaKey && e.key === 'p') {
+      e.preventDefault();
+      togglePin();
+    }
+
+    // Escape: close modals/dropdowns
+    if (e.key === 'Escape') {
+      closeDropdown();
+      closeAddModal();
+      const settingsModal = document.getElementById('settingsModal');
+      if (settingsModal) settingsModal.style.display = 'none';
+    }
+  });
+
   // Update durations every second
   setInterval(updateDurations, 1000);
 }

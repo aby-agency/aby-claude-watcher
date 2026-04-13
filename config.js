@@ -15,6 +15,7 @@ let config = {
   volume: 0.7,          // 0.0 - 1.0
   windowBounds: null,   // { x, y, width, height }
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
+  cleanupDays: 7,
 };
 
 function load() {

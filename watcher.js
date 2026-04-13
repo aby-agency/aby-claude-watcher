@@ -66,6 +66,7 @@ class SessionWatcher extends EventEmitter {
         });
         this.emit('session-added', this.sessions.get(id));
       }
+      this.cleanupOldSessions();
     }
 
     this.scan();
@@ -633,6 +634,23 @@ class SessionWatcher extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (session && session.state !== STATES.COMPLETED) {
       this.setState(sessionId, STATES.COMPLETED, false);
+    }
+  }
+
+  cleanupOldSessions() {
+    if (!this.config) return;
+    const days = this.config.get().cleanupDays || 7;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const saved = this.config.getSavedSessions();
+    let cleaned = 0;
+    for (const [id, data] of Object.entries(saved)) {
+      if (data.stateName === 'completed' && data.endedAt) {
+        if (new Date(data.endedAt).getTime() < cutoff) {
+          this.config.deleteSession(id);
+          this.sessions.delete(id);
+          cleaned++;
+        }
+      }
     }
   }
 

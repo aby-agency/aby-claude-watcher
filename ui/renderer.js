@@ -651,6 +651,14 @@ function closeAddModal() {
 async function confirmAdd() {
   const value = $addInput.value.trim();
   if (!value) return;
+
+  // If it looks like a directory path, launch a new session there
+  if (!value.endsWith('.jsonl') && !value.match(/^[a-f0-9-]{36}$/i) && value.startsWith('/')) {
+    window.api.launchSession(value);
+    closeAddModal();
+    return;
+  }
+
   const success = await window.api.addSession(value);
   if (success) {
     closeAddModal();

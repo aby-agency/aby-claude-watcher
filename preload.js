@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   removeSession: (sessionId) => ipcRenderer.invoke('remove-session', sessionId),
   openRemote: (url) => ipcRenderer.invoke('open-remote', url),
   setVolume: (value) => ipcRenderer.invoke('set-volume', value),
+  launchSession: (cwd) => ipcRenderer.invoke('launch-session', cwd),
 
   onSessionAdded: (callback) => ipcRenderer.on('session-added', (_, data) => callback(data)),
   onSessionUpdated: (callback) => ipcRenderer.on('session-updated', (_, data) => callback(data)),

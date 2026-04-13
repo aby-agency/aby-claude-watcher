@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeIm
 const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
-const { focusTerminal, resumeSession } = require('./focus');
+const { focusTerminal, resumeSession, launchSession } = require('./focus');
 const config = require('./config');
 
 let mainWindow;
@@ -188,6 +188,10 @@ function setupIPC() {
     const s = watcher.getSessions().find(s => s.sessionId === sessionId);
     const cwd = s ? s.cwd : null;
     return resumeSession(sessionId, cwd);
+  });
+
+  ipcMain.handle('launch-session', (_, cwd) => {
+    return launchSession(cwd);
   });
 
   ipcMain.handle('set-volume', (_, value) => {

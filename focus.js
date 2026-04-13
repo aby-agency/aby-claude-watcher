@@ -257,4 +257,42 @@ function resumeSession(sessionId, cwd) {
   }
 }
 
-module.exports = { focusTerminal, resumeSession };
+function launchSession(cwd) {
+  const dir = sanitizePath(cwd);
+  if (!dir) return Promise.reject(new Error('Invalid path'));
+
+  if (process.platform === 'darwin') {
+    return runAppleScript(`
+      tell application "iTerm2"
+        activate
+        tell current window
+          create tab with default profile
+          tell current session
+            write text "cd ${escapeForAppleScript(dir)} && claude"
+          end tell
+        end tell
+      end tell
+    `).catch(() => {
+      return runAppleScript(`
+        tell application "Terminal"
+          activate
+          do script "cd ${escapeForAppleScript(dir)} && claude"
+        end tell
+      `);
+    });
+  } else if (process.platform === 'win32') {
+    return new Promise((resolve, reject) => {
+      exec(`start cmd /K "cd /d ${dir} && claude"`, (err) => {
+        if (err) reject(err); else resolve();
+      });
+    });
+  } else {
+    return new Promise((resolve, reject) => {
+      exec(`x-terminal-emulator -e "cd ${dir} && claude" 2>/dev/null &`, (err) => {
+        if (err) reject(err); else resolve();
+      });
+    });
+  }
+}
+
+module.exports = { focusTerminal, resumeSession, launchSession };

@@ -959,3 +959,25 @@ body {
 .status-sep {
   color: var(--border);
 }
+
+.search-input {
+  padding: 3px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+  width: 160px;
+  -webkit-app-region: no-drag;
+  transition: border-color var(--transition);
+}
+
+.search-input:focus {
+  border-color: var(--state-running);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}

@@ -21,6 +21,7 @@ let viewMode = 'grid';
 let alwaysOnTop = false;
 let volume = 0.7;
 let openDropdown = null;
+let searchQuery = '';
 let sessionOrder = []; // User-defined order of session IDs
 let draggedId = null;
 
@@ -122,6 +123,12 @@ async function init() {
   });
   $btnTestSound.addEventListener('click', () => playNotificationSound());
 
+  // Search input
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase();
+    render();
+  });
+
   // Close dropdowns on outside click
   document.addEventListener('click', (e) => {
     if (openDropdown && !e.target.closest('.notif-dropdown') && !e.target.closest('.card-btn')) {
@@ -149,6 +156,21 @@ async function init() {
     if (e.metaKey && e.key === 'p') {
       e.preventDefault();
       togglePin();
+    }
+
+    // Cmd+F: toggle search
+    if (e.metaKey && e.key === 'f') {
+      e.preventDefault();
+      const search = document.getElementById('searchInput');
+      if (search.style.display === 'none') {
+        search.style.display = 'block';
+        search.focus();
+      } else {
+        search.style.display = 'none';
+        search.value = '';
+        searchQuery = '';
+        render();
+      }
     }
 
     // Escape: close modals/dropdowns
@@ -260,7 +282,17 @@ function removeSessionFromDOM(sessionId) {
 }
 
 function getSortedSessions() {
-  const arr = Array.from(sessions.values());
+  let arr = Array.from(sessions.values());
+
+  // Filter by search query
+  if (searchQuery) {
+    arr = arr.filter(s =>
+      s.projectName.toLowerCase().includes(searchQuery) ||
+      (s.slug || '').toLowerCase().includes(searchQuery) ||
+      (s.gitBranch || '').toLowerCase().includes(searchQuery)
+    );
+  }
+
 
   // Separate completed from active
   const active = arr.filter(s => s.state.name !== 'completed');

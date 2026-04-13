@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# cwa — Attach current terminal to an active Claude Code session in Claude Watch
+# Usage: cwa [session_id]
+
+SOCKET_PATH="/tmp/claude-watch.sock"
+SESSIONS_DIR="$HOME/.claude/sessions"
+
+detect_terminal() {
+  if [ -n "$TERM_PROGRAM" ]; then
+    echo "$TERM_PROGRAM"
+  elif [ -n "$WT_SESSION" ]; then
+    echo "WindowsTerminal"
+  else
+    echo "unknown"
+  fi
+}
+
+detect_terminal_id() {
+  if [ -n "$ITERM_SESSION_ID" ]; then
+    echo "$ITERM_SESSION_ID"
+  elif [ -n "$WARP_SESSION_ID" ]; then
+    echo "$WARP_SESSION_ID"
+  elif [ -n "$WT_SESSION" ]; then
+    echo "$WT_SESSION"
+  else
+    echo "$$"
+  fi
+}
+
+notify_claude_watch() {
+  local msg="$1"
+  if [ -S "$SOCKET_PATH" ]; then
+    echo "$msg" | nc -U -w 1 "$SOCKET_PATH" 2>/dev/null || true
+  fi
+}
+
+TERMINAL_APP=$(detect_terminal)
+TERMINAL_ID=$(detect_terminal_id)
+
+# If session ID provided as argument
+if [ -n "$1" ]; then
+  SESSION_ID="$1"
+  notify_claude_watch "{\"action\":\"attach\",\"sessionId\":\"$SESSION_ID\",\"terminalApp\":\"$TERMINAL_APP\",\"terminalId\":\"$TERMINAL_ID\"}"
+  echo "Attached session $SESSION_ID to Claude Watch"
+  exit 0
+fi
+
+# Auto-detect: find active sessions
+if [ ! -d "$SESSIONS_DIR" ]; then
+  echo "No Claude Code sessions directory found."
+  exit 1
+fi
+
+ACTIVE_SESSIONS=()
+for f in "$SESSIONS_DIR"/*.json; do
+  [ -f "$f" ] || continue
+  PID=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['pid'])" "$f" 2>/dev/null)
+  SESSION_ID=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sessionId'])" "$f" 2>/dev/null)
+  if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+    ACTIVE_SESSIONS+=("$SESSION_ID|$PID|$f")
+  fi
+done
+
+if [ ${#ACTIVE_SESSIONS[@]} -eq 0 ]; then
+  echo "No active Claude Code sessions found."
+  exit 1
+fi
+
+if [ ${#ACTIVE_SESSIONS[@]} -eq 1 ]; then
+  SESSION_ID=$(echo "${ACTIVE_SESSIONS[0]}" | cut -d'|' -f1)
+  notify_claude_watch "{\"action\":\"attach\",\"sessionId\":\"$SESSION_ID\",\"terminalApp\":\"$TERMINAL_APP\",\"terminalId\":\"$TERMINAL_ID\"}"
+  echo "Attached session $SESSION_ID to Claude Watch"
+  exit 0
+fi
+
+# Multiple sessions — let user choose
+echo "Multiple active sessions found:"
+i=1
+for entry in "${ACTIVE_SESSIONS[@]}"; do
+  SID=$(echo "$entry" | cut -d'|' -f1)
+  SPID=$(echo "$entry" | cut -d'|' -f2)
+  echo "  [$i] $SID (PID: $SPID)"
+  i=$((i+1))
+done
+
+printf "Select session [1-%d]: " ${#ACTIVE_SESSIONS[@]}
+read -r choice
+
+if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#ACTIVE_SESSIONS[@]} ]; then
+  idx=$((choice - 1))
+  SESSION_ID=$(echo "${ACTIVE_SESSIONS[$idx]}" | cut -d'|' -f1)
+  notify_claude_watch "{\"action\":\"attach\",\"sessionId\":\"$SESSION_ID\",\"terminalApp\":\"$TERMINAL_APP\",\"terminalId\":\"$TERMINAL_ID\"}"
+  echo "Attached session $SESSION_ID to Claude Watch"
+else
+  echo "Invalid choice."
+  exit 1
+fi

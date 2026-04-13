@@ -1,0 +1,25 @@
+{
+  "name": "claude-watch",
+  "version": "1.0.0",
+  "description": "Dashboard desktop pour monitorer en temps réel vos sessions Claude Code",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "bin": {
+    "claude-watch": "main.js"
+  },
+  "keywords": [
+    "claude",
+    "code",
+    "monitor",
+    "electron",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^41.2.0"
+  }
+}

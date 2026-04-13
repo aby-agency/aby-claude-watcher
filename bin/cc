@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# cc — Claude Code wrapper that registers the session with Claude Watch
+# Usage: cc [args...]
+
+SOCKET_PATH="/tmp/claude-watch.sock"
+
+# Detect terminal app
+detect_terminal() {
+  if [ -n "$TERM_PROGRAM" ]; then
+    echo "$TERM_PROGRAM"
+  elif [ -n "$WT_SESSION" ]; then
+    echo "WindowsTerminal"
+  else
+    echo "unknown"
+  fi
+}
+
+# Detect terminal identifier (tab/pane ID)
+detect_terminal_id() {
+  if [ -n "$ITERM_SESSION_ID" ]; then
+    echo "$ITERM_SESSION_ID"
+  elif [ -n "$WARP_SESSION_ID" ]; then
+    echo "$WARP_SESSION_ID"
+  elif [ -n "$WT_SESSION" ]; then
+    echo "$WT_SESSION"
+  else
+    echo "$$"
+  fi
+}
+
+# Send message to Claude Watch via socket (async, non-blocking)
+notify_claude_watch() {
+  local msg="$1"
+  if [ -S "$SOCKET_PATH" ]; then
+    echo "$msg" | nc -U -w 1 "$SOCKET_PATH" 2>/dev/null &
+  fi
+}
+
+TERMINAL_APP=$(detect_terminal)
+TERMINAL_ID=$(detect_terminal_id)
+
+# Notify Claude Watch in the background BEFORE launching Claude
+# We use $$ (our PID) — the watcher will find the session via the sessions dir
+notify_claude_watch "{\"action\":\"register\",\"pid\":$$,\"terminalApp\":\"$TERMINAL_APP\",\"terminalId\":\"$TERMINAL_ID\",\"cwd\":\"$(pwd)\"}"
+
+# Launch Claude Code in the foreground (interactive — needs stdin/stdout)
+exec claude "$@"

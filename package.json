@@ -5,7 +5,31 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev"
+    "dev": "electron . --dev",
+    "build": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.claudewatch.app",
+    "productName": "Claude Watch",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": ["dmg"],
+      "icon": "assets/icon.svg"
+    },
+    "dmg": {
+      "title": "Claude Watch"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "watcher.js",
+      "socket.js",
+      "focus.js",
+      "config.js",
+      "ui/**/*",
+      "bin/**/*",
+      "assets/**/*"
+    ]
   },
   "bin": {
     "claude-watch": "main.js"
@@ -20,6 +44,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^41.2.0"
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1"
   }
 }

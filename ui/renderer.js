@@ -136,6 +136,9 @@ async function init() {
     }
   });
 
+  // Close context menu on any click
+  document.addEventListener('click', () => hideContextMenu());
+
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     // Cmd+1-9: focus nth active session
@@ -327,7 +330,8 @@ function cardHTML(s) {
   return `
     <div class="card" data-state="${stateName}" data-session="${sid}"
          draggable="${stateName !== 'completed'}"
-         ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">
+         ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
+         oncontextmenu="showContextMenu(event, '${sid}')">
       <div class="card-header">
         <div class="card-title">
           <div class="project-name">${esc(s.projectName)}</div>
@@ -394,7 +398,8 @@ function listItemHTML(s) {
   return `
     <div class="list-item" data-state="${stateName}" data-session="${sid}"
          draggable="${stateName !== 'completed'}"
-         ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">
+         ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
+         oncontextmenu="showContextMenu(event, '${sid}')">
       <div class="state-dot"></div>
       <div class="project-name">${esc(s.projectName)}</div>
       <span class="last-tool">${(stateName === 'running' || stateName === 'thinking') ? toolPill(s.lastTool) : toolPill(null)}</span>
@@ -843,6 +848,41 @@ function updateStatusBar() {
   document.getElementById('statWaiting').textContent = `${waiting.length} en attente`;
   document.getElementById('statTokens').textContent = `${formatTokens({ input: totalInput, output: totalOutput })} tokens`;
   document.getElementById('statCost').textContent = totalCost < 0.01 ? '$0.00' : `$${totalCost.toFixed(2)}`;
+}
+
+// ═══ Context menu ═══
+
+function showContextMenu(e, sessionId) {
+  e.preventDefault();
+  e.stopPropagation();
+  const s = sessions.get(sessionId);
+  if (!s) return;
+  const sid = escAttr(sessionId);
+  const menu = document.getElementById('contextMenu');
+  const stateName = s.state.name;
+
+  let items = `
+    <div class="context-menu-item" onclick="handleFocus('${sid}'); hideContextMenu();">${ICONS.terminal} Focus terminal</div>
+  `;
+  if (s.remoteUrl) {
+    items += `<div class="context-menu-item" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}'); hideContextMenu();">${ICONS.globe} Ouvrir remote</div>`;
+  }
+  items += `<div class="context-menu-sep"></div>`;
+  if (stateName === 'completed') {
+    items += `
+      <div class="context-menu-item" onclick="handleResume('${sid}'); hideContextMenu();">${ICONS.play} Reprendre</div>
+      <div class="context-menu-item" onclick="handleRemove('${sid}'); hideContextMenu();">${ICONS.x} Supprimer</div>
+    `;
+  }
+
+  menu.innerHTML = items;
+  menu.style.display = 'block';
+  menu.style.left = `${Math.min(e.clientX, window.innerWidth - 200)}px`;
+  menu.style.top = `${Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 10)}px`;
+}
+
+function hideContextMenu() {
+  document.getElementById('contextMenu').style.display = 'none';
 }
 
 // ═══ Start ═══

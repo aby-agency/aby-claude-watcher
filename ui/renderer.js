@@ -170,6 +170,7 @@ function render() {
 
   // Full rebuild — used for initial load, view switch, add/remove
   fullRender();
+  updateStatusBar();
 }
 
 function fullRender() {
@@ -209,6 +210,7 @@ function updateSession(s) {
 
   // Update session count
   $sessionCount.textContent = `${sessions.size} session${sessions.size !== 1 ? 's' : ''}`;
+  updateStatusBar();
 }
 
 function removeSessionFromDOM(sessionId) {
@@ -223,6 +225,7 @@ function removeSessionFromDOM(sessionId) {
     $gridView.style.display = 'none';
     $listView.style.display = 'none';
   }
+  updateStatusBar();
 }
 
 function getSortedSessions() {
@@ -750,6 +753,32 @@ function saveCurrentOrder() {
       return s && s.state.name !== 'completed';
     });
   window.api.setSessionOrder(sessionOrder);
+}
+
+// ═══ Status bar ═══
+
+function updateStatusBar() {
+  const all = Array.from(sessions.values());
+  const active = all.filter(s => !['completed', 'idle'].includes(s.state.name));
+  const waiting = all.filter(s => s.state.name === 'waiting');
+  const totalInput = all.reduce((sum, s) => sum + (s.tokens?.input || 0), 0);
+  const totalOutput = all.reduce((sum, s) => sum + (s.tokens?.output || 0), 0);
+
+  let totalCost = 0;
+  for (const s of all) {
+    const inp = s.tokens?.input || 0;
+    const out = s.tokens?.output || 0;
+    const m = (s.model || '').toLowerCase();
+    let rate = { input: 3, output: 15 };
+    if (m.includes('opus')) rate = { input: 15, output: 75 };
+    else if (m.includes('haiku')) rate = { input: 0.25, output: 1.25 };
+    totalCost += (inp * rate.input + out * rate.output) / 1000000;
+  }
+
+  document.getElementById('statActive').textContent = `${active.length} active${active.length !== 1 ? 's' : ''}`;
+  document.getElementById('statWaiting').textContent = `${waiting.length} en attente`;
+  document.getElementById('statTokens').textContent = `${formatTokens({ input: totalInput, output: totalOutput })} tokens`;
+  document.getElementById('statCost').textContent = totalCost < 0.01 ? '$0.00' : `$${totalCost.toFixed(2)}`;
 }
 
 // ═══ Start ═══

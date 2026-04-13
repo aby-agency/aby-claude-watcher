@@ -138,7 +138,7 @@ body {
 .content {
   padding: 16px;
   overflow-y: auto;
-  height: calc(100vh - 45px);
+  height: calc(100vh - 45px - 24px);
 }
 
 .content::-webkit-scrollbar {
@@ -923,4 +923,27 @@ body {
   background: var(--bg-tertiary);
   color: var(--text-primary);
   border-color: var(--border-light);
+}
+
+/* Status bar */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px;
+  padding-left: 96px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+}
+
+.status-sep {
+  color: var(--border);
 }

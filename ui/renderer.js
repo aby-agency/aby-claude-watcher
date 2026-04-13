@@ -303,6 +303,10 @@ function cardHTML(s) {
           <span class="detail-value">${tokens}</span>
         </div>
         <div class="detail">
+          <span class="detail-label">Coût</span>
+          <span class="detail-value">${formatCost(s.tokens, s.model)}</span>
+        </div>
+        <div class="detail">
           <span class="detail-label">Modèle</span>
           <span class="detail-value">${formatModel(s.model)}</span>
         </div>
@@ -616,6 +620,33 @@ function formatTokens(tokens) {
   if (total >= 1000000) return `${(total / 1000000).toFixed(1)}M`;
   if (total >= 1000) return `${(total / 1000).toFixed(1)}k`;
   return String(total);
+}
+
+function formatCost(tokens, model) {
+  if (!tokens) return '—';
+  const input = tokens.input || 0;
+  const output = tokens.output || 0;
+  if (input === 0 && output === 0) return '—';
+
+  // Pricing per 1M tokens (USD)
+  const pricing = {
+    'opus': { input: 15, output: 75 },
+    'sonnet': { input: 3, output: 15 },
+    'haiku': { input: 0.25, output: 1.25 },
+  };
+
+  let tier = pricing.sonnet; // default
+  if (model) {
+    const m = model.toLowerCase();
+    if (m.includes('opus')) tier = pricing.opus;
+    else if (m.includes('haiku')) tier = pricing.haiku;
+    else if (m.includes('sonnet')) tier = pricing.sonnet;
+  }
+
+  const cost = (input * tier.input + output * tier.output) / 1000000;
+  if (cost < 0.01) return '<$0.01';
+  if (cost < 1) return `$${cost.toFixed(2)}`;
+  return `$${cost.toFixed(1)}`;
 }
 
 function esc(str) {

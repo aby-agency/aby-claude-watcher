@@ -199,6 +199,7 @@ function serializeSession(session) {
     state: session.state,
     lastTool: session.lastTool,
     model: session.model,
+    gitBranch: session.gitBranch || null,
     startedAt: session.startedAt,
     endedAt: session.endedAt,
     tokens: session.tokens,

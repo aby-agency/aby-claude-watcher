@@ -54,6 +54,7 @@ class SessionWatcher extends EventEmitter {
           state,
           lastTool: data.lastTool || null,
           model: data.model || null,
+          gitBranch: data.gitBranch || null,
           startedAt: data.startedAt || new Date().toISOString(),
           endedAt: data.endedAt || null,
           tokens: data.tokens || { input: 0, output: 0 },
@@ -119,6 +120,7 @@ class SessionWatcher extends EventEmitter {
               state: STATES.IDLE,
               lastTool: null,
               model: null,
+              gitBranch: null,
               startedAt: startedAtISO,
               endedAt: null,
               tokens: { input: 0, output: 0 },
@@ -282,6 +284,9 @@ class SessionWatcher extends EventEmitter {
             session.slug = event.slug;
           }
 
+          if (event.gitBranch) {
+            session.gitBranch = event.gitBranch;
+          }
 
           if (event.type === 'assistant') {
             lastAssistant = event;
@@ -412,6 +417,10 @@ class SessionWatcher extends EventEmitter {
     // Extract slug
     if (event.slug) {
       session.slug = event.slug;
+    }
+
+    if (event.gitBranch) {
+      session.gitBranch = event.gitBranch;
     }
 
     // Reset idle timer and stale timer
@@ -602,6 +611,7 @@ class SessionWatcher extends EventEmitter {
       stateName: session.state.name,
       lastTool: session.lastTool,
       model: session.model,
+      gitBranch: session.gitBranch,
       startedAt: session.startedAt,
       endedAt: session.endedAt,
       tokens: session.tokens,

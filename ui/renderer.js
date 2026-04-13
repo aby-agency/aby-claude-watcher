@@ -310,6 +310,10 @@ function cardHTML(s) {
           <span class="detail-label">Modèle</span>
           <span class="detail-value">${formatModel(s.model)}</span>
         </div>
+        <div class="detail">
+          <span class="detail-label">Branche</span>
+          <span class="detail-value branch-value">${esc(s.gitBranch || '—')}</span>
+        </div>
       </div>
     </div>
   `;

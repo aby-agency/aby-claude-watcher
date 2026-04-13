@@ -379,6 +379,13 @@ body {
   color: var(--text-secondary);
 }
 
+.branch-value {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ═══ Tool pills ═══ */
 
 .tool-pill {

@@ -175,7 +175,7 @@ function setupIPC() {
   });
 
   ipcMain.handle('open-remote', (_, url) => {
-    if (url && url.startsWith('https://claude.ai/')) {
+    if (url && (url.startsWith('https://claude.ai/') || url.startsWith('https://') && url.includes('anthropic'))) {
       shell.openExternal(url);
     }
   });

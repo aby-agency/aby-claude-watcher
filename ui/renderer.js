@@ -345,7 +345,7 @@ function cardHTML(s) {
 
   return `
     <div class="card" data-state="${stateName}" data-session="${sid}"
-         draggable="${stateName !== 'completed'}"
+         draggable="${stateName !== 'completed' && !searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
          oncontextmenu="showContextMenu(event, '${sid}')">
       <div class="card-header">
@@ -413,7 +413,7 @@ function listItemHTML(s) {
 
   return `
     <div class="list-item" data-state="${stateName}" data-session="${sid}"
-         draggable="${stateName !== 'completed'}"
+         draggable="${stateName !== 'completed' && !searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
          oncontextmenu="showContextMenu(event, '${sid}')">
       <div class="state-dot"></div>
@@ -722,28 +722,29 @@ function formatTokens(tokens) {
   return String(total);
 }
 
+// Pricing per 1M tokens (USD)
+const MODEL_PRICING = {
+  opus: { input: 15, output: 75 },
+  sonnet: { input: 3, output: 15 },
+  haiku: { input: 0.25, output: 1.25 },
+};
+
+function getModelRate(model) {
+  if (!model) return MODEL_PRICING.sonnet;
+  const m = model.toLowerCase();
+  if (m.includes('opus')) return MODEL_PRICING.opus;
+  if (m.includes('haiku')) return MODEL_PRICING.haiku;
+  return MODEL_PRICING.sonnet;
+}
+
 function formatCost(tokens, model) {
   if (!tokens) return '—';
   const input = tokens.input || 0;
   const output = tokens.output || 0;
   if (input === 0 && output === 0) return '—';
 
-  // Pricing per 1M tokens (USD)
-  const pricing = {
-    'opus': { input: 15, output: 75 },
-    'sonnet': { input: 3, output: 15 },
-    'haiku': { input: 0.25, output: 1.25 },
-  };
-
-  let tier = pricing.sonnet; // default
-  if (model) {
-    const m = model.toLowerCase();
-    if (m.includes('opus')) tier = pricing.opus;
-    else if (m.includes('haiku')) tier = pricing.haiku;
-    else if (m.includes('sonnet')) tier = pricing.sonnet;
-  }
-
-  const cost = (input * tier.input + output * tier.output) / 1000000;
+  const rate = getModelRate(model);
+  const cost = (input * rate.input + output * rate.output) / 1000000;
   if (cost < 0.01) return '<$0.01';
   if (cost < 1) return `$${cost.toFixed(2)}`;
   return `$${cost.toFixed(1)}`;
@@ -852,7 +853,7 @@ function saveCurrentOrder() {
 
 function updateStatusBar() {
   const all = Array.from(sessions.values());
-  const active = all.filter(s => !['completed', 'idle'].includes(s.state.name));
+  const active = all.filter(s => s.state.name !== 'completed');
   const waiting = all.filter(s => s.state.name === 'waiting');
   const totalInput = all.reduce((sum, s) => sum + (s.tokens?.input || 0), 0);
   const totalOutput = all.reduce((sum, s) => sum + (s.tokens?.output || 0), 0);
@@ -861,10 +862,7 @@ function updateStatusBar() {
   for (const s of all) {
     const inp = s.tokens?.input || 0;
     const out = s.tokens?.output || 0;
-    const m = (s.model || '').toLowerCase();
-    let rate = { input: 3, output: 15 };
-    if (m.includes('opus')) rate = { input: 15, output: 75 };
-    else if (m.includes('haiku')) rate = { input: 0.25, output: 1.25 };
+    const rate = getModelRate(s.model);
     totalCost += (inp * rate.input + out * rate.output) / 1000000;
   }
 

@@ -59,6 +59,10 @@ function createWindow() {
   mainWindow.on('resize', saveBounds);
   mainWindow.on('move', saveBounds);
 
+  mainWindow.on('focus', () => {
+    if (process.platform === 'darwin') app.dock.setBadge('');
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -282,15 +286,24 @@ function setupTray() {
 
   updateTrayMenu();
 
-  // Update tray menu when sessions change (debounced)
+  // Update tray menu and dock badge when sessions change (debounced)
   let trayTimer;
-  const debouncedTrayUpdate = () => {
+  const debouncedUpdate = () => {
     if (trayTimer) clearTimeout(trayTimer);
-    trayTimer = setTimeout(updateTrayMenu, 300);
+    trayTimer = setTimeout(() => {
+      updateTrayMenu();
+      updateDockBadge();
+    }, 300);
   };
-  watcher.on('session-added', debouncedTrayUpdate);
-  watcher.on('session-updated', debouncedTrayUpdate);
-  watcher.on('session-removed', debouncedTrayUpdate);
+  watcher.on('session-added', debouncedUpdate);
+  watcher.on('session-updated', debouncedUpdate);
+  watcher.on('session-removed', debouncedUpdate);
+}
+
+function updateDockBadge() {
+  if (process.platform !== 'darwin') return;
+  const waiting = watcher.getSessions().filter(s => s.state.name === 'waiting').length;
+  app.dock.setBadge(waiting > 0 ? String(waiting) : '');
 }
 
 function updateTrayMenu() {

@@ -309,7 +309,8 @@ class SessionWatcher extends EventEmitter {
 
       // Determine state from last events
       // Key insight: the LAST event type tells us the current state
-      if (hasLastPrompt) {
+      // Only mark COMPLETED on last-prompt if the PID is actually dead
+      if (hasLastPrompt && (!session.pid || !this.isPidAlive(session.pid))) {
         session.state = STATES.COMPLETED;
       } else if (lastUser && lastAssistant &&
                  new Date(lastUser.timestamp) > new Date(lastAssistant.timestamp)) {
@@ -653,10 +654,18 @@ class SessionWatcher extends EventEmitter {
     const watcher = this.fileWatchers.get(sessionId);
     if (watcher) { watcher.close(); this.fileWatchers.delete(sessionId); }
     this.clearWaitingTimer(sessionId);
+    this.clearStuckTimer(sessionId);
     const idle = this.idleTimers.get(sessionId);
     if (idle) { clearTimeout(idle); this.idleTimers.delete(sessionId); }
+    this.lastNotifTime.delete(sessionId);
+    // Clean up file offsets for this session's JSONL
+    const jsonlPath = this.findJsonlPath(sessionId);
+    if (jsonlPath) this.fileOffsets.delete(jsonlPath);
     this.sessions.delete(sessionId);
-    if (this.config) this.config.deleteSession(sessionId);
+    if (this.config) {
+      this.config.deleteSession(sessionId);
+      this.config.setCustomName(sessionId, '');
+    }
     this.emit('session-removed', sessionId);
   }
 

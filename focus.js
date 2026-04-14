@@ -58,6 +58,21 @@ function focusMac(terminalApp, terminalId, pid, cwd) {
   return focusITerm2(pid, cwd);
 }
 
+function fallbackOpenNewTab(cwd) {
+  if (!cwd) return runAppleScript(`tell application "iTerm2" to activate`);
+  return runAppleScript(`
+    tell application "iTerm2"
+      activate
+      tell current window
+        create tab with default profile
+        tell current session
+          write text "cd ${escapeForAppleScript(cwd)}"
+        end tell
+      end tell
+    end tell
+  `);
+}
+
 function focusITerm2(pid, cwd) {
   // Fast strategy: find the TTY of the Claude PID (or its ancestors) in Node,
   // then tell iTerm2 to focus the session with that TTY directly.
@@ -88,10 +103,10 @@ function focusITerm2(pid, cwd) {
         end repeat
       end tell
     `;
-    return runAppleScript(script).catch(() => {});
+    return runAppleScript(script).catch(() => fallbackOpenNewTab(cwd));
   }
 
-  // Fallback: just activate iTerm2 (no specific session found)
+  // Fallback: activate iTerm2, open new tab if cwd known
   return runAppleScript(`tell application "iTerm2" to activate`).catch(() => {
     // Fallback: just activate iTerm2 or open new tab in project dir
     if (cwd) {

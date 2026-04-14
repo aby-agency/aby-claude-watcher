@@ -103,7 +103,13 @@ function setNotificationPrefs(sessionId, prefs) {
 function setCustomName(sessionId, name) {
   if (!config.customNames) config.customNames = {};
   if (name && name.trim()) {
-    config.customNames[sessionId] = name.trim();
+    // Strip control chars, cap length
+    const clean = name.trim().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 60);
+    if (clean) {
+      config.customNames[sessionId] = clean;
+    } else {
+      delete config.customNames[sessionId];
+    }
   } else {
     delete config.customNames[sessionId];
   }
@@ -144,6 +150,10 @@ function getSavedSessions() {
 function deleteSession(sessionId) {
   delete config.sessions[sessionId];
   delete config.notifications[sessionId];
+  if (config.customNames) delete config.customNames[sessionId];
+  if (Array.isArray(config.sessionOrder)) {
+    config.sessionOrder = config.sessionOrder.filter(id => id !== sessionId);
+  }
   save();
 }
 

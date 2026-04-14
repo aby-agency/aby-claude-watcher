@@ -211,7 +211,7 @@ async function init() {
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     // Cmd+1-9: focus nth active session
-    if (e.metaKey && e.key >= '1' && e.key <= '9') {
+    if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
       e.preventDefault();
       const sorted = getSortedSessions().filter(s => s.state.name !== 'completed');
       const idx = parseInt(e.key) - 1;
@@ -219,19 +219,19 @@ async function init() {
     }
 
     // Cmd+G: toggle grid/list view
-    if (e.metaKey && e.key === 'g') {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
       e.preventDefault();
       setView(viewMode === 'grid' ? 'compact' : 'grid');
     }
 
     // Cmd+P: toggle always-on-top (pin)
-    if (e.metaKey && e.key === 'p') {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
       e.preventDefault();
       togglePin();
     }
 
     // Cmd+F: toggle search
-    if (e.metaKey && e.key === 'f') {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
       e.preventDefault();
       const search = document.getElementById('searchInput');
       if (search.style.display === 'none') {
@@ -246,7 +246,7 @@ async function init() {
     }
 
     // Cmd+? or Cmd+/: show shortcuts
-    if (e.metaKey && (e.key === '?' || e.key === '/')) {
+    if ((e.metaKey || e.ctrlKey) && (e.key === '?' || e.key === '/')) {
       e.preventDefault();
       document.getElementById('shortcutsModal').style.display = 'flex';
     }
@@ -635,7 +635,7 @@ async function toggleNotifDropdown(event, sessionId) {
   closeDropdown();
 
   const btn = event.currentTarget;
-  const card = btn.closest('.card') || btn.closest('.list-item');
+  const card = btn.closest('.card, .compact-item');
   if (!card) return;
 
   const prefs = await window.api.getNotificationPrefs(sessionId);

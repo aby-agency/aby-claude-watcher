@@ -66,6 +66,11 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    // On non-macOS, close the popover too (otherwise window-all-closed never fires)
+    if (process.platform !== 'darwin' && popoverWindow && !popoverWindow.isDestroyed()) {
+      popoverWindow.destroy();
+      popoverWindow = null;
+    }
   });
 }
 
@@ -191,9 +196,16 @@ function setupIPC() {
   });
 
   ipcMain.handle('open-remote', (_, url) => {
-    if (url && (url.startsWith('https://claude.ai/') || url.startsWith('https://') && url.includes('anthropic'))) {
-      shell.openExternal(url);
-    }
+    if (!url || typeof url !== 'string') return;
+    try {
+      const u = new URL(url);
+      if (u.protocol !== 'https:') return;
+      const host = u.hostname.toLowerCase();
+      if (host === 'claude.ai' || host.endsWith('.claude.ai') ||
+          host === 'anthropic.com' || host.endsWith('.anthropic.com')) {
+        shell.openExternal(url);
+      }
+    } catch {}
   });
 
   ipcMain.handle('remove-session', (_, sessionId) => {
@@ -312,7 +324,12 @@ function createPopoverWindow() {
   });
 }
 
+let popoverToggleLock = false;
 function togglePopover() {
+  if (popoverToggleLock) return;
+  popoverToggleLock = true;
+  setTimeout(() => { popoverToggleLock = false; }, 200);
+
   if (!popoverWindow || popoverWindow.isDestroyed()) createPopoverWindow();
 
   if (popoverWindow.isVisible()) {
@@ -429,4 +446,5 @@ app.on('will-quit', () => {
   config.saveSync();
   if (watcher) watcher.stop();
   if (socketServer) socketServer.stop();
+  if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.destroy();
 });

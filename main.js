@@ -6,6 +6,7 @@ const { focusTerminal, resumeSession, launchSession } = require('./focus');
 const config = require('./config');
 
 let mainWindow;
+let popoverWindow;
 let watcher;
 let socketServer;
 let tray;
@@ -153,6 +154,10 @@ function setupIPC() {
     config.setViewMode(mode);
   });
 
+  ipcMain.handle('set-compact-mode', (_, value) => {
+    config.setCompactMode(value);
+  });
+
   ipcMain.handle('set-always-on-top', (_, value) => {
     config.setAlwaysOnTop(value);
     if (mainWindow) mainWindow.setAlwaysOnTop(value);
@@ -172,6 +177,17 @@ function setupIPC() {
 
   ipcMain.handle('set-session-order', (_, order) => {
     config.setSessionOrder(order);
+  });
+
+  ipcMain.handle('set-custom-name', (_, sessionId, name) => {
+    config.setCustomName(sessionId, name);
+    const session = watcher.getSessions().find(s => s.sessionId === sessionId);
+    if (session) {
+      sendToRenderer('session-updated', serializeSession(session));
+      if (popoverWindow && !popoverWindow.isDestroyed()) {
+        popoverWindow.webContents.send('popover-update');
+      }
+    }
   });
 
   ipcMain.handle('open-remote', (_, url) => {
@@ -197,22 +213,41 @@ function setupIPC() {
   ipcMain.handle('set-volume', (_, value) => {
     config.setVolume(value);
   });
+
+  ipcMain.handle('set-notif-position', (_, value) => {
+    config.setNotifPosition(value);
+  });
+
+  ipcMain.handle('popover-hide', () => {
+    if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.hide();
+  });
+
+  ipcMain.handle('popover-open-main', () => {
+    if (!mainWindow) createWindow();
+    else mainWindow.show();
+    mainWindow.focus();
+  });
+
+  ipcMain.handle('popover-quit', () => {
+    app.quit();
+  });
 }
 
 function serializeSession(session) {
   return {
     sessionId: session.sessionId,
     projectName: session.projectName,
+    customName: config.getCustomName(session.sessionId),
     slug: session.slug,
     state: session.state,
     lastTool: session.lastTool,
     model: session.model,
-    lastMessage: session.lastMessage || null,
     gitBranch: session.gitBranch || null,
     startedAt: session.startedAt,
     endedAt: session.endedAt,
     tokens: session.tokens,
     remoteUrl: session.remoteUrl || null,
+    maybeStuck: session.maybeStuck || false,
     cwd: session.cwd,
   };
 }
@@ -238,6 +273,7 @@ app.whenReady().then(() => {
   setupWatcher();
   setupSocket();
   setupTray();
+  createPopoverWindow();
 
   app.on('activate', () => {
     if (!mainWindow) createWindow();
@@ -249,6 +285,52 @@ app.on('window-all-closed', () => {
   // On macOS, keep running in tray when window is closed
   if (process.platform !== 'darwin') app.quit();
 });
+
+function createPopoverWindow() {
+  popoverWindow = new BrowserWindow({
+    width: 320,
+    height: 360,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    transparent: true,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-popover.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  popoverWindow.loadFile(path.join(__dirname, 'ui', 'popover.html'));
+
+  popoverWindow.on('blur', () => {
+    if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.hide();
+  });
+}
+
+function togglePopover() {
+  if (!popoverWindow || popoverWindow.isDestroyed()) createPopoverWindow();
+
+  if (popoverWindow.isVisible()) {
+    popoverWindow.hide();
+    return;
+  }
+
+  // Position below the tray icon
+  const trayBounds = tray.getBounds();
+  const winBounds = popoverWindow.getBounds();
+  const x = Math.round(trayBounds.x + (trayBounds.width / 2) - (winBounds.width / 2));
+  const y = Math.round(trayBounds.y + trayBounds.height + 4);
+  popoverWindow.setPosition(x, y, false);
+  popoverWindow.show();
+  popoverWindow.focus();
+  // Force refresh on open
+  popoverWindow.webContents.send('popover-update');
+}
 
 function generateTrayIcon() {
   // 32x32 retina icon (displayed as 16x16) — monitor with clock
@@ -303,14 +385,8 @@ function setupTray() {
   tray = new Tray(icon);
   tray.setToolTip('Claude Watch');
 
-  tray.on('click', () => {
-    if (mainWindow && mainWindow.isVisible()) {
-      mainWindow.hide();
-    } else {
-      if (!mainWindow) createWindow();
-      else mainWindow.show();
-    }
-  });
+  tray.on('click', togglePopover);
+  tray.on('right-click', togglePopover);
 
   updateTrayMenu();
 
@@ -321,6 +397,10 @@ function setupTray() {
     trayTimer = setTimeout(() => {
       updateTrayMenu();
       updateDockBadge();
+      // Always send updates (popover might be hidden but still subscribed)
+      if (popoverWindow && !popoverWindow.isDestroyed()) {
+        popoverWindow.webContents.send('popover-update');
+      }
     }, 300);
   };
   watcher.on('session-added', debouncedUpdate);
@@ -338,49 +418,6 @@ function updateTrayMenu() {
   if (!tray) return;
 
   const sessions = watcher.getSessions();
-  const stateEmoji = {
-    thinking: '🟣',
-    running: '🟢',
-    waiting: '🔵',
-    idle: '⚪',
-    error: '🔴',
-    completed: '⏹',
-  };
-
-  const sessionItems = sessions
-    .filter(s => s.state.name !== 'completed')
-    .map(s => ({
-      label: `${stateEmoji[s.state.name] || '⚪'} ${s.projectName} — ${s.state.label}`,
-      click: () => {
-        focusTerminal(s);
-      },
-    }));
-
-  const completedCount = sessions.filter(s => s.state.name === 'completed').length;
-
-  const template = [
-    ...sessionItems,
-    ...(sessionItems.length === 0 ? [{ label: 'Aucune session active', enabled: false }] : []),
-    ...(completedCount > 0 ? [{ label: `${completedCount} terminée${completedCount > 1 ? 's' : ''}`, enabled: false }] : []),
-    { type: 'separator' },
-    {
-      label: mainWindow && mainWindow.isVisible() ? 'Masquer la fenêtre' : 'Afficher la fenêtre',
-      click: () => {
-        if (mainWindow && mainWindow.isVisible()) {
-          mainWindow.hide();
-        } else {
-          if (!mainWindow) createWindow();
-          else mainWindow.show();
-        }
-      },
-    },
-    { type: 'separator' },
-    { label: 'Quitter', click: () => app.quit() },
-  ];
-
-  tray.setContextMenu(Menu.buildFromTemplate(template));
-
-  // Update tooltip with summary
   const activeCount = sessions.filter(s => s.state.name !== 'completed').length;
   const waitingCount = sessions.filter(s => s.state.name === 'waiting').length;
   let tooltip = `Claude Watch — ${activeCount} active`;

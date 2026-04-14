@@ -10,27 +10,41 @@
 
   <!-- Toolbar -->
   <div class="toolbar">
-    <div class="toolbar-logo">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-      </svg>
-      Claude Watch
+    <div class="filter-chips status-filter">
+      <button class="filter-chip" data-filter="active" title="Actives">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      </button>
+      <button class="filter-chip" data-filter="waiting" title="En attente">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </button>
+      <button class="filter-chip" data-filter="completed" title="Terminées">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6 9 17l-5-5"/>
+        </svg>
+      </button>
+      <button class="filter-clear" id="btnClearFilters" title="Tout afficher" style="display:none;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+        </svg>
+      </button>
     </div>
-
-    <span class="session-count" id="sessionCount">0 sessions</span>
     <input type="text" class="search-input" id="searchInput" placeholder="Rechercher..." style="display:none;">
 
     <div class="toolbar-spacer"></div>
 
-    <div class="toolbar-group">
-      <button class="toolbar-btn active" id="btnGrid" title="Vue grille">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <div class="filter-segmented view-segmented">
+      <button class="filter-seg active" id="btnGrid" title="Vue grille">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
         </svg>
       </button>
-      <button class="toolbar-btn" id="btnList" title="Vue liste">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+      <button class="filter-seg" id="btnCompact" title="Vue compacte">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="18" x2="20" y2="18"/>
         </svg>
       </button>
     </div>
@@ -41,11 +55,15 @@
           <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
         </svg>
       </button>
-      <button class="toolbar-btn toolbar-btn-text" id="btnAdd" title="Ajouter une session">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <button class="toolbar-btn" id="btnAdd" title="Ajouter une session">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>
         </svg>
-        Ajouter
+      </button>
+      <button class="toolbar-btn" id="btnShortcuts" title="Raccourcis clavier">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
       </button>
       <button class="toolbar-btn" id="btnSettings" title="Paramètres">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -60,13 +78,24 @@
   <div class="content" id="content">
     <div class="empty-state" id="emptyState">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
       </svg>
-      <p>Aucune session Claude Code active</p>
-      <p class="hint">Les sessions seront détectées automatiquement</p>
+      <p>Aucune session Claude Code</p>
+      <p class="hint">Lancez <code>claude</code> dans un terminal ou utilisez le bouton +</p>
+    </div>
+    <div class="empty-state" id="emptyFiltered" style="display:none;">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <p>Aucun résultat</p>
+      <p class="hint">Essayez de modifier vos filtres ou votre recherche</p>
+      <button class="empty-action" id="btnClearAllFilters">Réinitialiser</button>
     </div>
     <div class="grid-view" id="gridView" style="display:none;"></div>
-    <div class="list-view" id="listView" style="display:none;"></div>
+    <div class="compact-view" id="compactView" style="display:none;"></div>
   </div>
 
   <!-- Notification overlay -->
@@ -80,6 +109,19 @@
       <div class="modal-actions">
         <button id="addCancel">Annuler</button>
         <button class="primary" id="addConfirm">Ajouter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename modal (hidden) -->
+  <div class="modal-backdrop" id="renameModal" style="display:none;">
+    <div class="modal">
+      <h3>Renommer la session</h3>
+      <input type="text" id="renameInput" placeholder="Nom personnalisé">
+      <div class="modal-actions">
+        <button id="renameReset">Réinitialiser</button>
+        <button id="renameCancel">Annuler</button>
+        <button class="primary" id="renameConfirm">Renommer</button>
       </div>
     </div>
   </div>
@@ -120,6 +162,24 @@
           Tester le son
         </button>
       </div>
+
+      <div class="settings-section">
+        <div class="settings-label">Position des notifications</div>
+        <div class="notif-position-grid">
+          <button class="position-btn" data-position="top-left" title="Haut gauche">
+            <span class="position-indicator" data-pos="top-left"></span>
+          </button>
+          <button class="position-btn" data-position="top-right" title="Haut droite">
+            <span class="position-indicator" data-pos="top-right"></span>
+          </button>
+          <button class="position-btn" data-position="bottom-left" title="Bas gauche">
+            <span class="position-indicator" data-pos="bottom-left"></span>
+          </button>
+          <button class="position-btn" data-position="bottom-right" title="Bas droite">
+            <span class="position-indicator" data-pos="bottom-right"></span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -130,8 +190,6 @@
     <span class="status-item" id="statWaiting">0 en attente</span>
     <span class="status-sep">&middot;</span>
     <span class="status-item" id="statTokens">0 tokens</span>
-    <span class="status-sep">&middot;</span>
-    <span class="status-item" id="statCost">$0.00</span>
   </div>
 
   <!-- Shortcuts modal -->

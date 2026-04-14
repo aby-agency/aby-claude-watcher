@@ -14,26 +14,32 @@ const ICONS = {
   focus: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>`,
   play: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
   globe: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>`,
+  alertTriangle: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  copy: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  edit: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
+  moreVertical: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>`,
 };
 
 const sessions = new Map();
-let viewMode = 'grid';
+let viewMode = 'grid'; // 'grid' | 'compact'
 let alwaysOnTop = false;
 let volume = 0.7;
+let notifPosition = 'top-right';
 let openDropdown = null;
 let searchQuery = '';
 let sessionOrder = []; // User-defined order of session IDs
 let draggedId = null;
+let activeFilters = new Set(); // empty = all visible, or: 'active', 'waiting', 'completed'
 
 // ═══ DOM refs ═══
 
 const $content = document.getElementById('content');
 const $emptyState = document.getElementById('emptyState');
+const $emptyFiltered = document.getElementById('emptyFiltered');
 const $gridView = document.getElementById('gridView');
-const $listView = document.getElementById('listView');
-const $sessionCount = document.getElementById('sessionCount');
+const $compactView = document.getElementById('compactView');
 const $btnGrid = document.getElementById('btnGrid');
-const $btnList = document.getElementById('btnList');
+const $btnCompact = document.getElementById('btnCompact');
 const $btnPin = document.getElementById('btnPin');
 const $btnAdd = document.getElementById('btnAdd');
 const $addModal = document.getElementById('addModal');
@@ -53,12 +59,17 @@ const $btnTestSound = document.getElementById('btnTestSound');
 async function init() {
   const config = await window.api.getConfig();
   viewMode = config.viewMode || 'grid';
+  // Migration: old 'list' → 'compact'
+  if (viewMode === 'list' || config.compactMode) viewMode = 'compact';
+  if (viewMode !== 'grid' && viewMode !== 'compact') viewMode = 'grid';
   alwaysOnTop = config.alwaysOnTop || false;
   volume = config.volume ?? 0.7;
+  notifPosition = config.notifPosition || 'top-right';
   sessionOrder = config.sessionOrder || [];
 
   updateViewToggle();
   updatePinButton();
+  updateNotifPosition();
   $volumeSlider.value = Math.round(volume * 100);
   $volumeValue.textContent = `${Math.round(volume * 100)}%`;
 
@@ -94,11 +105,55 @@ async function init() {
 
   // Toolbar
   $btnGrid.addEventListener('click', () => setView('grid'));
-  $btnList.addEventListener('click', () => setView('list'));
+  $btnCompact.addEventListener('click', () => setView('compact'));
+
+  // Status filter chips (multi-select)
+  document.querySelectorAll('.status-filter .filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const filter = chip.dataset.filter;
+      if (activeFilters.has(filter)) {
+        activeFilters.delete(filter);
+      } else {
+        activeFilters.add(filter);
+      }
+      updateFilterPills();
+      render();
+    });
+  });
+
+  // Clear filters button
+  document.getElementById('btnClearFilters').addEventListener('click', () => {
+    activeFilters.clear();
+    updateFilterPills();
+    render();
+  });
+
+  // Clear all (filters + search) from empty state
+  document.getElementById('btnClearAllFilters').addEventListener('click', () => {
+    activeFilters.clear();
+    searchQuery = '';
+    const search = document.getElementById('searchInput');
+    search.value = '';
+    search.style.display = 'none';
+    updateFilterPills();
+    render();
+  });
   $btnPin.addEventListener('click', togglePin);
   $btnAdd.addEventListener('click', () => $addModal.style.display = 'flex');
   $addCancel.addEventListener('click', closeAddModal);
   $addConfirm.addEventListener('click', confirmAdd);
+
+  // Rename modal
+  document.getElementById('renameConfirm').addEventListener('click', confirmRename);
+  document.getElementById('renameCancel').addEventListener('click', closeRenameModal);
+  document.getElementById('renameReset').addEventListener('click', resetRename);
+  document.getElementById('renameInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmRename();
+    if (e.key === 'Escape') closeRenameModal();
+  });
+  document.getElementById('renameModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('renameModal')) closeRenameModal();
+  });
   $addInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') confirmAdd();
     if (e.key === 'Escape') closeAddModal();
@@ -123,9 +178,15 @@ async function init() {
   });
   $btnTestSound.addEventListener('click', () => playNotificationSound());
 
+  // Notification position picker
+  document.querySelectorAll('.position-btn').forEach(btn => {
+    btn.addEventListener('click', () => setNotifPosition(btn.dataset.position));
+  });
+
   // Shortcuts modal
   const $shortcutsModal = document.getElementById('shortcutsModal');
   const $shortcutsClose = document.getElementById('shortcutsClose');
+  document.getElementById('btnShortcuts').addEventListener('click', () => $shortcutsModal.style.display = 'flex');
   $shortcutsClose.addEventListener('click', () => $shortcutsModal.style.display = 'none');
   $shortcutsModal.addEventListener('click', (e) => {
     if (e.target === $shortcutsModal) $shortcutsModal.style.display = 'none';
@@ -160,7 +221,7 @@ async function init() {
     // Cmd+G: toggle grid/list view
     if (e.metaKey && e.key === 'g') {
       e.preventDefault();
-      setView(viewMode === 'grid' ? 'list' : 'grid');
+      setView(viewMode === 'grid' ? 'compact' : 'grid');
     }
 
     // Cmd+P: toggle always-on-top (pin)
@@ -194,6 +255,7 @@ async function init() {
     if (e.key === 'Escape') {
       closeDropdown();
       closeAddModal();
+      closeRenameModal();
       const settingsModal = document.getElementById('settingsModal');
       if (settingsModal) settingsModal.style.display = 'none';
       const shortcutsModal = document.getElementById('shortcutsModal');
@@ -216,7 +278,7 @@ function setView(mode) {
 
 function updateViewToggle() {
   $btnGrid.classList.toggle('active', viewMode === 'grid');
-  $btnList.classList.toggle('active', viewMode === 'list');
+  $btnCompact.classList.toggle('active', viewMode === 'compact');
 }
 
 function togglePin() {
@@ -229,16 +291,43 @@ function updatePinButton() {
   $btnPin.classList.toggle('active', alwaysOnTop);
 }
 
+
+function updateFilterPills() {
+  document.querySelectorAll('.status-filter .filter-chip').forEach(p => {
+    p.classList.toggle('active', activeFilters.has(p.dataset.filter));
+  });
+  const clearBtn = document.getElementById('btnClearFilters');
+  clearBtn.style.display = activeFilters.size > 0 ? 'inline-flex' : 'none';
+}
+
+function updateNotifPosition() {
+  $notificationOverlay.setAttribute('data-position', notifPosition);
+  document.querySelectorAll('.position-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.position === notifPosition);
+  });
+}
+
+function setNotifPosition(pos) {
+  notifPosition = pos;
+  window.api.setNotifPosition(pos);
+  updateNotifPosition();
+}
+
 // ═══ Rendering ═══
 
 function render() {
   const count = sessions.size;
-  $sessionCount.textContent = `${count} session${count !== 1 ? 's' : ''}`;
+  const filtersActive = activeFilters.size > 0 || searchQuery;
+  const visibleCount = getSortedSessions().length;
 
-  const hasItems = count > 0;
-  $emptyState.style.display = hasItems ? 'none' : 'flex';
-  $gridView.style.display = hasItems && viewMode === 'grid' ? 'grid' : 'none';
-  $listView.style.display = hasItems && viewMode === 'list' ? 'flex' : 'none';
+  const showNoSessions = count === 0;
+  const showNoResults = count > 0 && visibleCount === 0;
+  const showItems = visibleCount > 0;
+
+  $emptyState.style.display = showNoSessions ? 'flex' : 'none';
+  $emptyFiltered.style.display = showNoResults ? 'flex' : 'none';
+  $gridView.style.display = showItems && viewMode === 'grid' ? 'grid' : 'none';
+  $compactView.style.display = showItems && viewMode === 'compact' ? 'flex' : 'none';
 
   // Full rebuild — used for initial load, view switch, add/remove
   fullRender();
@@ -247,14 +336,14 @@ function render() {
 
 function fullRender() {
   const sorted = getSortedSessions();
-  const container = viewMode === 'grid' ? $gridView : $listView;
-  const htmlFn = viewMode === 'grid' ? cardHTML : listItemHTML;
+  const container = viewMode === 'grid' ? $gridView : $compactView;
+  const htmlFn = viewMode === 'grid' ? cardHTML : compactItemHTML;
   container.innerHTML = sorted.map(s => htmlFn(s)).join('');
 }
 
 function updateSession(s) {
   // Targeted update: find the existing element and patch it in place
-  const container = viewMode === 'grid' ? $gridView : $listView;
+  const container = viewMode === 'grid' ? $gridView : $compactView;
   const selector = `[data-session="${s.sessionId}"]`;
   const existing = container.querySelector(selector);
 
@@ -274,30 +363,29 @@ function updateSession(s) {
   }
 
   // Patch in place — replace the element's HTML
-  const htmlFn = viewMode === 'grid' ? cardHTML : listItemHTML;
+  const htmlFn = viewMode === 'grid' ? cardHTML : compactItemHTML;
   const temp = document.createElement('div');
   temp.innerHTML = htmlFn(s);
   const newEl = temp.firstElementChild;
+
+  // Trigger state-changed animation if state actually changed
+  if (oldState !== stateName) {
+    newEl.classList.add('state-changed');
+    setTimeout(() => newEl.classList.remove('state-changed'), 800);
+  }
+
   existing.replaceWith(newEl);
 
-  // Update session count
-  $sessionCount.textContent = `${sessions.size} session${sessions.size !== 1 ? 's' : ''}`;
   updateStatusBar();
 }
 
 function removeSessionFromDOM(sessionId) {
-  for (const container of [$gridView, $listView]) {
+  for (const container of [$gridView, $compactView]) {
     const el = container.querySelector(`[data-session="${sessionId}"]`);
     if (el) el.remove();
   }
-  const count = sessions.size;
-  $sessionCount.textContent = `${count} session${count !== 1 ? 's' : ''}`;
-  if (count === 0) {
-    $emptyState.style.display = 'flex';
-    $gridView.style.display = 'none';
-    $listView.style.display = 'none';
-  }
-  updateStatusBar();
+  // Re-render empty states if needed
+  render();
 }
 
 function getSortedSessions() {
@@ -310,6 +398,17 @@ function getSortedSessions() {
       (s.slug || '').toLowerCase().includes(searchQuery) ||
       (s.gitBranch || '').toLowerCase().includes(searchQuery)
     );
+  }
+
+  // Filter by active filter pills (multi-select, OR logic)
+  if (activeFilters.size > 0) {
+    arr = arr.filter(s => {
+      const name = s.state.name;
+      if (activeFilters.has('active') && (name === 'running' || name === 'thinking')) return true;
+      if (activeFilters.has('waiting') && name === 'waiting') return true;
+      if (activeFilters.has('completed') && name === 'completed') return true;
+      return false;
+    });
   }
 
 
@@ -347,11 +446,15 @@ function cardHTML(s) {
     <div class="card" data-state="${stateName}" data-session="${sid}"
          draggable="${stateName !== 'completed' && !searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
-         oncontextmenu="showContextMenu(event, '${sid}')">
+         oncontextmenu="showContextMenu(event, '${sid}')"
+         ondblclick="handleFocus('${sid}')">
       <div class="card-header">
         <div class="card-title">
-          <div class="project-name">${esc(s.projectName)}</div>
-          <div class="session-slug">${esc(s.slug || s.sessionId.slice(0, 8))}</div>
+          <div class="project-name">${esc(s.customName || s.projectName)}</div>
+          <div class="session-slug" onclick="handleCopyId('${sid}', event)" title="Copier le session ID">
+            ${esc(s.slug || s.sessionId.slice(0, 8))}
+            <span class="copy-icon">${ICONS.copy}</span>
+          </div>
         </div>
         <div class="card-actions">
           <button class="card-btn" onclick="toggleNotifDropdown(event, '${sid}')" title="Notifications">
@@ -369,13 +472,16 @@ function cardHTML(s) {
           <button class="card-btn" onclick="handleRemove('${sid}')" title="Supprimer">
             ${ICONS.x}
           </button>` : ''}
+          <button class="card-btn" onclick="showContextMenu(event, '${sid}')" title="Plus d'options">
+            ${ICONS.moreVertical}
+          </button>
         </div>
       </div>
       <div class="state-badge ${stateName}">
-        <span class="dot"></span>
+        ${(stateName === 'running' || stateName === 'thinking') ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
         ${stateLabel}
+        ${s.maybeStuck ? `<span class="stuck-hint" title="Possible action requise">${ICONS.alertTriangle}</span>` : ''}
       </div>
-      ${s.lastMessage ? `<div class="card-preview">${esc(s.lastMessage)}</div>` : ''}
       <div class="card-details">
         <div class="detail">
           <span class="detail-label">Outil</span>
@@ -390,10 +496,6 @@ function cardHTML(s) {
           <span class="detail-value">${tokens}</span>
         </div>
         <div class="detail">
-          <span class="detail-label">Coût</span>
-          <span class="detail-value">${formatCost(s.tokens, s.model)}</span>
-        </div>
-        <div class="detail">
           <span class="detail-label">Modèle</span>
           <span class="detail-value">${formatModel(s.model)}</span>
         </div>
@@ -406,21 +508,20 @@ function cardHTML(s) {
   `;
 }
 
-function listItemHTML(s) {
+function compactItemHTML(s) {
   const stateName = s.state.name;
-  const duration = formatDuration(s.startedAt);
   const sid = escAttr(s.sessionId);
+  const isActive = stateName === 'running' || stateName === 'thinking';
 
   return `
-    <div class="list-item" data-state="${stateName}" data-session="${sid}"
+    <div class="compact-item" data-state="${stateName}" data-session="${sid}"
          draggable="${stateName !== 'completed' && !searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
-         oncontextmenu="showContextMenu(event, '${sid}')">
-      <div class="state-dot"></div>
-      <div class="project-name">${esc(s.projectName)}</div>
-      <span class="last-tool">${(stateName === 'running' || stateName === 'thinking') ? toolPill(s.lastTool) : toolPill(null)}</span>
-      <span class="duration ${stateName !== 'completed' ? 'duration-value' : ''}" ${stateName !== 'completed' ? `data-started="${s.startedAt}"` : ''}>${stateName === 'completed' && s.endedAt ? formatDuration(s.startedAt, s.endedAt) : duration}</span>
-      <div class="list-actions">
+         oncontextmenu="showContextMenu(event, '${sid}')"
+         ondblclick="handleFocus('${sid}')">
+      ${isActive ? '<span class="compact-spinner"></span>' : '<span class="compact-dot"></span>'}
+      <div class="project-name">${esc(s.customName || s.projectName)}</div>
+      <div class="compact-actions">
         <button class="card-btn" onclick="event.stopPropagation(); handleFocus('${sid}')" title="Focus terminal">
           ${ICONS.terminal}
         </button>
@@ -436,6 +537,9 @@ function listItemHTML(s) {
         <button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="Supprimer">
           ${ICONS.x}
         </button>` : ''}
+        <button class="card-btn" onclick="event.stopPropagation(); showContextMenu(event, '${sid}')" title="Plus d'options">
+          ${ICONS.moreVertical}
+        </button>
       </div>
     </div>
   `;
@@ -466,6 +570,56 @@ function handleResume(sessionId) {
 
 function handleOpenRemote(url) {
   window.api.openRemote(url);
+}
+
+// ═══ Rename session ═══
+
+let renamingId = null;
+
+function renameSession(sessionId) {
+  const s = sessions.get(sessionId);
+  if (!s) return;
+  renamingId = sessionId;
+  const modal = document.getElementById('renameModal');
+  const input = document.getElementById('renameInput');
+  input.value = s.customName || s.projectName;
+  input.placeholder = s.projectName;
+  modal.style.display = 'flex';
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+
+function confirmRename() {
+  if (!renamingId) return;
+  const s = sessions.get(renamingId);
+  const input = document.getElementById('renameInput');
+  const name = input.value.trim();
+  // If empty or matches project name, clear custom name
+  const nameToSet = (!name || (s && name === s.projectName)) ? '' : name;
+  window.api.setCustomName(renamingId, nameToSet);
+  closeRenameModal();
+}
+
+function resetRename() {
+  if (!renamingId) return;
+  window.api.setCustomName(renamingId, '');
+  closeRenameModal();
+}
+
+function closeRenameModal() {
+  document.getElementById('renameModal').style.display = 'none';
+  renamingId = null;
+}
+
+// ═══ Copy session ID ═══
+
+function handleCopyId(sessionId, event) {
+  event.stopPropagation();
+  navigator.clipboard.writeText(sessionId).then(() => {
+    const el = event.currentTarget;
+    const original = el.innerHTML;
+    el.innerHTML = `<span style="color: var(--state-running)">✓ Copié</span>`;
+    setTimeout(() => { el.innerHTML = original; }, 1200);
+  }).catch(() => {});
 }
 
 // ═══ Remove session ═══
@@ -722,34 +876,6 @@ function formatTokens(tokens) {
   return String(total);
 }
 
-// Pricing per 1M tokens (USD)
-const MODEL_PRICING = {
-  opus: { input: 15, output: 75 },
-  sonnet: { input: 3, output: 15 },
-  haiku: { input: 0.25, output: 1.25 },
-};
-
-function getModelRate(model) {
-  if (!model) return MODEL_PRICING.sonnet;
-  const m = model.toLowerCase();
-  if (m.includes('opus')) return MODEL_PRICING.opus;
-  if (m.includes('haiku')) return MODEL_PRICING.haiku;
-  return MODEL_PRICING.sonnet;
-}
-
-function formatCost(tokens, model) {
-  if (!tokens) return '—';
-  const input = tokens.input || 0;
-  const output = tokens.output || 0;
-  if (input === 0 && output === 0) return '—';
-
-  const rate = getModelRate(model);
-  const cost = (input * rate.input + output * rate.output) / 1000000;
-  if (cost < 0.01) return '<$0.01';
-  if (cost < 1) return `$${cost.toFixed(2)}`;
-  return `$${cost.toFixed(1)}`;
-}
-
 function esc(str) {
   if (!str) return '';
   const div = document.createElement('div');
@@ -838,7 +964,7 @@ function onDragEnd(e) {
 }
 
 function saveCurrentOrder() {
-  const container = viewMode === 'grid' ? $gridView : $listView;
+  const container = viewMode === 'grid' ? $gridView : $compactView;
   const items = container.querySelectorAll('[data-session]');
   sessionOrder = Array.from(items)
     .map(el => el.dataset.session)
@@ -858,18 +984,17 @@ function updateStatusBar() {
   const totalInput = all.reduce((sum, s) => sum + (s.tokens?.input || 0), 0);
   const totalOutput = all.reduce((sum, s) => sum + (s.tokens?.output || 0), 0);
 
-  let totalCost = 0;
-  for (const s of all) {
-    const inp = s.tokens?.input || 0;
-    const out = s.tokens?.output || 0;
-    const rate = getModelRate(s.model);
-    totalCost += (inp * rate.input + out * rate.output) / 1000000;
-  }
+  // Show filtered count when filters are active
+  const filtersActive = activeFilters.size > 0 || searchQuery;
+  const visibleCount = filtersActive ? getSortedSessions().length : all.length;
 
-  document.getElementById('statActive').textContent = `${active.length} active${active.length !== 1 ? 's' : ''}`;
+  const activeLabel = filtersActive
+    ? `${visibleCount}/${all.length} affichées`
+    : `${active.length} active${active.length !== 1 ? 's' : ''}`;
+
+  document.getElementById('statActive').textContent = activeLabel;
   document.getElementById('statWaiting').textContent = `${waiting.length} en attente`;
   document.getElementById('statTokens').textContent = `${formatTokens({ input: totalInput, output: totalOutput })} tokens`;
-  document.getElementById('statCost').textContent = totalCost < 0.01 ? '$0.00' : `$${totalCost.toFixed(2)}`;
 }
 
 // ═══ Context menu ═══
@@ -885,6 +1010,7 @@ function showContextMenu(e, sessionId) {
 
   let items = `
     <div class="context-menu-item" onclick="handleFocus('${sid}'); hideContextMenu();">${ICONS.terminal} Focus terminal</div>
+    <div class="context-menu-item" onclick="renameSession('${sid}'); hideContextMenu();">${ICONS.edit} Renommer</div>
   `;
   if (s.remoteUrl) {
     items += `<div class="context-menu-item" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}'); hideContextMenu();">${ICONS.globe} Ouvrir remote</div>`;

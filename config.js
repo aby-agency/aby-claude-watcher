@@ -12,10 +12,12 @@ let config = {
   sessions: {},         // { [sessionId]: { serialized session data } }
   viewMode: 'grid',     // 'grid' | 'list'
   alwaysOnTop: false,
+  compactMode: false,
+  notifPosition: 'top-right',  // 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
   volume: 0.7,          // 0.0 - 1.0
   windowBounds: null,   // { x, y, width, height }
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
-  cleanupDays: 7,
+  customNames: {},      // { [sessionId]: "Custom name" }
 };
 
 function load() {
@@ -66,6 +68,11 @@ function setViewMode(mode) {
   save();
 }
 
+function setCompactMode(value) {
+  config.compactMode = value;
+  save();
+}
+
 function setAlwaysOnTop(value) {
   config.alwaysOnTop = value;
   save();
@@ -73,6 +80,11 @@ function setAlwaysOnTop(value) {
 
 function setVolume(value) {
   config.volume = Math.max(0, Math.min(1, value));
+  save();
+}
+
+function setNotifPosition(value) {
+  config.notifPosition = value;
   save();
 }
 
@@ -86,6 +98,20 @@ function setNotificationPrefs(sessionId, prefs) {
     ...prefs,
   };
   save();
+}
+
+function setCustomName(sessionId, name) {
+  if (!config.customNames) config.customNames = {};
+  if (name && name.trim()) {
+    config.customNames[sessionId] = name.trim();
+  } else {
+    delete config.customNames[sessionId];
+  }
+  save();
+}
+
+function getCustomName(sessionId) {
+  return (config.customNames && config.customNames[sessionId]) || null;
 }
 
 function setSessionOrder(order) {
@@ -126,10 +152,14 @@ module.exports = {
   save,
   get,
   setViewMode,
+  setCompactMode,
   setAlwaysOnTop,
   setVolume,
+  setNotifPosition,
   getNotificationPrefs,
   setNotificationPrefs,
+  setCustomName,
+  getCustomName,
   setSessionOrder,
   getSessionOrder,
   setWindowBounds,

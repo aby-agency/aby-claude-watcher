@@ -1,0 +1,89 @@
+// Popover mini-view — shows active sessions in a compact list
+
+const STATE_COLORS = {
+  thinking: '#a78bfa',
+  running: '#22c55e',
+  waiting: '#3b82f6',
+  idle: '#94a3b8',
+  error: '#ef4444',
+  completed: '#4b5563',
+};
+
+function esc(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function renderPopover(sessions, config) {
+  const $list = document.getElementById('popList');
+  const $header = document.getElementById('popHeader');
+
+  const customNames = (config && config.customNames) || {};
+  const sessionOrder = (config && config.sessionOrder) || [];
+
+  const active = sessions.filter(s => s.state.name !== 'completed');
+
+  $header.textContent = `${active.length} session${active.length !== 1 ? 's' : ''}`;
+
+  if (active.length === 0) {
+    $list.innerHTML = '<div class="popover-empty">Aucune session active</div>';
+    return;
+  }
+
+  // Use same order as main window (user-defined sessionOrder, newest first for new ones)
+  active.sort((a, b) => {
+    const ai = sessionOrder.indexOf(a.sessionId);
+    const bi = sessionOrder.indexOf(b.sessionId);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return new Date(b.startedAt) - new Date(a.startedAt);
+  });
+
+  $list.innerHTML = active.map(s => {
+    const stateName = s.state.name;
+    const color = STATE_COLORS[stateName] || '#6b7280';
+    const isActive = stateName === 'running' || stateName === 'thinking';
+    const indicator = isActive
+      ? `<span class="pop-spinner" style="border-color: ${color}; border-top-color: transparent; border-right-color: transparent"></span>`
+      : `<span class="pop-dot" style="background: ${color}"></span>`;
+    const displayName = customNames[s.sessionId] || s.projectName;
+    return `
+      <div class="pop-item" data-session="${esc(s.sessionId)}">
+        ${indicator}
+        <span class="pop-name">${esc(displayName)}</span>
+        <span class="pop-state">${esc(s.state.label)}</span>
+      </div>
+    `;
+  }).join('');
+
+  // Wire up click handlers
+  $list.querySelectorAll('.pop-item').forEach(item => {
+    item.addEventListener('click', () => {
+      window.popoverApi.focusSession(item.dataset.session);
+      window.popoverApi.hide();
+    });
+  });
+}
+
+async function refresh() {
+  const [sessions, config] = await Promise.all([
+    window.popoverApi.getSessions(),
+    window.popoverApi.getConfig(),
+  ]);
+  renderPopover(sessions, config);
+}
+
+document.getElementById('popOpenBtn').addEventListener('click', () => {
+  window.popoverApi.openMainWindow();
+  window.popoverApi.hide();
+});
+
+document.getElementById('popQuitBtn').addEventListener('click', () => {
+  window.popoverApi.quit();
+});
+
+window.popoverApi.onUpdate(() => refresh());
+refresh();

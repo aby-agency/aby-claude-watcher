@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 
 function sanitizePid(pid) {
   const n = parseInt(pid, 10);
@@ -59,30 +59,40 @@ function focusMac(terminalApp, terminalId, pid, cwd) {
 }
 
 function focusITerm2(pid, cwd) {
-  // Strategy: iterate all iTerm2 sessions, find the one whose tty
-  // has a child process matching our Claude PID
-  const script = `
-    tell application "iTerm2"
-      activate
-      repeat with w in windows
-        repeat with t in tabs of w
-          repeat with s in sessions of t
-            set ttyName to (tty of s)
-            try
-              set shellOutput to (do shell script "pgrep -P $(lsof -t " & ttyName & " 2>/dev/null | head -1) 2>/dev/null | xargs -I{} pgrep -P {} 2>/dev/null; lsof -t " & ttyName & " 2>/dev/null")
-              if shellOutput contains "${pid}" then
+  // Fast strategy: find the TTY of the Claude PID (or its ancestors) in Node,
+  // then tell iTerm2 to focus the session with that TTY directly.
+  // This avoids running `do shell script` for every iTerm2 session.
+  let targetTty = null;
+  try {
+    // Get the TTY of the claude process
+    const out = execSync(`ps -p ${pid} -o tty=`, { encoding: 'utf-8', timeout: 500 }).trim();
+    if (out && out !== '??') {
+      targetTty = `/dev/${out}`;
+    }
+  } catch {}
+
+  if (targetTty) {
+    const script = `
+      tell application "iTerm2"
+        activate
+        repeat with w in windows
+          repeat with t in tabs of w
+            repeat with s in sessions of t
+              if (tty of s) is "${targetTty}" then
                 select t
                 select s
                 return
               end if
-            end try
+            end repeat
           end repeat
         end repeat
-      end repeat
-    end tell
-  `;
+      end tell
+    `;
+    return runAppleScript(script).catch(() => {});
+  }
 
-  return runAppleScript(script).catch(() => {
+  // Fallback: just activate iTerm2 (no specific session found)
+  return runAppleScript(`tell application "iTerm2" to activate`).catch(() => {
     // Fallback: just activate iTerm2 or open new tab in project dir
     if (cwd) {
       return runAppleScript(`

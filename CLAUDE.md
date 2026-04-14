@@ -26,7 +26,7 @@ npm run dev      # with devtools
 |-------|-------|---------|
 | thinking | purple `#a78bfa` | Last event = `user` text (Claude processing) |
 | running | green `#22c55e` | Last event = `assistant` with `stop_reason: "tool_use"` |
-| waiting | blue `#3b82f6` | `end_turn` + 2s no activity, OR stale 8s no JSONL change |
+| waiting | blue `#3b82f6` | `end_turn` + 5s no activity |
 | idle | grey-blue `#94a3b8` | No activity > 2 min |
 | error | red `#ef4444` | Error detected in events |
 | completed | dark grey `#4b5563` | `last-prompt` event OR session file gone + PID dead |
@@ -34,7 +34,9 @@ npm run dev      # with devtools
 ## Key decisions
 
 - JSONL `tool_use` events only written AFTER user approves permission — cannot detect permission prompts
-- Stale timer (8s) catches all "waiting" cases including permissions
+- Only `end_turn` reliably signals "waiting for user" — no stale timer (caused false positives)
+- Waiting delay: 5s (avoids false positives between rapid tool calls)
+- Notifications: 30s cooldown per session to avoid spam
 - Polling at 250ms (`fs.watch` unreliable on macOS)
 - Config saves debounced 500ms, `saveSync` on shutdown
 - Session completed only when: `last-prompt` event OR (session file gone + PID dead)

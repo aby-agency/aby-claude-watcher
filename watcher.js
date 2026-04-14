@@ -10,7 +10,6 @@ const PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
 const SCAN_INTERVAL = 2000;
 const POLL_INTERVAL = 250;
 const WAITING_DELAY = 2000;
-const STALE_DELAY = 8000;  // If no JSONL activity for 8s while thinking/running → waiting
 const IDLE_TIMEOUT = 120000;
 
 const STATES = {
@@ -30,8 +29,9 @@ class SessionWatcher extends EventEmitter {
     this.fileWatchers = new Map();
     this.fileOffsets = new Map();
     this.waitingTimers = new Map();
-    this.staleTimers = new Map();
     this.idleTimers = new Map();
+    this.stuckTimers = new Map();
+    this.lastNotifTime = new Map(); // sessionId → timestamp of last notification
     this.scanTimer = null;
   }
 
@@ -54,7 +54,6 @@ class SessionWatcher extends EventEmitter {
           state,
           lastTool: data.lastTool || null,
           model: data.model || null,
-          lastMessage: data.lastMessage || null,
           gitBranch: data.gitBranch || null,
           startedAt: data.startedAt || new Date().toISOString(),
           endedAt: data.endedAt || null,
@@ -66,7 +65,6 @@ class SessionWatcher extends EventEmitter {
         });
         this.emit('session-added', this.sessions.get(id));
       }
-      this.cleanupOldSessions();
     }
 
     this.scan();
@@ -77,12 +75,12 @@ class SessionWatcher extends EventEmitter {
     if (this.scanTimer) clearInterval(this.scanTimer);
     for (const watcher of this.fileWatchers.values()) watcher.close();
     for (const timer of this.waitingTimers.values()) clearTimeout(timer);
-    for (const timer of this.staleTimers.values()) clearTimeout(timer);
     for (const timer of this.idleTimers.values()) clearTimeout(timer);
+    for (const timer of this.stuckTimers.values()) clearTimeout(timer);
     this.fileWatchers.clear();
     this.fileOffsets.clear();
     this.waitingTimers.clear();
-    this.staleTimers.clear();
+    this.stuckTimers.clear();
     this.idleTimers.clear();
   }
 
@@ -122,8 +120,7 @@ class SessionWatcher extends EventEmitter {
               state: STATES.IDLE,
               lastTool: null,
               model: null,
-              lastMessage: null,
-              gitBranch: null,
+                  gitBranch: null,
               startedAt: startedAtISO,
               endedAt: null,
               tokens: { input: 0, output: 0 },
@@ -426,9 +423,13 @@ class SessionWatcher extends EventEmitter {
       session.gitBranch = event.gitBranch;
     }
 
-    // Reset idle timer and stale timer
+    // Reset idle timer + clear stuck hint
     this.resetIdleTimer(sessionId);
-    this.resetStaleTimer(sessionId);
+    this.clearStuckTimer(sessionId);
+    if (session.maybeStuck) {
+      session.maybeStuck = false;
+      this.emit('session-updated', session);
+    }
 
     switch (event.type) {
       case 'permission-mode':
@@ -491,10 +492,6 @@ class SessionWatcher extends EventEmitter {
 
     // Determine state from content
     const content = message.content || [];
-    const textBlock = content.find(c => c.type === 'text' && c.text);
-    if (textBlock) {
-      session.lastMessage = textBlock.text.slice(0, 120);
-    }
     const hasThinking = content.some(c => c.type === 'thinking');
     const hasToolUse = content.some(c => c.type === 'tool_use');
     const lastToolUse = [...content].reverse().find(c => c.type === 'tool_use');
@@ -549,25 +546,24 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
-  resetStaleTimer(sessionId) {
-    this.clearStaleTimer(sessionId);
+  startStuckTimer(sessionId) {
+    this.clearStuckTimer(sessionId);
     const timer = setTimeout(() => {
       const session = this.sessions.get(sessionId);
       if (!session) return;
-      // If still in an active state (thinking/running) and no new events came,
-      // something is probably waiting for user action (permission, input, etc.)
       if (session.state === STATES.THINKING || session.state === STATES.RUNNING) {
-        this.setState(sessionId, STATES.WAITING, false);
+        session.maybeStuck = true;
+        this.emit('session-updated', session);
       }
-    }, STALE_DELAY);
-    this.staleTimers.set(sessionId, timer);
+    }, 30000);
+    this.stuckTimers.set(sessionId, timer);
   }
 
-  clearStaleTimer(sessionId) {
-    const timer = this.staleTimers.get(sessionId);
+  clearStuckTimer(sessionId) {
+    const timer = this.stuckTimers.get(sessionId);
     if (timer) {
       clearTimeout(timer);
-      this.staleTimers.delete(sessionId);
+      this.stuckTimers.delete(sessionId);
     }
   }
 
@@ -588,23 +584,40 @@ class SessionWatcher extends EventEmitter {
     if (!session) return;
 
     const oldState = session.state;
-    if (oldState.name === newState.name) return;
+    const stateChanged = oldState.name !== newState.name;
 
-    session.state = newState;
+    if (stateChanged) {
+      session.state = newState;
 
-    // Freeze duration when completed
-    if (newState.name === 'completed' && !session.endedAt) {
-      session.endedAt = new Date().toISOString();
+      // Freeze duration when completed
+      if (newState.name === 'completed' && !session.endedAt) {
+        session.endedAt = new Date().toISOString();
+      }
+
+      this.emit('session-updated', session);
+      this.persistSession(session);
     }
 
-    this.emit('session-updated', session);
-
-    // Persist session state
-    this.persistSession(session);
-
-    // Trigger notification on transition to waiting (not on initial load)
+    // Trigger notification on waiting — with 30s cooldown to avoid spam
+    // This handles: stale timer → waiting, then end_turn → waiting again
     if (!isInitial && newState.name === 'waiting') {
-      this.emit('session-waiting', session);
+      const lastNotif = this.lastNotifTime.get(sessionId) || 0;
+      if (Date.now() - lastNotif > 30000) {
+        this.lastNotifTime.set(sessionId, Date.now());
+        this.emit('session-waiting', session);
+      }
+    }
+    // Reset cooldown when leaving waiting state
+    if (stateChanged && newState.name !== 'waiting') {
+      this.lastNotifTime.delete(sessionId);
+    }
+
+    // Start "maybe stuck" timer when entering thinking/running
+    if (stateChanged && (newState.name === 'thinking' || newState.name === 'running')) {
+      this.startStuckTimer(sessionId);
+    }
+    if (stateChanged && newState.name !== 'thinking' && newState.name !== 'running') {
+      this.clearStuckTimer(sessionId);
     }
   }
 
@@ -622,7 +635,6 @@ class SessionWatcher extends EventEmitter {
       startedAt: session.startedAt,
       endedAt: session.endedAt,
       tokens: session.tokens,
-      lastMessage: session.lastMessage,
       remoteUrl: session.remoteUrl,
       terminalApp: session.terminalApp,
       terminalId: session.terminalId,
@@ -637,28 +649,10 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
-  cleanupOldSessions() {
-    if (!this.config) return;
-    const days = this.config.get().cleanupDays || 7;
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    const saved = this.config.getSavedSessions();
-    let cleaned = 0;
-    for (const [id, data] of Object.entries(saved)) {
-      if (data.stateName === 'completed' && data.endedAt) {
-        if (new Date(data.endedAt).getTime() < cutoff) {
-          this.config.deleteSession(id);
-          this.sessions.delete(id);
-          cleaned++;
-        }
-      }
-    }
-  }
-
   removeSession(sessionId) {
     const watcher = this.fileWatchers.get(sessionId);
     if (watcher) { watcher.close(); this.fileWatchers.delete(sessionId); }
     this.clearWaitingTimer(sessionId);
-    this.clearStaleTimer(sessionId);
     const idle = this.idleTimers.get(sessionId);
     if (idle) { clearTimeout(idle); this.idleTimers.delete(sessionId); }
     this.sessions.delete(sessionId);
@@ -695,7 +689,6 @@ class SessionWatcher extends EventEmitter {
           state: STATES.IDLE,
           lastTool: null,
           model: null,
-          lastMessage: null,
           gitBranch: null,
           startedAt: new Date().toISOString(),
           endedAt: null,
@@ -724,7 +717,6 @@ class SessionWatcher extends EventEmitter {
           state: STATES.IDLE,
           lastTool: null,
           model: null,
-          lastMessage: null,
           gitBranch: null,
           startedAt: new Date().toISOString(),
           endedAt: null,

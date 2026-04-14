@@ -17,7 +17,8 @@ let config = {
   autoLaunch: false,
   language: null,       // 'fr' | 'en' | null (auto-detect)
   volume: 0.7,          // 0.0 - 1.0
-  windowBounds: null,   // { x, y, width, height }
+  windowBounds: null,        // { x, y, width, height } — grid & compact share this
+  microWindowBounds: null,   // separate bounds remembered for micro view
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
   customNames: {},      // { [sessionId]: "Custom name" }
 };
@@ -150,6 +151,15 @@ function getWindowBounds() {
   return config.windowBounds;
 }
 
+function setMicroWindowBounds(bounds) {
+  config.microWindowBounds = bounds;
+  save();
+}
+
+function getMicroWindowBounds() {
+  return config.microWindowBounds;
+}
+
 function saveSession(sessionId, data) {
   config.sessions[sessionId] = data;
   save();
@@ -188,6 +198,8 @@ module.exports = {
   getSessionOrder,
   setWindowBounds,
   getWindowBounds,
+  setMicroWindowBounds,
+  getMicroWindowBounds,
   saveSync,
   saveSession,
   getSavedSessions,

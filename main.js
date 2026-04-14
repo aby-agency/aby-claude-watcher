@@ -12,16 +12,22 @@ let popoverWindow;
 let watcher;
 let socketServer;
 let tray;
+let currentViewMode = 'grid';
+const MICRO_DEFAULT_BOUNDS = { width: 260, height: 200 };
 
 function createWindow() {
   const conf = config.get();
-  const bounds = config.getWindowBounds();
+  const initialMicro = (conf.viewMode === 'micro');
+  currentViewMode = initialMicro ? 'micro' : (conf.viewMode || 'grid');
+  const bounds = initialMicro
+    ? (config.getMicroWindowBounds() || MICRO_DEFAULT_BOUNDS)
+    : config.getWindowBounds();
 
   const opts = {
-    width: 900,
-    height: 650,
-    minWidth: 400,
-    minHeight: 300,
+    width: initialMicro ? MICRO_DEFAULT_BOUNDS.width : 900,
+    height: initialMicro ? MICRO_DEFAULT_BOUNDS.height : 650,
+    minWidth: initialMicro ? 200 : 400,
+    minHeight: initialMicro ? 100 : 300,
     backgroundColor: '#0d1117',
     titleBarStyle: 'hiddenInset',
     alwaysOnTop: conf.alwaysOnTop || false,
@@ -61,10 +67,14 @@ function createWindow() {
     console.error('Failed to load:', code, desc);
   });
 
-  // Save window bounds on move/resize
+  // Save window bounds on move/resize — into the slot matching the current view
   const saveBounds = () => {
-    if (!mainWindow.isDestroyed()) {
-      config.setWindowBounds(mainWindow.getBounds());
+    if (mainWindow.isDestroyed() || mainWindow.isMinimized()) return;
+    const b = mainWindow.getBounds();
+    if (currentViewMode === 'micro') {
+      config.setMicroWindowBounds(b);
+    } else {
+      config.setWindowBounds(b);
     }
   };
   mainWindow.on('resize', saveBounds);
@@ -181,6 +191,33 @@ function setupIPC() {
 
   ipcMain.handle('set-view-mode', (_, mode) => {
     config.setViewMode(mode);
+    if (!mainWindow) return;
+
+    const prev = currentViewMode;
+    if (prev === mode) return;
+
+    // Snapshot current bounds into the slot we're leaving, BEFORE resizing
+    const currentBounds = mainWindow.getBounds();
+    if (prev === 'micro') {
+      config.setMicroWindowBounds(currentBounds);
+    } else {
+      config.setWindowBounds(currentBounds);
+    }
+
+    currentViewMode = mode;
+
+    // Adjust min size first so setBounds can go smaller if needed
+    if (mode === 'micro') {
+      mainWindow.setMinimumSize(200, 100);
+    } else {
+      mainWindow.setMinimumSize(400, 300);
+    }
+
+    // Restore the target view's remembered bounds (or a sensible default)
+    const target = (mode === 'micro')
+      ? (config.getMicroWindowBounds() || { ...MICRO_DEFAULT_BOUNDS, x: currentBounds.x, y: currentBounds.y })
+      : (config.getWindowBounds() || { x: currentBounds.x, y: currentBounds.y, width: 900, height: 650 });
+    mainWindow.setBounds(target);
   });
 
   ipcMain.handle('set-compact-mode', (_, value) => {

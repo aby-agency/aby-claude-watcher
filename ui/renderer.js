@@ -21,7 +21,8 @@ const ICONS = {
 };
 
 const sessions = new Map();
-let viewMode = 'grid'; // 'grid' | 'compact'
+let viewMode = 'grid'; // 'grid' | 'compact' | 'micro'
+let previousViewMode = 'grid'; // remembered when entering micro so Back can restore
 let alwaysOnTop = false;
 let volume = 0.7;
 let notifPosition = 'top-right';
@@ -39,8 +40,13 @@ const $emptyState = document.getElementById('emptyState');
 const $emptyFiltered = document.getElementById('emptyFiltered');
 const $gridView = document.getElementById('gridView');
 const $compactView = document.getElementById('compactView');
+const $microView = document.getElementById('microView');
+const $microToolbar = document.getElementById('microToolbar');
 const $btnGrid = document.getElementById('btnGrid');
 const $btnCompact = document.getElementById('btnCompact');
+const $btnMicro = document.getElementById('btnMicro');
+const $btnBack = document.getElementById('btnBack');
+const $btnPinMicro = document.getElementById('btnPinMicro');
 const $btnPin = document.getElementById('btnPin');
 const $btnAdd = document.getElementById('btnAdd');
 const $addModal = document.getElementById('addModal');
@@ -67,15 +73,18 @@ async function init() {
   viewMode = config.viewMode || 'grid';
   // Migration: old 'list' → 'compact'
   if (viewMode === 'list' || config.compactMode) viewMode = 'compact';
-  if (viewMode !== 'grid' && viewMode !== 'compact') viewMode = 'grid';
+  if (viewMode !== 'grid' && viewMode !== 'compact' && viewMode !== 'micro') viewMode = 'grid';
+  previousViewMode = (viewMode === 'micro') ? 'grid' : viewMode;
   alwaysOnTop = config.alwaysOnTop || false;
   volume = config.volume ?? 0.7;
   notifPosition = config.notifPosition || 'top-right';
   autoLaunch = !!config.autoLaunch;
   sessionOrder = config.sessionOrder || [];
 
+  // applyMicroMode needs alwaysOnTop set so the pin buttons render the right state.
+  // It also calls updatePinButton + updateMicroPinButton internally, so we don't repeat them here.
+  applyMicroMode();
   updateViewToggle();
-  updatePinButton();
   updateNotifPosition();
   updateAutoLaunchToggle();
   $volumeSlider.value = Math.round(volume * 100);
@@ -104,6 +113,9 @@ async function init() {
   });
 
   window.api.onShowNotification((data) => {
+    // Skip the in-app toast in micro mode — the whole window is too small
+    // for a modal overlay. The pulsing waiting dot is enough signal.
+    if (viewMode === 'micro') return;
     showToast(data);
   });
 
@@ -114,6 +126,9 @@ async function init() {
   // Toolbar
   $btnGrid.addEventListener('click', () => setView('grid'));
   $btnCompact.addEventListener('click', () => setView('compact'));
+  $btnMicro.addEventListener('click', () => setView('micro'));
+  $btnBack.addEventListener('click', () => setView(previousViewMode || 'grid'));
+  $btnPinMicro.addEventListener('click', togglePin);
 
   // Status filter chips (multi-select)
   document.querySelectorAll('.status-filter .filter-chip').forEach(chip => {
@@ -324,21 +339,41 @@ async function init() {
 // ═══ View switching ═══
 
 function setView(mode) {
+  // Save previous non-micro view so Back can return to it
+  if (mode === 'micro' && viewMode !== 'micro') {
+    previousViewMode = viewMode;
+  }
   viewMode = mode;
   window.api.setViewMode(mode);
   updateViewToggle();
+  applyMicroMode();
   render();
 }
 
 function updateViewToggle() {
   $btnGrid.classList.toggle('active', viewMode === 'grid');
   $btnCompact.classList.toggle('active', viewMode === 'compact');
+  $btnMicro.classList.toggle('active', viewMode === 'micro');
+}
+
+function applyMicroMode() {
+  const isMicro = viewMode === 'micro';
+  document.body.classList.toggle('micro-mode', isMicro);
+  $microToolbar.style.display = isMicro ? 'flex' : 'none';
+  // Always sync both pin buttons so whichever toolbar is visible stays truthful
+  updatePinButton();
+  updateMicroPinButton();
+}
+
+function updateMicroPinButton() {
+  if ($btnPinMicro) $btnPinMicro.classList.toggle('active', alwaysOnTop);
 }
 
 function togglePin() {
   alwaysOnTop = !alwaysOnTop;
   window.api.setAlwaysOnTop(alwaysOnTop);
   updatePinButton();
+  updateMicroPinButton();
 }
 
 function updatePinButton() {
@@ -482,22 +517,34 @@ function render() {
   $emptyFiltered.style.display = showNoResults ? 'flex' : 'none';
   $gridView.style.display = showItems && viewMode === 'grid' ? 'grid' : 'none';
   $compactView.style.display = showItems && viewMode === 'compact' ? 'flex' : 'none';
+  $microView.style.display = showItems && viewMode === 'micro' ? 'flex' : 'none';
 
   // Full rebuild — used for initial load, view switch, add/remove
   fullRender();
   updateStatusBar();
 }
 
+function viewContainer() {
+  if (viewMode === 'grid') return $gridView;
+  if (viewMode === 'compact') return $compactView;
+  return $microView;
+}
+
+function viewItemHTML() {
+  if (viewMode === 'grid') return cardHTML;
+  if (viewMode === 'compact') return compactItemHTML;
+  return microItemHTML;
+}
+
 function fullRender() {
   const sorted = getSortedSessions();
-  const container = viewMode === 'grid' ? $gridView : $compactView;
-  const htmlFn = viewMode === 'grid' ? cardHTML : compactItemHTML;
-  container.innerHTML = sorted.map(s => htmlFn(s)).join('');
+  const htmlFn = viewItemHTML();
+  viewContainer().innerHTML = sorted.map(s => htmlFn(s)).join('');
 }
 
 function updateSession(s) {
   // Targeted update: find the existing element and patch it in place
-  const container = viewMode === 'grid' ? $gridView : $compactView;
+  const container = viewContainer();
   const selector = `[data-session="${s.sessionId}"]`;
   const existing = container.querySelector(selector);
 
@@ -517,7 +564,7 @@ function updateSession(s) {
   }
 
   // Patch in place — replace the element's HTML
-  const htmlFn = viewMode === 'grid' ? cardHTML : compactItemHTML;
+  const htmlFn = viewItemHTML();
   const temp = document.createElement('div');
   temp.innerHTML = htmlFn(s);
   const newEl = temp.firstElementChild;
@@ -657,6 +704,25 @@ function cardHTML(s) {
           <span class="detail-value branch-value">${esc(s.gitBranch || '—')}</span>
         </div>
       </div>
+    </div>
+  `;
+}
+
+function microItemHTML(s) {
+  const stateName = s.state.name;
+  const sid = escAttr(s.sessionId);
+  const name = s.customName || s.projectName;
+  const isActive = stateName === 'running' || stateName === 'thinking';
+  const indicator = isActive
+    ? '<span class="micro-item-spinner"></span>'
+    : '<span class="micro-item-dot"></span>';
+  const tooltip = `${name} — ${t('state_' + stateName)}`;
+  return `
+    <div class="micro-item" data-state="${stateName}" data-session="${sid}"
+         title="${escAttr(tooltip)}"
+         onclick="handleFocus('${sid}')">
+      ${indicator}
+      <span class="micro-item-name">${esc(name)}</span>
     </div>
   `;
 }
@@ -1117,7 +1183,7 @@ function onDragEnd(e) {
 }
 
 function saveCurrentOrder() {
-  const container = viewMode === 'grid' ? $gridView : $compactView;
+  const container = viewContainer();
   const items = container.querySelectorAll('[data-session]');
   sessionOrder = Array.from(items)
     .map(el => el.dataset.session)

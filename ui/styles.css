@@ -48,6 +48,125 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* ═══ Micro toolbar (micro view only) ═══ */
+
+.micro-toolbar {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+  padding-left: 78px; /* space for macOS traffic light buttons */
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.micro-toolbar-spacer {
+  flex: 1;
+}
+
+.micro-btn {
+  -webkit-app-region: no-drag;
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), color var(--transition);
+}
+
+.micro-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.micro-btn.active {
+  color: var(--state-running);
+}
+
+/* ═══ Micro view ═══ */
+
+.micro-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+}
+
+.micro-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background var(--transition);
+}
+
+.micro-item:hover {
+  background: var(--bg-secondary);
+}
+
+.micro-item .micro-item-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--state-neutral);
+}
+
+.micro-item .micro-item-spinner {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-right-color: transparent;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.micro-item[data-state="thinking"] { color: var(--state-thinking); }
+.micro-item[data-state="thinking"] .micro-item-dot { background: var(--state-thinking); }
+.micro-item[data-state="running"] { color: var(--state-running); }
+.micro-item[data-state="running"] .micro-item-dot { background: var(--state-running); }
+.micro-item[data-state="waiting"] .micro-item-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
+.micro-item[data-state="error"] .micro-item-dot { background: var(--state-error); animation: breathe 3s ease-in-out infinite; }
+.micro-item[data-state="completed"] .micro-item-dot { background: var(--state-completed); }
+
+.micro-item .micro-item-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.micro-item[data-state="completed"] .micro-item-name {
+  color: var(--text-muted);
+}
+
+/* ═══ Hide regular chrome in micro mode ═══ */
+
+body.micro-mode .toolbar,
+body.micro-mode .status-bar,
+body.micro-mode .empty-state {
+  display: none !important;
+}
+
+body.micro-mode .content {
+  height: calc(100vh - 36px);
+  padding: 0;
+}
+
 /* ═══ Toolbar ═══ */
 
 .toolbar {
@@ -275,7 +394,8 @@ body {
 
 .filter-seg::after,
 .toolbar-btn::after,
-.card-btn::after {
+.card-btn::after,
+.micro-btn::after {
   content: attr(title);
   position: absolute;
   top: calc(100% + 6px);
@@ -304,9 +424,23 @@ body {
 
 .filter-seg:hover::after,
 .toolbar-btn:hover::after,
-.card-btn:hover::after {
+.card-btn:hover::after,
+.micro-btn:hover::after {
   opacity: 1;
   transition-delay: 0.3s;
+}
+
+/* Micro toolbar buttons sit at the right edge — pin the pin-button tooltip
+   to the right so it doesn't overflow a narrow window */
+#btnPinMicro::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+#btnBack::after {
+  left: auto;
+  right: 0;
+  transform: none;
 }
 
 .session-count {

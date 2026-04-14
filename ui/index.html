@@ -8,6 +8,22 @@
 </head>
 <body>
 
+  <!-- Micro toolbar (shown only in micro view) -->
+  <div class="micro-toolbar" id="microToolbar" style="display:none;">
+    <div class="micro-toolbar-spacer"></div>
+    <button class="micro-btn" id="btnBack" data-i18n-title="micro_back" title="Back">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2"/>
+        <rect x="12" y="12" width="7" height="6" rx="1" fill="currentColor"/>
+      </svg>
+    </button>
+    <button class="micro-btn" id="btnPinMicro" data-i18n-title="pin_title" title="Always on top">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+      </svg>
+    </button>
+  </div>
+
   <!-- Toolbar -->
   <div class="toolbar">
     <div class="filter-chips status-filter">
@@ -45,6 +61,12 @@
       <button class="filter-seg" id="btnCompact" data-i18n-title="view_compact" title="Compact view">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="18" x2="20" y2="18"/>
+        </svg>
+      </button>
+      <button class="filter-seg" id="btnMicro" data-i18n-title="view_micro" title="Micro view">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2"/>
+          <rect x="12" y="12" width="7" height="6" rx="1" fill="currentColor"/>
         </svg>
       </button>
     </div>
@@ -96,6 +118,7 @@
     </div>
     <div class="grid-view" id="gridView" style="display:none;"></div>
     <div class="compact-view" id="compactView" style="display:none;"></div>
+    <div class="micro-view" id="microView" style="display:none;"></div>
   </div>
 
   <!-- Notification overlay -->

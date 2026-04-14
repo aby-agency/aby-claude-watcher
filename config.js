@@ -14,6 +14,7 @@ let config = {
   alwaysOnTop: false,
   compactMode: false,
   notifPosition: 'top-right',  // 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
+  autoLaunch: false,
   volume: 0.7,          // 0.0 - 1.0
   windowBounds: null,   // { x, y, width, height }
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
@@ -85,6 +86,11 @@ function setVolume(value) {
 
 function setNotifPosition(value) {
   config.notifPosition = value;
+  save();
+}
+
+function setAutoLaunch(value) {
+  config.autoLaunch = !!value;
   save();
 }
 
@@ -166,6 +172,7 @@ module.exports = {
   setAlwaysOnTop,
   setVolume,
   setNotifPosition,
+  setAutoLaunch,
   getNotificationPrefs,
   setNotificationPrefs,
   setCustomName,

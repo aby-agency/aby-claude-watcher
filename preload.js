@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('api', {
   openRemote: (url) => ipcRenderer.invoke('open-remote', url),
   setVolume: (value) => ipcRenderer.invoke('set-volume', value),
   setNotifPosition: (value) => ipcRenderer.invoke('set-notif-position', value),
+  setAutoLaunch: (value) => ipcRenderer.invoke('set-auto-launch', value),
   launchSession: (cwd) => ipcRenderer.invoke('launch-session', cwd),
 
   onSessionAdded: (callback) => ipcRenderer.on('session-added', (_, data) => callback(data)),

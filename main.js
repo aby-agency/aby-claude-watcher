@@ -231,6 +231,11 @@ function setupIPC() {
     config.setNotifPosition(value);
   });
 
+  ipcMain.handle('set-auto-launch', (_, value) => {
+    config.setAutoLaunch(value);
+    applyAutoLaunch();
+  });
+
   ipcMain.handle('popover-hide', () => {
     if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.hide();
   });
@@ -278,6 +283,18 @@ function sendToRenderer(channel, data) {
   }
 }
 
+function applyAutoLaunch() {
+  const enabled = !!config.get().autoLaunch;
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: enabled,
+      openAsHidden: true, // Start minimized to tray
+    });
+  } catch (e) {
+    console.error('Failed to set login item:', e.message);
+  }
+}
+
 // Allow audio autoplay in renderer
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
@@ -287,6 +304,9 @@ app.whenReady().then(() => {
     const allowed = ['media', 'audioCapture', 'midi', 'speaker-selection'];
     callback(allowed.includes(permission));
   });
+
+  // Apply auto-launch setting
+  applyAutoLaunch();
 
   createWindow();
   setupIPC();

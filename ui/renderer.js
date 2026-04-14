@@ -25,6 +25,7 @@ let viewMode = 'grid'; // 'grid' | 'compact'
 let alwaysOnTop = false;
 let volume = 0.7;
 let notifPosition = 'top-right';
+let autoLaunch = false;
 let openDropdown = null;
 let searchQuery = '';
 let sessionOrder = []; // User-defined order of session IDs
@@ -65,11 +66,13 @@ async function init() {
   alwaysOnTop = config.alwaysOnTop || false;
   volume = config.volume ?? 0.7;
   notifPosition = config.notifPosition || 'top-right';
+  autoLaunch = !!config.autoLaunch;
   sessionOrder = config.sessionOrder || [];
 
   updateViewToggle();
   updatePinButton();
   updateNotifPosition();
+  updateAutoLaunchToggle();
   $volumeSlider.value = Math.round(volume * 100);
   $volumeValue.textContent = `${Math.round(volume * 100)}%`;
 
@@ -182,6 +185,10 @@ async function init() {
   document.querySelectorAll('.position-btn').forEach(btn => {
     btn.addEventListener('click', () => setNotifPosition(btn.dataset.position));
   });
+
+  // Auto-launch toggle
+  const autoLaunchBtn = document.getElementById('autoLaunchToggle');
+  if (autoLaunchBtn) autoLaunchBtn.addEventListener('click', toggleAutoLaunch);
 
   // Shortcuts modal
   const $shortcutsModal = document.getElementById('shortcutsModal');
@@ -311,6 +318,20 @@ function setNotifPosition(pos) {
   notifPosition = pos;
   window.api.setNotifPosition(pos);
   updateNotifPosition();
+}
+
+function updateAutoLaunchToggle() {
+  const btn = document.getElementById('autoLaunchToggle');
+  if (btn) {
+    btn.classList.toggle('on', autoLaunch);
+    btn.setAttribute('aria-checked', String(autoLaunch));
+  }
+}
+
+function toggleAutoLaunch() {
+  autoLaunch = !autoLaunch;
+  window.api.setAutoLaunch(autoLaunch);
+  updateAutoLaunchToggle();
 }
 
 // ═══ Rendering ═══

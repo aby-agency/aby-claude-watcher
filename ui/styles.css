@@ -1273,6 +1273,52 @@ body {
   border-color: var(--border-light);
 }
 
+/* Settings toggle row */
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.settings-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--border);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--transition);
+  flex-shrink: 0;
+}
+
+.settings-toggle.on {
+  background: var(--state-running);
+}
+
+.settings-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--transition);
+}
+
+.settings-toggle.on .settings-toggle-knob {
+  transform: translateX(16px);
+}
+
 /* Notification position picker */
 .notif-position-grid {
   display: grid;

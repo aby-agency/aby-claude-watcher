@@ -35,26 +35,50 @@ function focusTerminal(session) {
   }
 }
 
+// Walk up the process tree from Claude's PID to find the host terminal app.
+// The immediate parent is the shell; one more hop is the terminal emulator.
+function detectTerminalFromPid(pid) {
+  if (!pid) return null;
+  try {
+    let cur = pid;
+    for (let i = 0; i < 6; i++) {
+      const ppid = parseInt(execSync(`ps -o ppid= -p ${cur}`, { encoding: 'utf-8', timeout: 500 }).trim(), 10);
+      if (!Number.isFinite(ppid) || ppid <= 1) break;
+      const comm = execSync(`ps -o comm= -p ${ppid}`, { encoding: 'utf-8', timeout: 500 }).trim().toLowerCase();
+      if (comm.includes('iterm')) return 'iterm';
+      if (comm.includes('warp')) return 'warp';
+      if (comm.includes('wezterm')) return 'wezterm';
+      if (comm.includes('alacritty')) return 'alacritty';
+      if (comm.includes('kitty')) return 'kitty';
+      if (comm.includes('ghostty')) return 'ghostty';
+      if (comm.includes('hyper')) return 'hyper';
+      if (comm.includes('code helper') || comm.endsWith('/code') || comm.endsWith('/cursor')) return 'vscode';
+      // Terminal.app is literally "Terminal" — match last to avoid false positives
+      if (comm === 'terminal' || comm.endsWith('/terminal')) return 'terminal';
+      cur = ppid;
+    }
+  } catch {}
+  return null;
+}
+
 function focusMac(terminalApp, terminalId, pid, cwd) {
-  const app = (terminalApp || '').toLowerCase();
+  // If wrapper provided a hint, use it; otherwise detect from process tree
+  const hint = (terminalApp || '').toLowerCase();
+  const detected = detectTerminalFromPid(pid);
+  const app = hint || detected || '';
 
-  // iTerm2 — full session-level focus via PID or tty matching
-  if (app.includes('iterm')) {
-    return focusITerm2(pid, cwd);
-  }
+  if (app.includes('iterm')) return focusITerm2(pid, cwd);
+  if (app.includes('warp')) return runAppleScript(`tell application "Warp" to activate`);
+  if (app === 'vscode') return runAppleScript(`tell application "Visual Studio Code" to activate`)
+    .catch(() => runAppleScript(`tell application "Cursor" to activate`));
+  if (app === 'wezterm') return runAppleScript(`tell application "WezTerm" to activate`);
+  if (app === 'alacritty') return runAppleScript(`tell application "Alacritty" to activate`);
+  if (app === 'kitty') return runAppleScript(`tell application "kitty" to activate`);
+  if (app === 'ghostty') return runAppleScript(`tell application "Ghostty" to activate`);
+  if (app === 'hyper') return runAppleScript(`tell application "Hyper" to activate`);
+  if (app === 'terminal' || app.includes('apple_terminal')) return focusTerminalApp(pid, cwd);
 
-  // Terminal.app
-  if (app.includes('terminal')) {
-    return focusTerminalApp(pid, cwd);
-  }
-
-  // Warp — can only activate the app, no tab control
-  if (app.includes('warp')) {
-    return runAppleScript(`tell application "Warp" to activate`);
-  }
-
-  // Unknown terminal or no terminal info — default to iTerm2
-  // Don't pass arbitrary terminalApp to AppleScript (injection risk)
+  // Truly unknown — fallback to iTerm2 (will at least activate it)
   return focusITerm2(pid, cwd);
 }
 

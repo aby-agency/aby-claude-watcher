@@ -37,6 +37,17 @@ Built at **Aby Agency** to solve our own daily workflow — shipped as MIT open 
 
 </details>
 
+<details>
+<summary><strong>Micro view</strong> — ambient status dots, pinned to a corner</summary>
+
+<div align="center">
+  <img src="assets/screenshot-micro.png" alt="Micro view" width="380">
+</div>
+
+<div align="center"><em>The most minimal mode — just dot + name per session. Click a line to jump to its terminal.</em></div>
+
+</details>
+
 ---
 
 ## Features

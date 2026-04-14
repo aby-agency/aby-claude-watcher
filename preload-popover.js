@@ -1,3 +1,7 @@
+// ─── preload-popover.js ───
+// Context bridge for the tray popover window.
+// Same trust model as preload.js — validation in main.js handlers.
+
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('popoverApi', {

@@ -370,15 +370,19 @@ function togglePopover() {
   }
 }
 
-function generateTrayIcon() {
-  // 32x32 retina icon (displayed as 16x16) — monitor with clock
-  const s = 32;
-  const buf = Buffer.alloc(s * s * 4);
+// Draw the tray icon at a given size — monitor + clock with thicker strokes
+// that render cleanly at both 16px (macOS) and 22px (Linux).
+function drawTrayIconBuffer(size) {
+  const buf = Buffer.alloc(size * size * 4);
   const px = (x, y, a = 255) => {
-    if (x < 0 || x >= s || y < 0 || y >= s) return;
-    const i = (y * s + x) * 4;
+    if (x < 0 || x >= size || y < 0 || y >= size) return;
+    const i = (y * size + x) * 4;
     buf[i] = 0; buf[i+1] = 0; buf[i+2] = 0; buf[i+3] = a;
   };
+
+  // Scale coordinates from a 32-unit canvas to the target size
+  const sc = (v) => Math.round(v * size / 32);
+
   const line = (x0, y0, x1, y1, a = 255) => {
     const dx = Math.abs(x1-x0), dy = Math.abs(y1-y0);
     const sx = x0<x1?1:-1, sy = y0<y1?1:-1;
@@ -395,31 +399,43 @@ function generateTrayIcon() {
     for(let i=x;i<x+w;i++){px(i,y,a);px(i,y+h-1,a);}
     for(let j=y;j<y+h;j++){px(x,j,a);px(x+w-1,j,a);}
   };
-  // Monitor
-  rect(3, 4, 26, 18);
-  rect(4, 5, 24, 16);
+  // Monitor (2px thick border)
+  rect(sc(3), sc(4), sc(26), sc(18));
+  rect(sc(4), sc(5), sc(24), sc(16));
   // Stand
-  for(let x=13;x<=18;x++) px(x,22);
-  for(let x=10;x<=21;x++) px(x,23);
-  // Clock circle (top-right)
-  const cx=24,cy=9,r=5;
-  for(let a=0;a<360;a+=8){
+  for(let x=sc(13);x<=sc(18);x++) px(x,sc(22));
+  for(let x=sc(10);x<=sc(21);x++) px(x,sc(23));
+  // Clock circle
+  const cx=sc(24),cy=sc(9),r=sc(5);
+  for(let a=0;a<360;a+=6){
     px(cx+Math.round(r*Math.cos(a*Math.PI/180)),cy+Math.round(r*Math.sin(a*Math.PI/180)));
   }
   // Clock hands
-  line(cx,cy,cx,cy-3); // hour
-  line(cx,cy,cx+2,cy+1); // minute
+  line(cx,cy,cx,cy-sc(3));
+  line(cx,cy,cx+sc(2),cy+sc(1));
   // Dots inside monitor (sessions)
-  px(10,13,180);px(11,13,180);
-  px(15,13,180);px(16,13,180);
-  px(20,13,180);px(21,13,180);
+  [10,15,20].forEach(x0 => {
+    px(sc(x0),sc(13),180);
+    px(sc(x0+1),sc(13),180);
+  });
 
-  return nativeImage.createFromBuffer(buf, { width: s, height: s, scaleFactor: 2 });
+  return buf;
+}
+
+function generateTrayIcon() {
+  // Generate both 16x16 (@1x) and 32x32 (@2x retina) representations
+  const img16 = nativeImage.createFromBuffer(drawTrayIconBuffer(16), { width: 16, height: 16 });
+  const img32 = drawTrayIconBuffer(32);
+  img16.addRepresentation({ width: 32, height: 32, scaleFactor: 2, buffer: img32 });
+  return img16;
 }
 
 function setupTray() {
   const icon = generateTrayIcon();
-  icon.setTemplateImage(true);
+  // Template image mode: macOS only. On Linux/Windows, use colored icon.
+  if (process.platform === 'darwin') {
+    icon.setTemplateImage(true);
+  }
   tray = new Tray(icon);
   tray.setToolTip('Claude Watch');
 

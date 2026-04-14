@@ -1,3 +1,15 @@
+// ─── preload.js ───
+// Context bridge between main process and renderer.
+//
+// TRUST BOUNDARY: This file exposes IPC invoke methods to the renderer.
+// Input validation and security checks are performed in main.js handlers,
+// NOT here. Any method that accepts arbitrary strings (openRemote, addSession,
+// launchSession, setCustomName, etc.) is validated in main.js before use.
+// See main.js:ipcMain.handle(...) for each method's validation.
+//
+// Electron settings: contextIsolation: true, nodeIntegration: false.
+// The renderer has no direct Node.js access — only this `window.api` surface.
+
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {

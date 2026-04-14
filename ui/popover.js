@@ -68,11 +68,13 @@ function renderPopover(sessions, config) {
   });
 }
 
+let refreshSeq = 0;
 async function refresh() {
-  const [sessions, config] = await Promise.all([
-    window.popoverApi.getSessions(),
-    window.popoverApi.getConfig(),
-  ]);
+  const myId = ++refreshSeq;
+  const sessions = await window.popoverApi.getSessions();
+  if (myId !== refreshSeq) return; // stale, abort
+  const config = await window.popoverApi.getConfig();
+  if (myId !== refreshSeq) return; // stale, abort
   renderPopover(sessions, config);
 }
 

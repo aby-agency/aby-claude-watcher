@@ -192,6 +192,7 @@ function setupIPC() {
       if (popoverWindow && !popoverWindow.isDestroyed()) {
         popoverWindow.webContents.send('popover-update');
       }
+      updateTrayMenu();
     }
   });
 
@@ -318,6 +319,10 @@ function createPopoverWindow() {
   });
 
   popoverWindow.loadFile(path.join(__dirname, 'ui', 'popover.html'));
+  popoverWindow._loaded = false;
+  popoverWindow.webContents.once('did-finish-load', () => {
+    popoverWindow._loaded = true;
+  });
 
   popoverWindow.on('blur', () => {
     if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.hide();
@@ -345,8 +350,17 @@ function togglePopover() {
   popoverWindow.setPosition(x, y, false);
   popoverWindow.show();
   popoverWindow.focus();
-  // Force refresh on open
-  popoverWindow.webContents.send('popover-update');
+  // Force refresh on open, wait for load if needed
+  const sendUpdate = () => {
+    if (popoverWindow && !popoverWindow.isDestroyed()) {
+      popoverWindow.webContents.send('popover-update');
+    }
+  };
+  if (popoverWindow._loaded) {
+    sendUpdate();
+  } else {
+    popoverWindow.webContents.once('did-finish-load', sendUpdate);
+  }
 }
 
 function generateTrayIcon() {

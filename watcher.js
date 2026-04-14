@@ -160,20 +160,25 @@ class SessionWatcher extends EventEmitter {
         }
       }
 
-      // Sessions not in active files: check PID
-      // Only mark completed if PID is confirmed dead
-      // Otherwise mark idle (session file might have been cleaned up temporarily)
+      // Sessions not in active files: check PID with a grace window
+      // (session file can briefly disappear during atomic rewrites)
       for (const [id, session] of this.sessions) {
-        if (!activeSessionIds.has(id) && session.state !== STATES.COMPLETED) {
-          if (session.pid && this.isPidAlive(session.pid)) {
-            // PID still alive but no session file — mark idle, not completed
-            if (session.state !== STATES.IDLE && session.state !== STATES.WAITING) {
-              this.setState(id, STATES.IDLE, false);
-            }
-          } else {
-            // PID dead AND no session file — truly completed
-            this.markCompleted(id);
+        if (activeSessionIds.has(id)) {
+          session._missingTicks = 0;
+          continue;
+        }
+        if (session.state === STATES.COMPLETED) continue;
+
+        session._missingTicks = (session._missingTicks || 0) + 1;
+        // Wait 2 ticks (4s) before acting
+        if (session._missingTicks < 2) continue;
+
+        if (session.pid && this.isPidAlive(session.pid)) {
+          if (session.state !== STATES.IDLE && session.state !== STATES.WAITING) {
+            this.setState(id, STATES.IDLE, false);
           }
+        } else {
+          this.markCompleted(id);
         }
       }
     } catch (e) {
@@ -253,7 +258,8 @@ class SessionWatcher extends EventEmitter {
       const session = this.sessions.get(sessionId);
       if (!session) return;
 
-      // Reset tokens to avoid double-counting on restart
+      // Track previous tokens so we can take max() to avoid regression
+      const prevTokens = { ...session.tokens };
       session.tokens = { input: 0, output: 0 };
 
       // Read last ~64KB for state detection (covers ~50 recent events)
@@ -340,6 +346,10 @@ class SessionWatcher extends EventEmitter {
       if (readStart > 0) {
         this.scanTokensFast(sessionId, jsonlPath, readStart);
       }
+
+      // Take max of previous and new counts to avoid token regression
+      session.tokens.input = Math.max(session.tokens.input, prevTokens.input || 0);
+      session.tokens.output = Math.max(session.tokens.output, prevTokens.output || 0);
 
       this.emit('session-updated', session);
     } catch (e) {

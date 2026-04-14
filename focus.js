@@ -151,35 +151,42 @@ function focusITerm2(pid, cwd) {
 }
 
 function focusTerminalApp(pid, cwd) {
-  const script = `
-    tell application "Terminal"
-      activate
-      repeat with w in windows
-        repeat with t in tabs of w
-          set tabProcs to processes of t
-          repeat with p in tabProcs
-            if p contains "${pid}" then
+  // Same TTY strategy as iTerm2: find TTY via Node, match in AppleScript
+  let targetTty = null;
+  try {
+    const out = execSync(`ps -p ${pid} -o tty=`, { encoding: 'utf-8', timeout: 500 }).trim();
+    if (out && out !== '??') targetTty = `/dev/${out}`;
+  } catch {}
+
+  if (targetTty) {
+    const script = `
+      tell application "Terminal"
+        activate
+        repeat with w in windows
+          repeat with t in tabs of w
+            if (tty of t) is "${targetTty}" then
               set selected tab of w to t
               set index of w to 1
               return
             end if
           end repeat
         end repeat
-      end repeat
-    end tell
-  `;
+      end tell
+    `;
+    return runAppleScript(script).catch(() => {
+      if (cwd) {
+        return runAppleScript(`
+          tell application "Terminal"
+            activate
+            do script "cd ${escapeForAppleScript(cwd)}"
+          end tell
+        `);
+      }
+      return runAppleScript(`tell application "Terminal" to activate`);
+    });
+  }
 
-  return runAppleScript(script).catch(() => {
-    if (cwd) {
-      return runAppleScript(`
-        tell application "Terminal"
-          activate
-          do script "cd ${escapeForAppleScript(cwd)}"
-        end tell
-      `);
-    }
-    return runAppleScript(`tell application "Terminal" to activate`);
-  });
+  return runAppleScript(`tell application "Terminal" to activate`);
 }
 
 function focusWindows(pid, cwd) {

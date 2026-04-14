@@ -1,11 +1,11 @@
-# Claude Watch
+# Aby Claude Watcher
 
 > Dashboard desktop pour monitorer en temps réel toutes vos sessions Claude Code actives.
 
 ---
 
 <!-- Screenshot placeholder -->
-<!-- ![Claude Watch](assets/screenshot.png) -->
+<!-- ![Aby Claude Watcher](assets/screenshot.png) -->
 
 ---
 
@@ -114,7 +114,7 @@ cc                  # equivalent a `claude` + enregistrement session
 cc -p "prompt"      # avec prompt initial
 ```
 
-Installe dans le PATH. Demarre Claude Code et notifie Claude Watch via socket locale pour activer le focus terminal.
+Installe dans le PATH. Demarre Claude Code et notifie Aby Claude Watcher via socket locale pour activer le focus terminal.
 
 ### `cwa` — attacher une session existante
 

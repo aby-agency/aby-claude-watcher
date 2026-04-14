@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# cc — Claude Code wrapper that registers the session with Claude Watch
+# cc — Claude Code wrapper that registers the session with Aby Claude Watcher
 # Usage: cc [args...]
 
-SOCKET_PATH="/tmp/claude-watch.sock"
+SOCKET_PATH="/tmp/aby-claude-watcher.sock"
 
 # Detect terminal app
 detect_terminal() {
@@ -28,7 +28,7 @@ detect_terminal_id() {
   fi
 }
 
-# Send message to Claude Watch via socket (async, non-blocking)
+# Send message to Aby Claude Watcher via socket (async, non-blocking)
 # Tries nc -U first, falls back to python3 if unavailable
 notify_claude_watch() {
   local msg="$1"
@@ -52,7 +52,7 @@ finally: s.close()
 TERMINAL_APP=$(detect_terminal)
 TERMINAL_ID=$(detect_terminal_id)
 
-# Notify Claude Watch in the background BEFORE launching Claude
+# Notify Aby Claude Watcher in the background BEFORE launching Claude
 # We use $$ (our PID) — the watcher will find the session via the sessions dir
 notify_claude_watch "{\"action\":\"register\",\"pid\":$$,\"terminalApp\":\"$TERMINAL_APP\",\"terminalId\":\"$TERMINAL_ID\",\"cwd\":\"$(pwd)\"}"
 

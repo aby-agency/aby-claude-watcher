@@ -1,4 +1,4 @@
-# Claude Watch
+# Aby Claude Watcher
 
 Electron desktop app monitoring Claude Code sessions in real-time.
 

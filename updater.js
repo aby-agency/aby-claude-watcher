@@ -10,8 +10,9 @@ const https = require('https');
 const { app } = require('electron');
 
 // Configure these for your repo — update when you publish to GitHub
-const GITHUB_OWNER = 'invictorius';
-const GITHUB_REPO = 'claude-watch';
+const GITHUB_OWNER = 'aby-agency';
+const GITHUB_REPO = 'aby-claude-watcher';
+const WEBSITE_URL = 'https://aby-agency.fr';
 
 const CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 let lastCheck = 0;
@@ -37,7 +38,7 @@ function fetchLatestRelease() {
       hostname: 'api.github.com',
       path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
       headers: {
-        'User-Agent': 'Claude-Watch-Updater',
+        'User-Agent': 'Aby-Claude-Watcher-Updater',
         'Accept': 'application/vnd.github.v3+json',
       },
       timeout: 10000,
@@ -102,4 +103,4 @@ async function checkForUpdates(force = false) {
   }
 }
 
-module.exports = { checkForUpdates, GITHUB_OWNER, GITHUB_REPO };
+module.exports = { checkForUpdates, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL };

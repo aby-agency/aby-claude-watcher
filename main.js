@@ -3,7 +3,7 @@ const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
 const { focusTerminal, resumeSession, launchSession } = require('./focus');
-const { checkForUpdates, GITHUB_OWNER, GITHUB_REPO } = require('./updater');
+const { checkForUpdates, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
 const config = require('./config');
 
 let mainWindow;
@@ -205,7 +205,8 @@ function setupIPC() {
       const host = u.hostname.toLowerCase();
       if (host === 'claude.ai' || host.endsWith('.claude.ai') ||
           host === 'anthropic.com' || host.endsWith('.anthropic.com') ||
-          host === 'github.com' || host.endsWith('.github.com')) {
+          host === 'github.com' || host.endsWith('.github.com') ||
+          host === 'aby-agency.fr' || host.endsWith('.aby-agency.fr')) {
         shell.openExternal(url);
       }
     } catch {}
@@ -247,6 +248,7 @@ function setupIPC() {
       version: app.getVersion(),
       name: app.getName(),
       githubUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`,
+      websiteUrl: WEBSITE_URL,
     };
   });
 
@@ -479,7 +481,7 @@ function setupTray() {
     icon.setTemplateImage(true);
   }
   tray = new Tray(icon);
-  tray.setToolTip('Claude Watch');
+  tray.setToolTip('Aby Claude Watcher');
 
   tray.on('click', togglePopover);
   tray.on('right-click', togglePopover);
@@ -516,7 +518,7 @@ function updateTrayMenu() {
   const sessions = watcher.getSessions();
   const activeCount = sessions.filter(s => s.state.name !== 'completed').length;
   const waitingCount = sessions.filter(s => s.state.name === 'waiting').length;
-  let tooltip = `Claude Watch — ${activeCount} active`;
+  let tooltip = `Aby Claude Watcher — ${activeCount} active`;
   if (waitingCount > 0) tooltip += ` (${waitingCount} en attente)`;
   tray.setToolTip(tooltip);
 }

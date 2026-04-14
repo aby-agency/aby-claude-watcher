@@ -1,7 +1,7 @@
 {
-  "name": "claude-watch",
+  "name": "aby-claude-watcher",
   "version": "1.0.0",
-  "description": "Dashboard desktop pour monitorer en temps réel vos sessions Claude Code",
+  "description": "Aby Claude Watcher — dashboard desktop pour monitorer en temps réel vos sessions Claude Code",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -10,40 +10,48 @@
     "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js && node test/updater.test.js"
   },
   "build": {
-    "appId": "com.claudewatch.app",
-    "productName": "Claude Watch",
+    "appId": "fr.aby-agency.aby-claude-watcher",
+    "productName": "Aby Claude Watcher",
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": ["dmg"],
       "icon": "assets/icon.svg"
     },
     "dmg": {
-      "title": "Claude Watch"
+      "title": "Aby Claude Watcher"
     },
     "files": [
       "main.js",
       "preload.js",
+      "preload-popover.js",
       "watcher.js",
       "socket.js",
       "focus.js",
       "config.js",
+      "updater.js",
       "ui/**/*",
       "bin/**/*",
       "assets/**/*"
     ]
   },
   "bin": {
-    "claude-watch": "main.js"
+    "aby-claude-watcher": "main.js"
   },
   "keywords": [
     "claude",
-    "code",
+    "claude-code",
     "monitor",
+    "dashboard",
     "electron",
-    "dashboard"
+    "aby"
   ],
-  "author": "",
+  "author": "Aby Agency <contact@aby-agency.fr> (https://aby-agency.fr)",
   "license": "MIT",
+  "homepage": "https://aby-agency.fr",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aby-agency/aby-claude-watcher.git"
+  },
   "devDependencies": {
     "electron": "^41.2.0",
     "electron-builder": "^26.8.1"

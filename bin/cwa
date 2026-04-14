@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# cwa — Attach current terminal to an active Claude Code session in Claude Watch
+# cwa — Attach current terminal to an active Claude Code session in Aby Claude Watcher
 # Usage: cwa [session_id]
 
-SOCKET_PATH="/tmp/claude-watch.sock"
+SOCKET_PATH="/tmp/aby-claude-watcher.sock"
 SESSIONS_DIR="$HOME/.claude/sessions"
 
 detect_terminal() {
@@ -53,7 +53,7 @@ TERMINAL_ID=$(detect_terminal_id)
 if [ -n "$1" ]; then
   SESSION_ID="$1"
   notify_claude_watch "{\"action\":\"attach\",\"sessionId\":\"$SESSION_ID\",\"terminalApp\":\"$TERMINAL_APP\",\"terminalId\":\"$TERMINAL_ID\"}"
-  echo "Attached session $SESSION_ID to Claude Watch"
+  echo "Attached session $SESSION_ID to Aby Claude Watcher"
   exit 0
 fi
 
@@ -93,7 +93,7 @@ fi
 if [ ${#ACTIVE_SESSIONS[@]} -eq 1 ]; then
   SESSION_ID=$(echo "${ACTIVE_SESSIONS[0]}" | cut -d'|' -f1)
   notify_claude_watch "{\"action\":\"attach\",\"sessionId\":\"$SESSION_ID\",\"terminalApp\":\"$TERMINAL_APP\",\"terminalId\":\"$TERMINAL_ID\"}"
-  echo "Attached session $SESSION_ID to Claude Watch"
+  echo "Attached session $SESSION_ID to Aby Claude Watcher"
   exit 0
 fi
 
@@ -114,7 +114,7 @@ if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#ACTI
   idx=$((choice - 1))
   SESSION_ID=$(echo "${ACTIVE_SESSIONS[$idx]}" | cut -d'|' -f1)
   notify_claude_watch "{\"action\":\"attach\",\"sessionId\":\"$SESSION_ID\",\"terminalApp\":\"$TERMINAL_APP\",\"terminalId\":\"$TERMINAL_ID\"}"
-  echo "Attached session $SESSION_ID to Claude Watch"
+  echo "Attached session $SESSION_ID to Aby Claude Watcher"
 else
   echo "Invalid choice."
   exit 1

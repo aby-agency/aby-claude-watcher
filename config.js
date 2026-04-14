@@ -3,7 +3,7 @@ const path = require('path');
 const { app } = require('electron');
 
 const CONFIG_PATH = path.join(
-  app ? app.getPath('userData') : path.join(require('os').homedir(), '.claude-watch'),
+  app ? app.getPath('userData') : path.join(require('os').homedir(), '.aby-claude-watcher'),
   'config.json'
 );
 

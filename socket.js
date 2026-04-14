@@ -4,8 +4,8 @@ const path = require('path');
 const { EventEmitter } = require('events');
 
 const SOCKET_PATH = process.platform === 'win32'
-  ? '\\\\.\\pipe\\claude-watch'
-  : '/tmp/claude-watch.sock';
+  ? '\\\\.\\pipe\\aby-claude-watcher'
+  : '/tmp/aby-claude-watcher.sock';
 
 class SocketServer extends EventEmitter {
   constructor() {

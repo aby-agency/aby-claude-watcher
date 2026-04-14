@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Create isolated test config dir
-const testDir = path.join(os.tmpdir(), `claude-watch-test-${Date.now()}`);
+const testDir = path.join(os.tmpdir(), `aby-claude-watcher-test-${Date.now()}`);
 fs.mkdirSync(testDir, { recursive: true });
 
 // Stub electron

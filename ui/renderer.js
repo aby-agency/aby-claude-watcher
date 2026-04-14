@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════
-// Claude Watch — Renderer
+// Aby Claude Watcher — Renderer
 // ═══════════════════════════════════════════════
 
 // Lucide-style SVG icons (24x24 viewBox, stroke-based)
@@ -209,6 +209,11 @@ async function init() {
     const info = await window.api.getAppInfo();
     window.api.openExternalUrl(info.githubUrl);
   });
+  document.getElementById('aboutWebsite').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const info = await window.api.getAppInfo();
+    window.api.openExternalUrl(info.websiteUrl);
+  });
 
   // Update available event from main process
   window.api.onUpdateAvailable((info) => showUpdateBanner(info));
@@ -381,7 +386,7 @@ async function checkForUpdate(force) {
     });
     showUpdateBanner(result);
   } else if (result.status === 'up-to-date') {
-    statusLabel.textContent = 'Claude Watch est à jour';
+    statusLabel.textContent = 'Aby Claude Watcher est à jour';
     statusHint.textContent = `Version ${result.current} — dernière vérification à l'instant`;
   } else if (result.status === 'no-releases') {
     statusLabel.textContent = 'Aucune version publiée';

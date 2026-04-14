@@ -23,12 +23,19 @@ If you run more than one Claude Code session at a time, you know the pain: you s
 Built at **Aby Agency** to solve our own daily workflow — shipped as MIT open source for anyone who ships with Claude.
 
 <div align="center">
-  <img src="assets/screenshot-grid.png" alt="Grid view" width="360">
-  &nbsp;&nbsp;
-  <img src="assets/screenshot-compact.png" alt="Compact view" width="480">
+  <img src="assets/demo.gif" alt="Aby Claude Watcher in action" width="720">
 </div>
 
-<div align="center"><em>Grid view (left) — rich session cards. Compact view (right) — always-on-top list.</em></div>
+<div align="center"><em>Grid view with live sessions — states, tool pills, tokens, model, branch, all real-time.</em></div>
+
+<details>
+<summary><strong>Compact view</strong> — always-on-top list mode</summary>
+
+<div align="center">
+  <img src="assets/demo-compact.gif" alt="Compact view" width="560">
+</div>
+
+</details>
 
 ---
 

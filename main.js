@@ -244,6 +244,13 @@ function setupIPC() {
   ipcMain.handle('popover-quit', () => {
     app.quit();
   });
+
+  ipcMain.handle('popover-resize', (_, height) => {
+    if (!popoverWindow || popoverWindow.isDestroyed()) return;
+    const clamped = Math.max(120, Math.min(600, Math.round(height)));
+    const [w] = popoverWindow.getSize();
+    popoverWindow.setSize(w, clamped, false);
+  });
 }
 
 function serializeSession(session) {

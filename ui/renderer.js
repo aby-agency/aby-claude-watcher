@@ -371,7 +371,7 @@ function updateSession(s) {
   // Trigger state-changed animation if state actually changed
   if (oldState !== stateName) {
     newEl.classList.add('state-changed');
-    setTimeout(() => newEl.classList.remove('state-changed'), 800);
+    newEl.addEventListener('animationend', () => newEl.classList.remove('state-changed'), { once: true });
   }
 
   existing.replaceWith(newEl);

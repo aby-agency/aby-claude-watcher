@@ -29,8 +29,20 @@ detect_terminal_id() {
 
 notify_claude_watch() {
   local msg="$1"
-  if [ -S "$SOCKET_PATH" ]; then
+  if [ ! -S "$SOCKET_PATH" ]; then return; fi
+  if echo "" | nc -U -w 1 "$SOCKET_PATH" >/dev/null 2>&1; then
     echo "$msg" | nc -U -w 1 "$SOCKET_PATH" 2>/dev/null || true
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.settimeout(1)
+try:
+    s.connect(sys.argv[1])
+    s.sendall((sys.argv[2] + '\n').encode())
+except: pass
+finally: s.close()
+" "$SOCKET_PATH" "$msg" || true
   fi
 }
 
@@ -51,11 +63,23 @@ if [ ! -d "$SESSIONS_DIR" ]; then
   exit 1
 fi
 
+read_json_field() {
+  local file="$1"
+  local field="$2"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r ".$field" "$file" 2>/dev/null
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])" "$file" "$field" 2>/dev/null
+  elif command -v node >/dev/null 2>&1; then
+    node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1]))[process.argv[2]])" "$file" "$field" 2>/dev/null
+  fi
+}
+
 ACTIVE_SESSIONS=()
 for f in "$SESSIONS_DIR"/*.json; do
   [ -f "$f" ] || continue
-  PID=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['pid'])" "$f" 2>/dev/null)
-  SESSION_ID=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sessionId'])" "$f" 2>/dev/null)
+  PID=$(read_json_field "$f" "pid")
+  SESSION_ID=$(read_json_field "$f" "sessionId")
   if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
     ACTIVE_SESSIONS+=("$SESSION_ID|$PID|$f")
   fi

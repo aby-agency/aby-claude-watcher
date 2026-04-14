@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder --mac"
+    "build": "electron-builder --mac",
+    "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js"
   },
   "build": {
     "appId": "com.claudewatch.app",

@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld('popoverApi', {
   hide: () => ipcRenderer.invoke('popover-hide'),
   quit: () => ipcRenderer.invoke('popover-quit'),
   onUpdate: (cb) => ipcRenderer.on('popover-update', () => cb()),
+  resize: (height) => ipcRenderer.invoke('popover-resize', height),
 });

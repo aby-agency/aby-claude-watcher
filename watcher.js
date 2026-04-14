@@ -182,7 +182,10 @@ class SessionWatcher extends EventEmitter {
         }
       }
     } catch (e) {
-      // sessions dir might not exist yet
+      // ENOENT is expected when Claude Code is not yet running
+      if (e.code !== 'ENOENT') {
+        console.error('SessionWatcher scan error:', e.message);
+      }
     }
   }
 

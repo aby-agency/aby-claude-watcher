@@ -15,8 +15,8 @@ function sanitizeSessionId(id) {
 
 function sanitizePath(p) {
   if (!p || typeof p !== 'string') return null;
-  // Block shell metacharacters
-  if (/[;&|`$(){}!<>]/.test(p)) return null;
+  // Block shell metacharacters and quote/backslash that could break quoted args
+  if (/[;&|`$(){}!<>"\\\n\r]/.test(p)) return null;
   return p;
 }
 

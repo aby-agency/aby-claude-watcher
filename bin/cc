@@ -29,10 +29,23 @@ detect_terminal_id() {
 }
 
 # Send message to Claude Watch via socket (async, non-blocking)
+# Tries nc -U first, falls back to python3 if unavailable
 notify_claude_watch() {
   local msg="$1"
-  if [ -S "$SOCKET_PATH" ]; then
+  if [ ! -S "$SOCKET_PATH" ]; then return; fi
+  if echo "" | nc -U -w 1 "$SOCKET_PATH" >/dev/null 2>&1; then
     echo "$msg" | nc -U -w 1 "$SOCKET_PATH" 2>/dev/null &
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.settimeout(1)
+try:
+    s.connect(sys.argv[1])
+    s.sendall((sys.argv[2] + '\n').encode())
+except: pass
+finally: s.close()
+" "$SOCKET_PATH" "$msg" &
   fi
 }
 

@@ -76,6 +76,11 @@ async function refresh() {
   const config = await window.popoverApi.getConfig();
   if (myId !== refreshSeq) return; // stale, abort
   renderPopover(sessions, config);
+  // Auto-resize to fit content
+  requestAnimationFrame(() => {
+    const height = document.querySelector('.popover-body').scrollHeight;
+    window.popoverApi.resize(height);
+  });
 }
 
 document.getElementById('popOpenBtn').addEventListener('click', () => {
@@ -87,5 +92,15 @@ document.getElementById('popQuitBtn').addEventListener('click', () => {
   window.popoverApi.quit();
 });
 
-window.popoverApi.onUpdate(() => refresh());
+// Debounce rapid updates to avoid hammering IPC with many sessions
+let refreshPending = null;
+function scheduleRefresh() {
+  if (refreshPending) return;
+  refreshPending = setTimeout(() => {
+    refreshPending = null;
+    refresh();
+  }, 100);
+}
+
+window.popoverApi.onUpdate(scheduleRefresh);
 refresh();

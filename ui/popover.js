@@ -4,7 +4,6 @@ const STATE_COLORS = {
   thinking: '#a78bfa',
   running: '#22c55e',
   waiting: '#3b82f6',
-  idle: '#94a3b8',
   error: '#ef4444',
   completed: '#4b5563',
 };
@@ -25,8 +24,7 @@ function renderPopover(sessions, config) {
 
   const active = sessions.filter(s => s.state.name !== 'completed');
 
-  const nPlural = active.length !== 1 ? 's' : '';
-  $header.textContent = `${active.length} session${nPlural}`;
+  $header.textContent = window.i18n.t('popover_header', { n: active.length });
 
   if (active.length === 0) {
     $list.innerHTML = `<div class="popover-empty">${window.i18n.t('popover_empty')}</div>`;

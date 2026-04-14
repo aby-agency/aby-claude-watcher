@@ -10,15 +10,13 @@ const PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
 const SCAN_INTERVAL = 2000;
 const POLL_INTERVAL = 250;
 const WAITING_DELAY = 2000;
-const IDLE_TIMEOUT = 120000;
 
 const STATES = {
-  THINKING: { name: 'thinking', color: '#a78bfa', label: 'Réflexion' },
-  RUNNING: { name: 'running', color: '#22c55e', label: 'Exécution' },
-  WAITING: { name: 'waiting', color: '#3b82f6', label: 'En attente' },
-  IDLE: { name: 'idle', color: '#94a3b8', label: 'Inactif' },
-  ERROR: { name: 'error', color: '#ef4444', label: 'Erreur' },
-  COMPLETED: { name: 'completed', color: '#4b5563', label: 'Terminé' },
+  THINKING: { name: 'thinking', color: '#a78bfa' },
+  RUNNING: { name: 'running', color: '#22c55e' },
+  WAITING: { name: 'waiting', color: '#3b82f6' },
+  ERROR: { name: 'error', color: '#ef4444' },
+  COMPLETED: { name: 'completed', color: '#4b5563' },
 };
 
 class SessionWatcher extends EventEmitter {
@@ -29,8 +27,6 @@ class SessionWatcher extends EventEmitter {
     this.fileWatchers = new Map();
     this.fileOffsets = new Map();
     this.waitingTimers = new Map();
-    this.idleTimers = new Map();
-    this.stuckTimers = new Map();
     this.lastNotifTime = new Map(); // sessionId → timestamp of last notification
     this.scanTimer = null;
   }
@@ -75,13 +71,9 @@ class SessionWatcher extends EventEmitter {
     if (this.scanTimer) clearInterval(this.scanTimer);
     for (const watcher of this.fileWatchers.values()) watcher.close();
     for (const timer of this.waitingTimers.values()) clearTimeout(timer);
-    for (const timer of this.idleTimers.values()) clearTimeout(timer);
-    for (const timer of this.stuckTimers.values()) clearTimeout(timer);
     this.fileWatchers.clear();
     this.fileOffsets.clear();
     this.waitingTimers.clear();
-    this.stuckTimers.clear();
-    this.idleTimers.clear();
   }
 
   scan() {
@@ -117,7 +109,7 @@ class SessionWatcher extends EventEmitter {
               cwd,
               projectName,
               slug: '',
-              state: STATES.IDLE,
+              state: STATES.WAITING,
               lastTool: null,
               model: null,
                   gitBranch: null,
@@ -145,10 +137,7 @@ class SessionWatcher extends EventEmitter {
             if (pidAlive && session.state === STATES.COMPLETED) {
               // Session was marked completed but PID is alive — reactivate
               session.endedAt = null;
-              this.setState(sessionId, STATES.IDLE, false);
-            } else if (!pidAlive && session.state !== STATES.COMPLETED && session.state !== STATES.IDLE) {
-              // PID died but session file still exists — mark idle
-              this.setState(sessionId, STATES.IDLE, false);
+              this.setState(sessionId, STATES.WAITING, false);
             }
 
             if (!this.fileWatchers.has(sessionId)) {
@@ -174,12 +163,10 @@ class SessionWatcher extends EventEmitter {
         if (session._missingTicks < 2) continue;
 
         if (session.pid && this.isPidAlive(session.pid)) {
-          if (session.state !== STATES.IDLE && session.state !== STATES.WAITING) {
-            this.setState(id, STATES.IDLE, false);
-          }
-        } else {
-          this.markCompleted(id);
+          // PID alive but session file missing — leave state as-is
+          continue;
         }
+        this.markCompleted(id);
       }
     } catch (e) {
       // ENOENT is expected when Claude Code is not yet running
@@ -437,14 +424,6 @@ class SessionWatcher extends EventEmitter {
       session.gitBranch = event.gitBranch;
     }
 
-    // Reset idle timer + clear stuck hint
-    this.resetIdleTimer(sessionId);
-    this.clearStuckTimer(sessionId);
-    if (session.maybeStuck) {
-      session.maybeStuck = false;
-      this.emit('session-updated', session);
-    }
-
     switch (event.type) {
       case 'permission-mode':
         break;
@@ -560,39 +539,6 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
-  startStuckTimer(sessionId) {
-    this.clearStuckTimer(sessionId);
-    const timer = setTimeout(() => {
-      const session = this.sessions.get(sessionId);
-      if (!session) return;
-      if (session.state === STATES.THINKING || session.state === STATES.RUNNING) {
-        session.maybeStuck = true;
-        this.emit('session-updated', session);
-      }
-    }, 30000);
-    this.stuckTimers.set(sessionId, timer);
-  }
-
-  clearStuckTimer(sessionId) {
-    const timer = this.stuckTimers.get(sessionId);
-    if (timer) {
-      clearTimeout(timer);
-      this.stuckTimers.delete(sessionId);
-    }
-  }
-
-  resetIdleTimer(sessionId) {
-    const existing = this.idleTimers.get(sessionId);
-    if (existing) clearTimeout(existing);
-    const timer = setTimeout(() => {
-      const session = this.sessions.get(sessionId);
-      if (session && session.state !== STATES.COMPLETED) {
-        this.setState(sessionId, STATES.IDLE, false);
-      }
-    }, IDLE_TIMEOUT);
-    this.idleTimers.set(sessionId, timer);
-  }
-
   setState(sessionId, newState, isInitial) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
@@ -624,14 +570,6 @@ class SessionWatcher extends EventEmitter {
     // Reset cooldown when leaving waiting state
     if (stateChanged && newState.name !== 'waiting') {
       this.lastNotifTime.delete(sessionId);
-    }
-
-    // Start "maybe stuck" timer when entering thinking/running
-    if (stateChanged && (newState.name === 'thinking' || newState.name === 'running')) {
-      this.startStuckTimer(sessionId);
-    }
-    if (stateChanged && newState.name !== 'thinking' && newState.name !== 'running') {
-      this.clearStuckTimer(sessionId);
     }
   }
 
@@ -667,9 +605,6 @@ class SessionWatcher extends EventEmitter {
     const watcher = this.fileWatchers.get(sessionId);
     if (watcher) { watcher.close(); this.fileWatchers.delete(sessionId); }
     this.clearWaitingTimer(sessionId);
-    this.clearStuckTimer(sessionId);
-    const idle = this.idleTimers.get(sessionId);
-    if (idle) { clearTimeout(idle); this.idleTimers.delete(sessionId); }
     this.lastNotifTime.delete(sessionId);
     // Clean up file offsets for this session's JSONL
     const jsonlPath = this.findJsonlPath(sessionId);
@@ -708,7 +643,7 @@ class SessionWatcher extends EventEmitter {
           cwd: null,
           projectName: 'Manual',
           slug: '',
-          state: STATES.IDLE,
+          state: STATES.WAITING,
           lastTool: null,
           model: null,
           gitBranch: null,
@@ -736,7 +671,7 @@ class SessionWatcher extends EventEmitter {
           cwd: null,
           projectName: 'Manual',
           slug: '',
-          state: STATES.IDLE,
+          state: STATES.WAITING,
           lastTool: null,
           model: null,
           gitBranch: null,

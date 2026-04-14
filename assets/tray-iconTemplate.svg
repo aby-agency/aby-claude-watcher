@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <g fill="black">
+    <!-- Body -->
+    <ellipse cx="17" cy="20" rx="10" ry="5.5"/>
+    <!-- Tail wedge -->
+    <polygon points="3,14 8,20 11,18"/>
+    <!-- Head -->
+    <circle cx="14" cy="11" r="6"/>
+    <!-- Bill -->
+    <ellipse cx="22.5" cy="11" rx="4" ry="2"/>
+  </g>
+</svg>

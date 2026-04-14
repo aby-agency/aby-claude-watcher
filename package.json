@@ -14,11 +14,14 @@
     "productName": "Aby Claude Watcher",
     "mac": {
       "category": "public.app-category.developer-tools",
-      "target": ["dmg"],
-      "icon": "assets/icon.svg"
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "icon": "assets/icon.icns"
     },
     "dmg": {
-      "title": "Aby Claude Watcher"
+      "title": "Aby Claude Watcher",
+      "artifactName": "${productName}-${version}-${arch}.dmg"
     },
     "files": [
       "main.js",
@@ -29,6 +32,7 @@
       "focus.js",
       "config.js",
       "updater.js",
+      "i18n.js",
       "ui/**/*",
       "bin/**/*",
       "assets/**/*"

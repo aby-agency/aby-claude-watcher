@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeImage, shell, screen } = require('electron');
 const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
@@ -32,10 +32,18 @@ function createWindow() {
     },
   };
 
-  // Restore saved window position and size
+  // Restore saved window position and size, clamped to current displays
   if (bounds) {
-    opts.x = bounds.x;
-    opts.y = bounds.y;
+    const displays = screen.getAllDisplays();
+    const visible = displays.some(d => {
+      const wa = d.workArea;
+      return bounds.x < wa.x + wa.width && bounds.x + bounds.width > wa.x &&
+             bounds.y < wa.y + wa.height && bounds.y + bounds.height > wa.y;
+    });
+    if (visible) {
+      opts.x = bounds.x;
+      opts.y = bounds.y;
+    }
     opts.width = bounds.width;
     opts.height = bounds.height;
   }
@@ -64,6 +72,20 @@ function createWindow() {
 
   mainWindow.on('focus', () => {
     if (process.platform === 'darwin') app.dock.setBadge('');
+  });
+
+  // On macOS, clicking the red close button should HIDE the window (stay in tray)
+  // rather than destroy it — true "tray-only" app behavior when dismissed
+  mainWindow.on('close', (e) => {
+    if (process.platform === 'darwin' && !app._isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+      if (app.dock) app.dock.hide();
+    }
+  });
+
+  mainWindow.on('show', () => {
+    if (process.platform === 'darwin' && app.dock) app.dock.show();
   });
 
   mainWindow.on('closed', () => {
@@ -305,7 +327,6 @@ function serializeSession(session) {
     endedAt: session.endedAt,
     tokens: session.tokens,
     remoteUrl: session.remoteUrl || null,
-    maybeStuck: session.maybeStuck || false,
     cwd: session.cwd,
   };
 }
@@ -336,6 +357,18 @@ function applyAutoLaunch() {
 
 // Allow audio autoplay in renderer
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
+// Single-instance lock — prevents socket conflicts and duplicate trays
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
 
 app.whenReady().then(() => {
   // Only grant audio-related permissions (needed for notification sound routing)
@@ -441,64 +474,11 @@ function togglePopover() {
   }
 }
 
-// Draw the tray icon at a given size — monitor + clock with thicker strokes
-// that render cleanly at both 16px (macOS) and 22px (Linux).
-function drawTrayIconBuffer(size) {
-  const buf = Buffer.alloc(size * size * 4);
-  const px = (x, y, a = 255) => {
-    if (x < 0 || x >= size || y < 0 || y >= size) return;
-    const i = (y * size + x) * 4;
-    buf[i] = 0; buf[i+1] = 0; buf[i+2] = 0; buf[i+3] = a;
-  };
-
-  // Scale coordinates from a 32-unit canvas to the target size
-  const sc = (v) => Math.round(v * size / 32);
-
-  const line = (x0, y0, x1, y1, a = 255) => {
-    const dx = Math.abs(x1-x0), dy = Math.abs(y1-y0);
-    const sx = x0<x1?1:-1, sy = y0<y1?1:-1;
-    let err = dx-dy;
-    while(true) {
-      px(x0,y0,a);
-      if(x0===x1&&y0===y1) break;
-      const e2=2*err;
-      if(e2>-dy){err-=dy;x0+=sx;}
-      if(e2<dx){err+=dx;y0+=sy;}
-    }
-  };
-  const rect = (x, y, w, h, a = 255) => {
-    for(let i=x;i<x+w;i++){px(i,y,a);px(i,y+h-1,a);}
-    for(let j=y;j<y+h;j++){px(x,j,a);px(x+w-1,j,a);}
-  };
-  // Monitor (2px thick border)
-  rect(sc(3), sc(4), sc(26), sc(18));
-  rect(sc(4), sc(5), sc(24), sc(16));
-  // Stand
-  for(let x=sc(13);x<=sc(18);x++) px(x,sc(22));
-  for(let x=sc(10);x<=sc(21);x++) px(x,sc(23));
-  // Clock circle
-  const cx=sc(24),cy=sc(9),r=sc(5);
-  for(let a=0;a<360;a+=6){
-    px(cx+Math.round(r*Math.cos(a*Math.PI/180)),cy+Math.round(r*Math.sin(a*Math.PI/180)));
-  }
-  // Clock hands
-  line(cx,cy,cx,cy-sc(3));
-  line(cx,cy,cx+sc(2),cy+sc(1));
-  // Dots inside monitor (sessions)
-  [10,15,20].forEach(x0 => {
-    px(sc(x0),sc(13),180);
-    px(sc(x0+1),sc(13),180);
-  });
-
-  return buf;
-}
-
 function generateTrayIcon() {
-  // Generate both 16x16 (@1x) and 32x32 (@2x retina) representations
-  const img16 = nativeImage.createFromBuffer(drawTrayIconBuffer(16), { width: 16, height: 16 });
-  const img32 = drawTrayIconBuffer(32);
-  img16.addRepresentation({ width: 32, height: 32, scaleFactor: 2, buffer: img32 });
-  return img16;
+  // `Template` suffix tells Electron this is a template image (macOS).
+  // The @2x variant is auto-loaded from the same directory.
+  const iconPath = path.join(__dirname, 'assets', 'tray-iconTemplate.png');
+  return nativeImage.createFromPath(iconPath);
 }
 
 function setupTray() {
@@ -549,6 +529,8 @@ function updateTrayMenu() {
   if (waitingCount > 0) tooltip += i18n.t('tray_tooltip_waiting', { n: waitingCount });
   tray.setToolTip(tooltip);
 }
+
+app.on('before-quit', () => { app._isQuitting = true; });
 
 app.on('will-quit', () => {
   config.saveSync();

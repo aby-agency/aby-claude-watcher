@@ -7,7 +7,6 @@
       state_thinking: 'Réflexion',
       state_running: 'Exécution',
       state_waiting: 'En attente',
-      state_idle: 'Inactif',
       state_error: 'Erreur',
       state_completed: 'Terminé',
 
@@ -105,6 +104,7 @@
 
       // Popover
       popover_empty: 'Aucune session active',
+      popover_header: '{n} session{s}',
       popover_open: 'Ouvrir',
       popover_quit: 'Quitter',
       popover_quit_title: 'Quitter Aby Claude Watcher',
@@ -114,9 +114,6 @@
       status_waiting: '{n} en attente',
       status_tokens: '{n} tokens',
       status_filtered: '{visible}/{total} affichées',
-
-      // Stuck hint
-      stuck_hint: 'Possible action requise',
 
       // Tray
       tray_tooltip: '{app} — {n} active{s}',
@@ -136,7 +133,6 @@
       state_thinking: 'Thinking',
       state_running: 'Running',
       state_waiting: 'Waiting',
-      state_idle: 'Idle',
       state_error: 'Error',
       state_completed: 'Completed',
 
@@ -234,6 +230,7 @@
 
       // Popover
       popover_empty: 'No active session',
+      popover_header: '{n} session{s}',
       popover_open: 'Open',
       popover_quit: 'Quit',
       popover_quit_title: 'Quit Aby Claude Watcher',
@@ -243,9 +240,6 @@
       status_waiting: '{n} waiting',
       status_tokens: '{n} tokens',
       status_filtered: '{visible}/{total} shown',
-
-      // Stuck hint
-      stuck_hint: 'Action may be required',
 
       // Tray
       tray_tooltip: '{app} — {n} active',

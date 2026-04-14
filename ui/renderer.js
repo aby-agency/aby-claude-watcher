@@ -370,6 +370,7 @@ function setNotifPosition(pos) {
 function t(key, params) { return window.i18n.t(key, params); }
 
 function applyI18n() {
+  document.documentElement.lang = window.i18n.getLanguage();
   // Plain text: [data-i18n]
   document.querySelectorAll('[data-i18n]').forEach(el => {
     el.textContent = t(el.dataset.i18n);
@@ -423,7 +424,7 @@ async function checkForUpdate(force) {
 
   if (result.status === 'update-available') {
     statusLabel.textContent = t('update_available', { version: result.latest });
-    statusHint.innerHTML = `<a href="#" class="update-link" data-url="${esc(result.url)}">${t('update_download_link')}</a>`;
+    statusHint.innerHTML = `<a href="#" class="update-link" data-url="${escAttr(result.url)}">${t('update_download_link')}</a>`;
     statusHint.querySelector('.update-link').addEventListener('click', (e) => {
       e.preventDefault();
       window.api.openExternalUrl(result.url);
@@ -633,7 +634,6 @@ function cardHTML(s) {
       <div class="state-badge ${stateName}">
         ${(stateName === 'running' || stateName === 'thinking') ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
         ${stateLabel}
-        ${s.maybeStuck ? `<span class="stuck-hint" title="${t('stuck_hint')}">${ICONS.alertTriangle}</span>` : ''}
       </div>
       <div class="card-details">
         <div class="detail">

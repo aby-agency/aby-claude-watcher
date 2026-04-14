@@ -16,7 +16,7 @@
   --state-thinking: #a78bfa;
   --state-running: #22c55e;
   --state-waiting: #3b82f6;
-  --state-idle: #94a3b8;
+  --state-neutral: #94a3b8;
   --state-error: #ef4444;
   --state-completed: #4b5563;
 
@@ -324,6 +324,7 @@ body {
 .content {
   padding: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
   height: calc(100vh - 45px - 24px);
 }
 
@@ -402,7 +403,7 @@ body {
 
 .grid-view {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 12px;
 }
 
@@ -426,7 +427,7 @@ body {
   bottom: 0;
   width: 3px;
   border-radius: 3px 0 0 3px;
-  background: var(--card-accent, var(--state-idle));
+  background: var(--card-accent, var(--state-neutral));
   transition: background var(--transition);
 }
 
@@ -541,7 +542,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   background: var(--badge-bg, rgba(107, 114, 128, 0.15));
-  color: var(--badge-color, var(--state-idle));
+  color: var(--badge-color, var(--state-neutral));
   transition: all var(--transition);
 }
 
@@ -594,22 +595,12 @@ body {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
-.stuck-hint {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 4px;
-  color: #f59e0b;
-  animation: pulse-slow 2s ease-in-out infinite;
-  cursor: help;
-}
-
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
 
-/* Idle/error badges — slow breathing */
-.state-badge.idle .dot,
+/* Error badges — slow breathing */
 .state-badge.error .dot {
   animation: breathe 3s ease-in-out infinite;
 }
@@ -624,11 +615,11 @@ body {
 @keyframes stateFlash {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 var(--card-accent, var(--state-idle));
+    box-shadow: 0 0 0 0 var(--card-accent, var(--state-neutral));
   }
   30% {
     transform: scale(1.015);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--card-accent, var(--state-idle)) 30%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--card-accent, var(--state-neutral)) 30%, transparent);
   }
   100% {
     transform: scale(1);
@@ -739,7 +730,7 @@ body {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--state-idle);
+  background: var(--state-neutral);
 }
 
 .compact-spinner {
@@ -758,7 +749,6 @@ body {
 .compact-item[data-state="running"] { color: var(--state-running); }
 .compact-item[data-state="running"] .compact-dot { background: var(--state-running); }
 .compact-item[data-state="waiting"] .compact-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
-.compact-item[data-state="idle"] .compact-dot { background: var(--state-idle); }
 .compact-item[data-state="error"] .compact-dot { background: var(--state-error); }
 .compact-item[data-state="completed"] .compact-dot { background: var(--state-completed); }
 
@@ -1256,7 +1246,6 @@ body {
 .card[data-state="waiting"] { --card-accent: var(--state-waiting); }
 .card[data-state="completed"] { --card-accent: var(--state-completed); }
 .card[data-state="error"] { --card-accent: var(--state-error); }
-.card[data-state="idle"] { --card-accent: var(--state-idle); }
 
 /* Completed cards — greyed out */
 .card[data-state="completed"] {
@@ -1280,15 +1269,13 @@ body {
 .compact-item[data-state="waiting"] .state-dot { background: var(--state-waiting); }
 .compact-item[data-state="completed"] .state-dot { background: var(--state-completed); }
 .compact-item[data-state="error"] .state-dot { background: var(--state-error); }
-.compact-item[data-state="idle"] .state-dot { background: var(--state-idle); }
 
 .compact-item[data-state="running"] .state-dot,
 .compact-item[data-state="thinking"] .state-dot {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-/* Idle/waiting/error dots — slow gentle breathing */
-.compact-item[data-state="idle"] .state-dot,
+/* Waiting/error dots — slow gentle breathing */
 .compact-item[data-state="waiting"] .state-dot,
 .compact-item[data-state="error"] .state-dot {
   animation: breathe 3s ease-in-out infinite;

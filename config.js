@@ -15,6 +15,7 @@ let config = {
   compactMode: false,
   notifPosition: 'top-right',  // 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
   autoLaunch: false,
+  language: null,       // 'fr' | 'en' | null (auto-detect)
   volume: 0.7,          // 0.0 - 1.0
   windowBounds: null,   // { x, y, width, height }
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
@@ -91,6 +92,11 @@ function setNotifPosition(value) {
 
 function setAutoLaunch(value) {
   config.autoLaunch = !!value;
+  save();
+}
+
+function setLanguage(lang) {
+  config.language = (lang === 'fr' || lang === 'en') ? lang : null;
   save();
 }
 
@@ -173,6 +179,7 @@ module.exports = {
   setVolume,
   setNotifPosition,
   setAutoLaunch,
+  setLanguage,
   getNotificationPrefs,
   setNotificationPrefs,
   setCustomName,

@@ -5,6 +5,7 @@ const { SocketServer } = require('./socket');
 const { focusTerminal, resumeSession, launchSession } = require('./focus');
 const { checkForUpdates, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
 const config = require('./config');
+const i18n = require('./i18n');
 
 let mainWindow;
 let popoverWindow;
@@ -239,6 +240,22 @@ function setupIPC() {
     applyAutoLaunch();
   });
 
+  ipcMain.handle('set-language', (_, lang) => {
+    config.setLanguage(lang);
+    applyLanguage();
+    // Broadcast to both windows so they reload text immediately
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('language-changed', i18n.getLanguage());
+    }
+    if (popoverWindow && !popoverWindow.isDestroyed()) {
+      popoverWindow.webContents.send('popover-update');
+    }
+    // Update tray tooltip with new language
+    updateTrayMenu();
+  });
+
+  ipcMain.handle('get-language', () => i18n.getLanguage());
+
   ipcMain.handle('check-updates', async (_, force) => {
     return checkForUpdates(!!force);
   });
@@ -299,6 +316,12 @@ function sendToRenderer(channel, data) {
   }
 }
 
+function applyLanguage() {
+  const cfg = config.get();
+  const lang = cfg.language || i18n.detectSystemLanguage();
+  i18n.setLanguage(lang);
+}
+
 function applyAutoLaunch() {
   const enabled = !!config.get().autoLaunch;
   try {
@@ -321,7 +344,8 @@ app.whenReady().then(() => {
     callback(allowed.includes(permission));
   });
 
-  // Apply auto-launch setting
+  // Apply language + auto-launch
+  applyLanguage();
   applyAutoLaunch();
 
   createWindow();
@@ -518,8 +542,8 @@ function updateTrayMenu() {
   const sessions = watcher.getSessions();
   const activeCount = sessions.filter(s => s.state.name !== 'completed').length;
   const waitingCount = sessions.filter(s => s.state.name === 'waiting').length;
-  let tooltip = `Aby Claude Watcher — ${activeCount} active`;
-  if (waitingCount > 0) tooltip += ` (${waitingCount} en attente)`;
+  let tooltip = i18n.t('tray_tooltip', { app: 'Aby Claude Watcher', n: activeCount });
+  if (waitingCount > 0) tooltip += i18n.t('tray_tooltip_waiting', { n: waitingCount });
   tray.setToolTip(tooltip);
 }
 

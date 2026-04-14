@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('api', {
   getAppInfo: () => ipcRenderer.invoke('get-app-info'),
   openExternalUrl: (url) => ipcRenderer.invoke('open-remote', url),
   launchSession: (cwd) => ipcRenderer.invoke('launch-session', cwd),
+  getLanguage: () => ipcRenderer.invoke('get-language'),
+  setLanguage: (lang) => ipcRenderer.invoke('set-language', lang),
 
   onSessionAdded: (callback) => ipcRenderer.on('session-added', (_, data) => callback(data)),
   onSessionUpdated: (callback) => ipcRenderer.on('session-updated', (_, data) => callback(data)),
@@ -41,4 +43,5 @@ contextBridge.exposeInMainWorld('api', {
   onShowNotification: (callback) => ipcRenderer.on('show-notification', (_, data) => callback(data)),
   onPlaySound: (callback) => ipcRenderer.on('play-sound', () => callback()),
   onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_, info) => callback(info)),
+  onLanguageChanged: (callback) => ipcRenderer.on('language-changed', (_, lang) => callback(lang)),
 });

@@ -25,10 +25,11 @@ function renderPopover(sessions, config) {
 
   const active = sessions.filter(s => s.state.name !== 'completed');
 
-  $header.textContent = `${active.length} session${active.length !== 1 ? 's' : ''}`;
+  const nPlural = active.length !== 1 ? 's' : '';
+  $header.textContent = `${active.length} session${nPlural}`;
 
   if (active.length === 0) {
-    $list.innerHTML = '<div class="popover-empty">Aucune session active</div>';
+    $list.innerHTML = `<div class="popover-empty">${window.i18n.t('popover_empty')}</div>`;
     return;
   }
 
@@ -54,7 +55,7 @@ function renderPopover(sessions, config) {
       <div class="pop-item" data-session="${esc(s.sessionId)}">
         ${indicator}
         <span class="pop-name">${esc(displayName)}</span>
-        <span class="pop-state">${esc(s.state.label)}</span>
+        <span class="pop-state">${esc(window.i18n.t('state_' + s.state.name))}</span>
       </div>
     `;
   }).join('');
@@ -75,6 +76,16 @@ async function refresh() {
   if (myId !== refreshSeq) return; // stale, abort
   const config = await window.popoverApi.getConfig();
   if (myId !== refreshSeq) return; // stale, abort
+  // Sync language
+  const lang = config.language || window.i18n.detectSystemLanguage();
+  window.i18n.setLanguage(lang);
+  // Apply i18n to static elements (title, button labels)
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = window.i18n.t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.setAttribute('title', window.i18n.t(el.dataset.i18nTitle));
+  });
   renderPopover(sessions, config);
   // Auto-resize to fit content
   requestAnimationFrame(() => {

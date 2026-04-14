@@ -11,38 +11,38 @@
   <!-- Toolbar -->
   <div class="toolbar">
     <div class="filter-chips status-filter">
-      <button class="filter-chip" data-filter="active" title="Actives">
+      <button class="filter-chip" data-filter="active" data-i18n-title="filter_active" title="Active">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
       </button>
-      <button class="filter-chip" data-filter="waiting" title="En attente">
+      <button class="filter-chip" data-filter="waiting" data-i18n-title="filter_waiting" title="Waiting">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
       </button>
-      <button class="filter-chip" data-filter="completed" title="Terminées">
+      <button class="filter-chip" data-filter="completed" data-i18n-title="filter_completed" title="Completed">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 6 9 17l-5-5"/>
         </svg>
       </button>
-      <button class="filter-clear" id="btnClearFilters" title="Tout afficher" style="display:none;">
+      <button class="filter-clear" id="btnClearFilters" data-i18n-title="filter_clear" title="Show all" style="display:none;">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
         </svg>
       </button>
     </div>
-    <input type="text" class="search-input" id="searchInput" placeholder="Rechercher..." style="display:none;">
+    <input type="text" class="search-input" id="searchInput" data-i18n-placeholder="search_placeholder" placeholder="Search..." style="display:none;">
 
     <div class="toolbar-spacer"></div>
 
     <div class="filter-segmented view-segmented">
-      <button class="filter-seg active" id="btnGrid" title="Vue grille">
+      <button class="filter-seg active" id="btnGrid" data-i18n-title="view_grid" title="Grid view">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
         </svg>
       </button>
-      <button class="filter-seg" id="btnCompact" title="Vue compacte">
+      <button class="filter-seg" id="btnCompact" data-i18n-title="view_compact" title="Compact view">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="10" x2="20" y2="10"/><line x1="4" y1="14" x2="20" y2="14"/><line x1="4" y1="18" x2="20" y2="18"/>
         </svg>
@@ -50,22 +50,22 @@
     </div>
 
     <div class="toolbar-group">
-      <button class="toolbar-btn" id="btnPin" title="Always on top">
+      <button class="toolbar-btn" id="btnPin" data-i18n-title="pin_title" title="Always on top">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
         </svg>
       </button>
-      <button class="toolbar-btn" id="btnAdd" title="Ajouter une session">
+      <button class="toolbar-btn" id="btnAdd" data-i18n-title="add_session" title="Add session">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>
         </svg>
       </button>
-      <button class="toolbar-btn" id="btnShortcuts" title="Raccourcis clavier">
+      <button class="toolbar-btn" id="btnShortcuts" data-i18n-title="shortcuts_title" title="Keyboard shortcuts">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
       </button>
-      <button class="toolbar-btn" id="btnSettings" title="Paramètres">
+      <button class="toolbar-btn" id="btnSettings" data-i18n-title="settings_title" title="Settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
           <circle cx="12" cy="12" r="3"/>
@@ -82,17 +82,17 @@
         <line x1="8" y1="21" x2="16" y2="21"/>
         <line x1="12" y1="17" x2="12" y2="21"/>
       </svg>
-      <p>Aucune session Claude Code</p>
-      <p class="hint">Lancez <code>claude</code> dans un terminal ou utilisez le bouton +</p>
+      <p data-i18n="empty_title">No Claude Code sessions</p>
+      <p class="hint" data-i18n-html="empty_hint">Run <code>claude</code> in a terminal or use the + button</p>
     </div>
     <div class="empty-state" id="emptyFiltered" style="display:none;">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <p>Aucun résultat</p>
-      <p class="hint">Essayez de modifier vos filtres ou votre recherche</p>
-      <button class="empty-action" id="btnClearAllFilters">Réinitialiser</button>
+      <p data-i18n="empty_filtered_title">No results</p>
+      <p class="hint" data-i18n="empty_filtered_hint">Try adjusting your filters or search</p>
+      <button class="empty-action" id="btnClearAllFilters" data-i18n="reset">Reset</button>
     </div>
     <div class="grid-view" id="gridView" style="display:none;"></div>
     <div class="compact-view" id="compactView" style="display:none;"></div>
@@ -104,11 +104,11 @@
   <!-- Add session modal (hidden) -->
   <div class="modal-backdrop" id="addModal" style="display:none;">
     <div class="modal">
-      <h3>Ajouter une session</h3>
-      <input type="text" id="addInput" placeholder="Session ID, fichier .jsonl, ou dossier projet">
+      <h3 data-i18n="add_session">Add session</h3>
+      <input type="text" id="addInput" data-i18n-placeholder="add_placeholder" placeholder="Session ID, .jsonl file, or project folder">
       <div class="modal-actions">
-        <button id="addCancel">Annuler</button>
-        <button class="primary" id="addConfirm">Ajouter</button>
+        <button id="addCancel" data-i18n="cancel">Cancel</button>
+        <button class="primary" id="addConfirm" data-i18n="add_confirm">Add</button>
       </div>
     </div>
   </div>
@@ -116,12 +116,12 @@
   <!-- Rename modal (hidden) -->
   <div class="modal-backdrop" id="renameModal" style="display:none;">
     <div class="modal">
-      <h3>Renommer la session</h3>
-      <input type="text" id="renameInput" placeholder="Nom personnalisé">
+      <h3 data-i18n="rename_title">Rename session</h3>
+      <input type="text" id="renameInput" data-i18n-placeholder="rename_placeholder" placeholder="Custom name">
       <div class="modal-actions">
-        <button id="renameReset">Réinitialiser</button>
-        <button id="renameCancel">Annuler</button>
-        <button class="primary" id="renameConfirm">Renommer</button>
+        <button id="renameReset" data-i18n="reset">Reset</button>
+        <button id="renameCancel" data-i18n="cancel">Cancel</button>
+        <button class="primary" id="renameConfirm" data-i18n="rename_confirm">Rename</button>
       </div>
     </div>
   </div>
@@ -133,8 +133,8 @@
   <div class="modal-backdrop" id="settingsModal" style="display:none;">
     <div class="modal settings-modal">
       <div class="modal-header">
-        <h3>Paramètres</h3>
-        <button class="modal-close" id="settingsClose">
+        <h3 data-i18n="settings_title">Settings</h3>
+        <button class="modal-close" id="settingsClose" data-i18n-title="close" title="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
           </svg>
@@ -142,9 +142,9 @@
       </div>
 
       <div class="settings-tabs">
-        <button class="settings-tab active" data-tab="general">Général</button>
-        <button class="settings-tab" data-tab="notifications">Notifications</button>
-        <button class="settings-tab" data-tab="about">À propos</button>
+        <button class="settings-tab active" data-tab="general" data-i18n="tab_general">General</button>
+        <button class="settings-tab" data-tab="notifications" data-i18n="tab_notifications">Notifications</button>
+        <button class="settings-tab" data-tab="about" data-i18n="tab_about">About</button>
       </div>
 
       <div class="settings-content">
@@ -153,10 +153,22 @@
           <div class="settings-section">
             <div class="settings-toggle-row">
               <div>
-                <div class="settings-label">Lancement au démarrage</div>
-                <div class="settings-hint">Ouvrir Aby Claude Watcher automatiquement à la connexion</div>
+                <div class="settings-label" data-i18n="language_label">Language</div>
+                <div class="settings-hint" data-i18n="language_hint">Interface language</div>
               </div>
-              <button class="settings-toggle" id="autoLaunchToggle" role="switch" aria-checked="false">
+              <div class="language-picker">
+                <button class="language-btn" data-lang="fr">FR</button>
+                <button class="language-btn" data-lang="en">EN</button>
+              </div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <div class="settings-toggle-row">
+              <div>
+                <div class="settings-label" data-i18n="auto_launch_label">Launch at startup</div>
+                <div class="settings-hint" data-i18n="auto_launch_hint_html">Open <strong>Aby Claude Watcher</strong> automatically at login</div>
+              </div>
+              <button class="settings-toggle" id="autoLaunchToggle" role="switch" aria-checked="false" data-i18n-title="auto_launch_label" title="Launch at startup">
                 <span class="settings-toggle-knob"></span>
               </button>
             </div>
@@ -166,7 +178,7 @@
         <!-- Notifications tab -->
         <div class="settings-panel" data-panel="notifications" style="display:none;">
           <div class="settings-section">
-            <div class="settings-label">Volume</div>
+            <div class="settings-label" data-i18n="volume_label">Volume</div>
             <div class="settings-row">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
@@ -183,23 +195,23 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3"/>
               </svg>
-              Tester le son
+              <span data-i18n="test_sound">Test sound</span>
             </button>
           </div>
 
           <div class="settings-section">
-            <div class="settings-label">Position à l'écran</div>
+            <div class="settings-label" data-i18n="position_label">On-screen position</div>
             <div class="notif-position-grid">
-              <button class="position-btn" data-position="top-left" title="Haut gauche">
+              <button class="position-btn" data-position="top-left" data-i18n-title="position_top_left" title="Top left">
                 <span class="position-indicator" data-pos="top-left"></span>
               </button>
-              <button class="position-btn" data-position="top-right" title="Haut droite">
+              <button class="position-btn" data-position="top-right" data-i18n-title="position_top_right" title="Top right">
                 <span class="position-indicator" data-pos="top-right"></span>
               </button>
-              <button class="position-btn" data-position="bottom-left" title="Bas gauche">
+              <button class="position-btn" data-position="bottom-left" data-i18n-title="position_bottom_left" title="Bottom left">
                 <span class="position-indicator" data-pos="bottom-left"></span>
               </button>
-              <button class="position-btn" data-position="bottom-right" title="Bas droite">
+              <button class="position-btn" data-position="bottom-right" data-i18n-title="position_bottom_right" title="Bottom right">
                 <span class="position-indicator" data-pos="bottom-right"></span>
               </button>
             </div>
@@ -210,20 +222,20 @@
         <div class="settings-panel" data-panel="about" style="display:none;">
           <div class="settings-section about-section">
             <div class="about-app-name">Aby Claude Watcher</div>
-            <div class="about-version">Version <span id="aboutVersion">...</span></div>
+            <div class="about-version"><span data-i18n="about_version">Version</span> <span id="aboutVersion">...</span></div>
           </div>
 
           <div class="settings-section">
             <div class="settings-toggle-row">
               <div>
-                <div class="settings-label" id="updateStatusLabel">Aucune vérification récente</div>
-                <div class="settings-hint" id="updateStatusHint">Cliquez pour chercher une mise à jour</div>
+                <div class="settings-label" id="updateStatusLabel" data-i18n="update_check_label">No recent check</div>
+                <div class="settings-hint" id="updateStatusHint" data-i18n="update_check_hint">Click to check for updates</div>
               </div>
               <button class="settings-test-btn" id="btnCheckUpdate">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/>
                 </svg>
-                Vérifier
+                <span data-i18n="update_check_btn">Check</span>
               </button>
             </div>
           </div>
@@ -260,24 +272,25 @@
   <div class="modal-backdrop" id="shortcutsModal" style="display:none;">
     <div class="modal">
       <div class="modal-header">
-        <h3>Raccourcis clavier</h3>
-        <button class="modal-close" id="shortcutsClose">
+        <h3 data-i18n="shortcuts_title">Keyboard shortcuts</h3>
+        <button class="modal-close" id="shortcutsClose" data-i18n-title="close" title="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
           </svg>
         </button>
       </div>
       <div class="shortcuts-list">
-        <div class="shortcut-row"><kbd>&#8984;1</kbd> — <kbd>&#8984;9</kbd><span>Focus session 1-9</span></div>
-        <div class="shortcut-row"><kbd>&#8984;G</kbd><span>Basculer grille / liste</span></div>
-        <div class="shortcut-row"><kbd>&#8984;P</kbd><span>Always on top (pin)</span></div>
-        <div class="shortcut-row"><kbd>&#8984;F</kbd><span>Rechercher</span></div>
-        <div class="shortcut-row"><kbd>&#8984;?</kbd><span>Raccourcis clavier</span></div>
-        <div class="shortcut-row"><kbd>Esc</kbd><span>Fermer modale / dropdown</span></div>
+        <div class="shortcut-row"><kbd>&#8984;1</kbd> — <kbd>&#8984;9</kbd><span data-i18n="shortcut_focus_sessions">Focus session 1-9</span></div>
+        <div class="shortcut-row"><kbd>&#8984;G</kbd><span data-i18n="shortcut_toggle_view">Toggle grid / compact</span></div>
+        <div class="shortcut-row"><kbd>&#8984;P</kbd><span data-i18n="shortcut_pin">Always on top (pin)</span></div>
+        <div class="shortcut-row"><kbd>&#8984;F</kbd><span data-i18n="shortcut_search">Search</span></div>
+        <div class="shortcut-row"><kbd>&#8984;?</kbd><span data-i18n="shortcut_shortcuts">Keyboard shortcuts</span></div>
+        <div class="shortcut-row"><kbd>Esc</kbd><span data-i18n="shortcut_escape">Close modal / dropdown</span></div>
       </div>
     </div>
   </div>
 
+  <script src="../i18n.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

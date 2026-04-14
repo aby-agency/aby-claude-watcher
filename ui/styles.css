@@ -1464,6 +1464,36 @@ body {
   transform: translateX(16px);
 }
 
+/* Language picker */
+.language-picker {
+  display: inline-flex;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.language-btn {
+  padding: 3px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.language-btn:hover {
+  color: var(--text-secondary);
+}
+
+.language-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
 /* Notification position picker */
 .notif-position-grid {
   display: grid;

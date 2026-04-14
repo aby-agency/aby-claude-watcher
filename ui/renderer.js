@@ -58,6 +58,11 @@ const $btnTestSound = document.getElementById('btnTestSound');
 // ═══ Init ═══
 
 async function init() {
+  // Apply language first so all static strings render correctly
+  const lang = await window.api.getLanguage();
+  window.i18n.setLanguage(lang);
+  applyI18n();
+
   const config = await window.api.getConfig();
   viewMode = config.viewMode || 'grid';
   // Migration: old 'list' → 'compact'
@@ -189,6 +194,20 @@ async function init() {
   // Auto-launch toggle
   const autoLaunchBtn = document.getElementById('autoLaunchToggle');
   if (autoLaunchBtn) autoLaunchBtn.addEventListener('click', toggleAutoLaunch);
+
+  // Language picker
+  document.querySelectorAll('.language-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const lang = btn.dataset.lang;
+      await window.api.setLanguage(lang);
+    });
+  });
+  window.api.onLanguageChanged((lang) => {
+    window.i18n.setLanguage(lang);
+    applyI18n();
+    // Re-render all sessions so state labels update
+    render();
+  });
 
   // Settings tabs
   document.querySelectorAll('.settings-tab').forEach(tab => {
@@ -348,6 +367,31 @@ function setNotifPosition(pos) {
   updateNotifPosition();
 }
 
+function t(key, params) { return window.i18n.t(key, params); }
+
+function applyI18n() {
+  // Plain text: [data-i18n]
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  // HTML text: [data-i18n-html]
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    el.innerHTML = t(el.dataset.i18nHtml);
+  });
+  // Titles (tooltips): [data-i18n-title]
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.setAttribute('title', t(el.dataset.i18nTitle));
+  });
+  // Placeholders: [data-i18n-placeholder]
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.setAttribute('placeholder', t(el.dataset.i18nPlaceholder));
+  });
+  // Update language picker active state
+  document.querySelectorAll('.language-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === window.i18n.getLanguage());
+  });
+}
+
 function updateAutoLaunchToggle() {
   const btn = document.getElementById('autoLaunchToggle');
   if (btn) {
@@ -372,31 +416,31 @@ async function loadAboutInfo() {
 async function checkForUpdate(force) {
   const statusLabel = document.getElementById('updateStatusLabel');
   const statusHint = document.getElementById('updateStatusHint');
-  statusLabel.textContent = 'Vérification...';
-  statusHint.textContent = 'Connexion à GitHub';
+  statusLabel.textContent = t('update_checking');
+  statusHint.textContent = t('update_checking_hint');
 
   const result = await window.api.checkUpdates(force);
 
   if (result.status === 'update-available') {
-    statusLabel.textContent = `Nouvelle version ${result.latest} disponible`;
-    statusHint.innerHTML = `<a href="#" class="update-link" data-url="${esc(result.url)}">Télécharger sur GitHub</a>`;
+    statusLabel.textContent = t('update_available', { version: result.latest });
+    statusHint.innerHTML = `<a href="#" class="update-link" data-url="${esc(result.url)}">${t('update_download_link')}</a>`;
     statusHint.querySelector('.update-link').addEventListener('click', (e) => {
       e.preventDefault();
       window.api.openExternalUrl(result.url);
     });
     showUpdateBanner(result);
   } else if (result.status === 'up-to-date') {
-    statusLabel.textContent = 'Aby Claude Watcher est à jour';
-    statusHint.textContent = `Version ${result.current} — dernière vérification à l'instant`;
+    statusLabel.textContent = t('update_up_to_date', { app: 'Aby Claude Watcher' });
+    statusHint.textContent = t('update_up_to_date_hint', { version: result.current });
   } else if (result.status === 'no-releases') {
-    statusLabel.textContent = 'Aucune version publiée';
-    statusHint.textContent = 'Le projet n\'a pas encore de release GitHub';
+    statusLabel.textContent = t('update_no_releases');
+    statusHint.textContent = t('update_no_releases_hint');
   } else if (result.status === 'rate-limited') {
-    statusLabel.textContent = 'Vérifié récemment';
-    statusHint.textContent = 'Cliquez sur "Vérifier" pour forcer';
+    statusLabel.textContent = t('update_rate_limited');
+    statusHint.textContent = t('update_rate_limited_hint');
   } else {
-    statusLabel.textContent = 'Erreur de vérification';
-    statusHint.textContent = result.error || 'Vérifiez votre connexion';
+    statusLabel.textContent = t('update_error');
+    statusHint.textContent = result.error || t('update_error_hint');
   }
 }
 
@@ -408,8 +452,8 @@ function showUpdateBanner(info) {
   banner.id = 'updateBanner';
   banner.className = 'update-banner';
   banner.innerHTML = `
-    <span>Nouvelle version <strong>${esc(info.latest)}</strong> disponible</span>
-    <button class="update-banner-btn" id="updateDownload">Télécharger</button>
+    <span>${t('update_available', { version: `<strong>${esc(info.latest)}</strong>` })}</span>
+    <button class="update-banner-btn" id="updateDownload">${t('update_banner_download')}</button>
     <button class="update-banner-close" id="updateDismiss">${ICONS.x}</button>
   `;
   document.body.appendChild(banner);
@@ -546,7 +590,7 @@ function getSortedSessions() {
 
 function cardHTML(s) {
   const stateName = s.state.name;
-  const stateLabel = s.state.label;
+  const stateLabel = t('state_' + s.state.name);
   const duration = formatDuration(s.startedAt);
   const tokens = formatTokens(s.tokens);
   const sid = escAttr(s.sessionId);
@@ -560,28 +604,28 @@ function cardHTML(s) {
       <div class="card-header">
         <div class="card-title">
           <div class="project-name">${esc(s.customName || s.projectName)}</div>
-          <div class="session-slug" onclick="handleCopyId('${sid}', event)" title="Copier le session ID">
+          <div class="session-slug" onclick="handleCopyId('${sid}', event)" title="${t('action_copy_id')}">
             ${esc(s.slug || s.sessionId.slice(0, 8))}
             <span class="copy-icon">${ICONS.copy}</span>
           </div>
         </div>
         <div class="card-actions">
-          <button class="card-btn" onclick="toggleNotifDropdown(event, '${sid}')" title="Notifications">
+          <button class="card-btn" onclick="toggleNotifDropdown(event, '${sid}')" title="${t('action_notifications')}">
             ${ICONS.bell}
           </button>
-          <button class="card-btn" onclick="handleFocus('${sid}')" title="Focus terminal">
+          <button class="card-btn" onclick="handleFocus('${sid}')" title="${t('action_focus_terminal')}">
             ${ICONS.terminal}
           </button>
-          ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}')" title="Ouvrir remote control">
+          ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">
             ${ICONS.globe}
           </button>` : ''}
-          ${stateName === 'completed' ? `<button class="card-btn" onclick="handleResume('${sid}')" title="Reprendre la session">
+          ${stateName === 'completed' ? `<button class="card-btn" onclick="handleResume('${sid}')" title="${t('action_resume')}">
             ${ICONS.play}
           </button>
-          <button class="card-btn" onclick="handleRemove('${sid}')" title="Supprimer">
+          <button class="card-btn" onclick="handleRemove('${sid}')" title="${t('action_delete')}">
             ${ICONS.x}
           </button>` : ''}
-          <button class="card-btn" onclick="showContextMenu(event, '${sid}')" title="Plus d'options">
+          <button class="card-btn" onclick="showContextMenu(event, '${sid}')" title="${t('action_more')}">
             ${ICONS.moreVertical}
           </button>
         </div>
@@ -589,27 +633,27 @@ function cardHTML(s) {
       <div class="state-badge ${stateName}">
         ${(stateName === 'running' || stateName === 'thinking') ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
         ${stateLabel}
-        ${s.maybeStuck ? `<span class="stuck-hint" title="Possible action requise">${ICONS.alertTriangle}</span>` : ''}
+        ${s.maybeStuck ? `<span class="stuck-hint" title="${t('stuck_hint')}">${ICONS.alertTriangle}</span>` : ''}
       </div>
       <div class="card-details">
         <div class="detail">
-          <span class="detail-label">Outil</span>
+          <span class="detail-label">${t('tool')}</span>
           <span class="detail-value">${(stateName === 'running' || stateName === 'thinking') ? toolPill(s.lastTool) : toolPill(null)}</span>
         </div>
         <div class="detail">
-          <span class="detail-label">Durée</span>
+          <span class="detail-label">${t('duration')}</span>
           <span class="detail-value ${stateName !== 'completed' ? 'duration-value' : ''}" ${stateName !== 'completed' ? `data-started="${s.startedAt}"` : ''}>${stateName === 'completed' && s.endedAt ? formatDuration(s.startedAt, s.endedAt) : duration}</span>
         </div>
         <div class="detail">
-          <span class="detail-label">Tokens</span>
+          <span class="detail-label">${t('tokens')}</span>
           <span class="detail-value">${tokens}</span>
         </div>
         <div class="detail">
-          <span class="detail-label">Modèle</span>
+          <span class="detail-label">${t('model')}</span>
           <span class="detail-value">${formatModel(s.model)}</span>
         </div>
         <div class="detail">
-          <span class="detail-label">Branche</span>
+          <span class="detail-label">${t('branch')}</span>
           <span class="detail-value branch-value">${esc(s.gitBranch || '—')}</span>
         </div>
       </div>
@@ -631,22 +675,22 @@ function compactItemHTML(s) {
       ${isActive ? '<span class="compact-spinner"></span>' : '<span class="compact-dot"></span>'}
       <div class="project-name">${esc(s.customName || s.projectName)}</div>
       <div class="compact-actions">
-        <button class="card-btn" onclick="event.stopPropagation(); handleFocus('${sid}')" title="Focus terminal">
+        <button class="card-btn" onclick="event.stopPropagation(); handleFocus('${sid}')" title="${t('action_focus_terminal')}">
           ${ICONS.terminal}
         </button>
-        ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="event.stopPropagation(); handleOpenRemote('${escAttr(s.remoteUrl)}')" title="Remote">
+        ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="event.stopPropagation(); handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">
           ${ICONS.globe}
         </button>` : ''}
-        <button class="card-btn" onclick="event.stopPropagation(); toggleNotifDropdown(event, '${sid}')" title="Notifications">
+        <button class="card-btn" onclick="event.stopPropagation(); toggleNotifDropdown(event, '${sid}')" title="${t('action_notifications')}">
           ${ICONS.bell}
         </button>
-        ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="Reprendre">
+        ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">
           ${ICONS.play}
         </button>
-        <button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="Supprimer">
+        <button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">
           ${ICONS.x}
         </button>` : ''}
-        <button class="card-btn" onclick="event.stopPropagation(); showContextMenu(event, '${sid}')" title="Plus d'options">
+        <button class="card-btn" onclick="event.stopPropagation(); showContextMenu(event, '${sid}')" title="${t('action_more')}">
           ${ICONS.moreVertical}
         </button>
       </div>
@@ -726,7 +770,7 @@ function handleCopyId(sessionId, event) {
   navigator.clipboard.writeText(sessionId).then(() => {
     const el = event.currentTarget;
     const original = el.innerHTML;
-    el.innerHTML = `<span style="color: var(--state-running)">✓ Copié</span>`;
+    el.innerHTML = `<span style="color: var(--state-running)">${t('action_copied')}</span>`;
     setTimeout(() => { el.innerHTML = original; }, 1200);
   }).catch(() => {});
 }
@@ -754,11 +798,11 @@ async function toggleNotifDropdown(event, sessionId) {
   dropdown.innerHTML = `
     <div class="notif-option" onclick="toggleNotifPref(event, '${sessionId}', 'modal')">
       <div class="notif-toggle ${prefs.modal ? 'on' : ''}" data-pref="modal"></div>
-      <span>Modal in-app</span>
+      <span>${t('notif_modal')}</span>
     </div>
     <div class="notif-option" onclick="toggleNotifPref(event, '${sessionId}', 'sound')">
       <div class="notif-toggle ${prefs.sound ? 'on' : ''}" data-pref="sound"></div>
-      <span>Son</span>
+      <span>${t('notif_sound')}</span>
     </div>
   `;
 
@@ -802,13 +846,13 @@ function showToast(data) {
       <div class="toast-body">
         <span class="state-badge waiting">
           <span class="dot"></span>
-          En attente
+          ${t('state_waiting')}
         </span>
         <span class="toast-slug">${esc(data.slug || '')}</span>
       </div>
       <div class="toast-actions">
         <button class="toast-focus-btn" onclick="handleFocus('${sid}'); this.closest('.notification-toast').remove();">
-          ${ICONS.terminal} Focus terminal
+          ${ICONS.terminal} ${t('action_focus_terminal')}
         </button>
       </div>
     </div>
@@ -1098,12 +1142,13 @@ function updateStatusBar() {
   const visibleCount = filtersActive ? getSortedSessions().length : all.length;
 
   const activeLabel = filtersActive
-    ? `${visibleCount}/${all.length} affichées`
-    : `${active.length} active${active.length !== 1 ? 's' : ''}`;
+    ? t('status_filtered', { visible: visibleCount, total: all.length })
+    : t('status_active', { n: active.length });
 
   document.getElementById('statActive').textContent = activeLabel;
-  document.getElementById('statWaiting').textContent = `${waiting.length} en attente`;
-  document.getElementById('statTokens').textContent = `${formatTokens({ input: totalInput, output: totalOutput })} tokens`;
+  document.getElementById('statWaiting').textContent = t('status_waiting', { n: waiting.length });
+  const tokensText = formatTokens({ input: totalInput, output: totalOutput });
+  document.getElementById('statTokens').textContent = t('status_tokens', { n: tokensText });
 }
 
 // ═══ Context menu ═══
@@ -1118,17 +1163,17 @@ function showContextMenu(e, sessionId) {
   const stateName = s.state.name;
 
   let items = `
-    <div class="context-menu-item" onclick="handleFocus('${sid}'); hideContextMenu();">${ICONS.terminal} Focus terminal</div>
-    <div class="context-menu-item" onclick="renameSession('${sid}'); hideContextMenu();">${ICONS.edit} Renommer</div>
+    <div class="context-menu-item" onclick="handleFocus('${sid}'); hideContextMenu();">${ICONS.terminal} ${t('action_focus_terminal')}</div>
+    <div class="context-menu-item" onclick="renameSession('${sid}'); hideContextMenu();">${ICONS.edit} ${t('rename_confirm')}</div>
   `;
   if (s.remoteUrl) {
-    items += `<div class="context-menu-item" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}'); hideContextMenu();">${ICONS.globe} Ouvrir remote</div>`;
+    items += `<div class="context-menu-item" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}'); hideContextMenu();">${ICONS.globe} ${t('action_remote')}</div>`;
   }
   items += `<div class="context-menu-sep"></div>`;
   if (stateName === 'completed') {
     items += `
-      <div class="context-menu-item" onclick="handleResume('${sid}'); hideContextMenu();">${ICONS.play} Reprendre</div>
-      <div class="context-menu-item" onclick="handleRemove('${sid}'); hideContextMenu();">${ICONS.x} Supprimer</div>
+      <div class="context-menu-item" onclick="handleResume('${sid}'); hideContextMenu();">${ICONS.play} ${t('action_resume')}</div>
+      <div class="context-menu-item" onclick="handleRemove('${sid}'); hideContextMenu();">${ICONS.x} ${t('action_delete')}</div>
     `;
   }
 

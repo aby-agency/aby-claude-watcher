@@ -268,12 +268,14 @@ body {
 .filter-seg[data-filter="completed"].active { color: var(--text-secondary); }
 
 .filter-seg,
-.toolbar-btn {
+.toolbar-btn,
+.card-btn {
   position: relative;
 }
 
 .filter-seg::after,
-.toolbar-btn::after {
+.toolbar-btn::after,
+.card-btn::after {
   content: attr(title);
   position: absolute;
   top: calc(100% + 6px);
@@ -294,8 +296,15 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+/* Don't show CSS tooltip when title is empty */
+.card-btn:not([title])::after,
+.card-btn[title=""]::after {
+  content: none;
+}
+
 .filter-seg:hover::after,
-.toolbar-btn:hover::after {
+.toolbar-btn:hover::after,
+.card-btn:hover::after {
   opacity: 1;
   transition-delay: 0.3s;
 }

@@ -3,6 +3,7 @@ const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
 const { focusTerminal, resumeSession, launchSession } = require('./focus');
+const { checkForUpdates, GITHUB_OWNER, GITHUB_REPO } = require('./updater');
 const config = require('./config');
 
 let mainWindow;
@@ -203,7 +204,8 @@ function setupIPC() {
       if (u.protocol !== 'https:') return;
       const host = u.hostname.toLowerCase();
       if (host === 'claude.ai' || host.endsWith('.claude.ai') ||
-          host === 'anthropic.com' || host.endsWith('.anthropic.com')) {
+          host === 'anthropic.com' || host.endsWith('.anthropic.com') ||
+          host === 'github.com' || host.endsWith('.github.com')) {
         shell.openExternal(url);
       }
     } catch {}
@@ -234,6 +236,18 @@ function setupIPC() {
   ipcMain.handle('set-auto-launch', (_, value) => {
     config.setAutoLaunch(value);
     applyAutoLaunch();
+  });
+
+  ipcMain.handle('check-updates', async (_, force) => {
+    return checkForUpdates(!!force);
+  });
+
+  ipcMain.handle('get-app-info', () => {
+    return {
+      version: app.getVersion(),
+      name: app.getName(),
+      githubUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`,
+    };
   });
 
   ipcMain.handle('popover-hide', () => {
@@ -314,6 +328,14 @@ app.whenReady().then(() => {
   setupSocket();
   setupTray();
   createPopoverWindow();
+
+  // Check for updates 30s after startup (non-blocking)
+  setTimeout(async () => {
+    const result = await checkForUpdates(false);
+    if (result.status === 'update-available') {
+      sendToRenderer('update-available', result);
+    }
+  }, 30000);
 
   app.on('activate', () => {
     if (!mainWindow) createWindow();

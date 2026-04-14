@@ -8,7 +8,8 @@ function isAllowedRemoteUrl(url) {
     if (u.protocol !== 'https:') return false;
     const host = u.hostname.toLowerCase();
     return host === 'claude.ai' || host.endsWith('.claude.ai') ||
-           host === 'anthropic.com' || host.endsWith('.anthropic.com');
+           host === 'anthropic.com' || host.endsWith('.anthropic.com') ||
+           host === 'github.com' || host.endsWith('.github.com');
   } catch {
     return false;
   }
@@ -26,6 +27,7 @@ test('accepts https://claude.ai/...', () => assertEq(isAllowedRemoteUrl('https:/
 test('accepts subdomain .claude.ai', () => assertEq(isAllowedRemoteUrl('https://app.claude.ai/x'), true));
 test('accepts anthropic.com', () => assertEq(isAllowedRemoteUrl('https://anthropic.com'), true));
 test('accepts subdomain .anthropic.com', () => assertEq(isAllowedRemoteUrl('https://api.anthropic.com/v1'), true));
+test('accepts github.com releases', () => assertEq(isAllowedRemoteUrl('https://github.com/user/repo/releases/tag/v1.0.0'), true));
 test('rejects http (not https)', () => assertEq(isAllowedRemoteUrl('http://claude.ai'), false));
 test('rejects evil with fragment', () => assertEq(isAllowedRemoteUrl('https://evil.com/#anthropic'), false));
 test('rejects evil with query', () => assertEq(isAllowedRemoteUrl('https://evil.com?x=anthropic'), false));

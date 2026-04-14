@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld('api', {
   setVolume: (value) => ipcRenderer.invoke('set-volume', value),
   setNotifPosition: (value) => ipcRenderer.invoke('set-notif-position', value),
   setAutoLaunch: (value) => ipcRenderer.invoke('set-auto-launch', value),
+  checkUpdates: (force) => ipcRenderer.invoke('check-updates', force),
+  getAppInfo: () => ipcRenderer.invoke('get-app-info'),
+  openExternalUrl: (url) => ipcRenderer.invoke('open-remote', url),
   launchSession: (cwd) => ipcRenderer.invoke('launch-session', cwd),
 
   onSessionAdded: (callback) => ipcRenderer.on('session-added', (_, data) => callback(data)),
@@ -37,4 +40,5 @@ contextBridge.exposeInMainWorld('api', {
   onSessionRemoved: (callback) => ipcRenderer.on('session-removed', (_, id) => callback(id)),
   onShowNotification: (callback) => ipcRenderer.on('show-notification', (_, data) => callback(data)),
   onPlaySound: (callback) => ipcRenderer.on('play-sound', () => callback()),
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_, info) => callback(info)),
 });

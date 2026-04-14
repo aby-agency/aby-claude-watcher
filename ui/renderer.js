@@ -190,6 +190,29 @@ async function init() {
   const autoLaunchBtn = document.getElementById('autoLaunchToggle');
   if (autoLaunchBtn) autoLaunchBtn.addEventListener('click', toggleAutoLaunch);
 
+  // Settings tabs
+  document.querySelectorAll('.settings-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      document.querySelectorAll('.settings-tab').forEach(t => t.classList.toggle('active', t === tab));
+      document.querySelectorAll('.settings-panel').forEach(p => {
+        p.style.display = p.dataset.panel === target ? 'block' : 'none';
+      });
+      if (target === 'about') loadAboutInfo();
+    });
+  });
+
+  // About tab: update check + github link
+  document.getElementById('btnCheckUpdate').addEventListener('click', () => checkForUpdate(true));
+  document.getElementById('aboutGithub').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const info = await window.api.getAppInfo();
+    window.api.openExternalUrl(info.githubUrl);
+  });
+
+  // Update available event from main process
+  window.api.onUpdateAvailable((info) => showUpdateBanner(info));
+
   // Shortcuts modal
   const $shortcutsModal = document.getElementById('shortcutsModal');
   const $shortcutsClose = document.getElementById('shortcutsClose');
@@ -332,6 +355,66 @@ function toggleAutoLaunch() {
   autoLaunch = !autoLaunch;
   window.api.setAutoLaunch(autoLaunch);
   updateAutoLaunchToggle();
+}
+
+// ═══ About + updates ═══
+
+async function loadAboutInfo() {
+  const info = await window.api.getAppInfo();
+  document.getElementById('aboutVersion').textContent = info.version;
+}
+
+async function checkForUpdate(force) {
+  const statusLabel = document.getElementById('updateStatusLabel');
+  const statusHint = document.getElementById('updateStatusHint');
+  statusLabel.textContent = 'Vérification...';
+  statusHint.textContent = 'Connexion à GitHub';
+
+  const result = await window.api.checkUpdates(force);
+
+  if (result.status === 'update-available') {
+    statusLabel.textContent = `Nouvelle version ${result.latest} disponible`;
+    statusHint.innerHTML = `<a href="#" class="update-link" data-url="${esc(result.url)}">Télécharger sur GitHub</a>`;
+    statusHint.querySelector('.update-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      window.api.openExternalUrl(result.url);
+    });
+    showUpdateBanner(result);
+  } else if (result.status === 'up-to-date') {
+    statusLabel.textContent = 'Claude Watch est à jour';
+    statusHint.textContent = `Version ${result.current} — dernière vérification à l'instant`;
+  } else if (result.status === 'no-releases') {
+    statusLabel.textContent = 'Aucune version publiée';
+    statusHint.textContent = 'Le projet n\'a pas encore de release GitHub';
+  } else if (result.status === 'rate-limited') {
+    statusLabel.textContent = 'Vérifié récemment';
+    statusHint.textContent = 'Cliquez sur "Vérifier" pour forcer';
+  } else {
+    statusLabel.textContent = 'Erreur de vérification';
+    statusHint.textContent = result.error || 'Vérifiez votre connexion';
+  }
+}
+
+function showUpdateBanner(info) {
+  const existing = document.getElementById('updateBanner');
+  if (existing) return; // already shown
+
+  const banner = document.createElement('div');
+  banner.id = 'updateBanner';
+  banner.className = 'update-banner';
+  banner.innerHTML = `
+    <span>Nouvelle version <strong>${esc(info.latest)}</strong> disponible</span>
+    <button class="update-banner-btn" id="updateDownload">Télécharger</button>
+    <button class="update-banner-close" id="updateDismiss">${ICONS.x}</button>
+  `;
+  document.body.appendChild(banner);
+
+  document.getElementById('updateDownload').addEventListener('click', () => {
+    window.api.openExternalUrl(info.url);
+  });
+  document.getElementById('updateDismiss').addEventListener('click', () => {
+    banner.remove();
+  });
 }
 
 // ═══ Rendering ═══

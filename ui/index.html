@@ -131,7 +131,7 @@
 
   <!-- Settings modal (hidden) -->
   <div class="modal-backdrop" id="settingsModal" style="display:none;">
-    <div class="modal">
+    <div class="modal settings-modal">
       <div class="modal-header">
         <h3>Paramètres</h3>
         <button class="modal-close" id="settingsClose">
@@ -141,55 +141,101 @@
         </button>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-label">Volume des notifications</div>
-        <div class="settings-row">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-          </svg>
-          <input type="range" id="volumeSlider" min="0" max="100" value="70" class="slider">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-          </svg>
-          <span class="volume-value" id="volumeValue">70%</span>
-        </div>
-        <button class="settings-test-btn" id="btnTestSound">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
-          Tester le son
-        </button>
+      <div class="settings-tabs">
+        <button class="settings-tab active" data-tab="general">Général</button>
+        <button class="settings-tab" data-tab="notifications">Notifications</button>
+        <button class="settings-tab" data-tab="about">À propos</button>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-label">Position des notifications</div>
-        <div class="notif-position-grid">
-          <button class="position-btn" data-position="top-left" title="Haut gauche">
-            <span class="position-indicator" data-pos="top-left"></span>
-          </button>
-          <button class="position-btn" data-position="top-right" title="Haut droite">
-            <span class="position-indicator" data-pos="top-right"></span>
-          </button>
-          <button class="position-btn" data-position="bottom-left" title="Bas gauche">
-            <span class="position-indicator" data-pos="bottom-left"></span>
-          </button>
-          <button class="position-btn" data-position="bottom-right" title="Bas droite">
-            <span class="position-indicator" data-pos="bottom-right"></span>
-          </button>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-toggle-row">
-          <div>
-            <div class="settings-label">Lancement au démarrage</div>
-            <div class="settings-hint">Ouvrir Claude Watch automatiquement à la connexion</div>
+      <div class="settings-content">
+        <!-- General tab -->
+        <div class="settings-panel active" data-panel="general">
+          <div class="settings-section">
+            <div class="settings-toggle-row">
+              <div>
+                <div class="settings-label">Lancement au démarrage</div>
+                <div class="settings-hint">Ouvrir Claude Watch automatiquement à la connexion</div>
+              </div>
+              <button class="settings-toggle" id="autoLaunchToggle" role="switch" aria-checked="false">
+                <span class="settings-toggle-knob"></span>
+              </button>
+            </div>
           </div>
-          <button class="settings-toggle" id="autoLaunchToggle" role="switch" aria-checked="false">
-            <span class="settings-toggle-knob"></span>
-          </button>
+        </div>
+
+        <!-- Notifications tab -->
+        <div class="settings-panel" data-panel="notifications" style="display:none;">
+          <div class="settings-section">
+            <div class="settings-label">Volume</div>
+            <div class="settings-row">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              </svg>
+              <input type="range" id="volumeSlider" min="0" max="100" value="70" class="slider">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              </svg>
+              <span class="volume-value" id="volumeValue">70%</span>
+            </div>
+            <button class="settings-test-btn" id="btnTestSound">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              Tester le son
+            </button>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-label">Position à l'écran</div>
+            <div class="notif-position-grid">
+              <button class="position-btn" data-position="top-left" title="Haut gauche">
+                <span class="position-indicator" data-pos="top-left"></span>
+              </button>
+              <button class="position-btn" data-position="top-right" title="Haut droite">
+                <span class="position-indicator" data-pos="top-right"></span>
+              </button>
+              <button class="position-btn" data-position="bottom-left" title="Bas gauche">
+                <span class="position-indicator" data-pos="bottom-left"></span>
+              </button>
+              <button class="position-btn" data-position="bottom-right" title="Bas droite">
+                <span class="position-indicator" data-pos="bottom-right"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- About tab -->
+        <div class="settings-panel" data-panel="about" style="display:none;">
+          <div class="settings-section about-section">
+            <div class="about-app-name">Claude Watch</div>
+            <div class="about-version">Version <span id="aboutVersion">...</span></div>
+          </div>
+
+          <div class="settings-section">
+            <div class="settings-toggle-row">
+              <div>
+                <div class="settings-label" id="updateStatusLabel">Aucune vérification récente</div>
+                <div class="settings-hint" id="updateStatusHint">Cliquez pour chercher une mise à jour</div>
+              </div>
+              <button class="settings-test-btn" id="btnCheckUpdate">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/>
+                </svg>
+                Vérifier
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-section about-links">
+            <a href="#" id="aboutGithub" class="about-link">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+              </svg>
+              GitHub
+            </a>
+          </div>
         </div>
       </div>
     </div>

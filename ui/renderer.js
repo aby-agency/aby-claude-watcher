@@ -166,6 +166,13 @@ async function init() {
   $addCancel.addEventListener('click', closeAddModal);
   $addConfirm.addEventListener('click', confirmAdd);
 
+  // Resume modal
+  document.getElementById('resumeConfirm').addEventListener('click', confirmResume);
+  document.getElementById('resumeCancel').addEventListener('click', closeResumeModal);
+  document.getElementById('resumeModal').addEventListener('click', (e) => {
+    if (e.target.id === 'resumeModal') closeResumeModal();
+  });
+
   // Rename modal
   document.getElementById('renameConfirm').addEventListener('click', confirmRename);
   document.getElementById('renameCancel').addEventListener('click', closeRenameModal);
@@ -250,7 +257,12 @@ async function init() {
   });
 
   // Update available event from main process
-  window.api.onUpdateAvailable((info) => showUpdateBanner(info));
+  window.api.onUpdateAvailable((info) => {
+    lastUpdateResult = { ...info, status: 'update-available' };
+    renderUpdateState();
+    startUpdateRelativeTicker();
+    showUpdateBanner(info);
+  });
 
   // Shortcuts modal
   const $shortcutsModal = document.getElementById('shortcutsModal');
@@ -325,6 +337,7 @@ async function init() {
       closeDropdown();
       closeAddModal();
       closeRenameModal();
+      closeResumeModal();
       const settingsModal = document.getElementById('settingsModal');
       if (settingsModal) settingsModal.style.display = 'none';
       const shortcutsModal = document.getElementById('shortcutsModal');
@@ -444,39 +457,89 @@ function toggleAutoLaunch() {
 
 // ═══ About + updates ═══
 
+let lastUpdateResult = null;
+let updateRelativeTimer = null;
+
 async function loadAboutInfo() {
   const info = await window.api.getAppInfo();
   document.getElementById('aboutVersion').textContent = info.version;
+  renderUpdateState();
 }
 
-async function checkForUpdate(force) {
+function formatRelativeTime(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const sec = Math.floor(diff / 1000);
+  const min = Math.floor(sec / 60);
+  const hour = Math.floor(min / 60);
+  const day = Math.floor(hour / 24);
+  if (sec < 45) return t('rel_just_now');
+  if (min < 60) return t('rel_minutes_ago', { n: Math.max(1, min) });
+  if (hour < 2) return t('rel_hour_ago');
+  if (hour < 24) return t('rel_hours_ago', { n: hour });
+  if (day < 2) return t('rel_day_ago');
+  return t('rel_days_ago', { n: day });
+}
+
+function renderUpdateState() {
   const statusLabel = document.getElementById('updateStatusLabel');
   const statusHint = document.getElementById('updateStatusHint');
-  statusLabel.textContent = t('update_checking');
-  statusHint.textContent = t('update_checking_hint');
+  if (!statusLabel || !statusHint) return;
 
-  const result = await window.api.checkUpdates(force);
+  const result = lastUpdateResult;
+  if (!result) {
+    statusLabel.textContent = t('update_check_label');
+    statusHint.textContent = t('update_check_hint');
+    return;
+  }
+
+  const when = formatRelativeTime(result.lastCheck);
 
   if (result.status === 'update-available') {
     statusLabel.textContent = t('update_available', { version: result.latest });
-    statusHint.innerHTML = `<a href="#" class="update-link" data-url="${escAttr(result.url)}">${t('update_download_link')}</a>`;
+    statusHint.innerHTML = `<a href="#" class="update-link">${t('update_download_link')}</a>`;
     statusHint.querySelector('.update-link').addEventListener('click', (e) => {
       e.preventDefault();
       window.api.openExternalUrl(result.url);
     });
-    showUpdateBanner(result);
   } else if (result.status === 'up-to-date') {
     statusLabel.textContent = t('update_up_to_date', { app: 'Aby Claude Watcher' });
-    statusHint.textContent = t('update_up_to_date_hint', { version: result.current });
+    statusHint.textContent = t('update_up_to_date_hint', { version: result.current, when });
   } else if (result.status === 'no-releases') {
     statusLabel.textContent = t('update_no_releases');
     statusHint.textContent = t('update_no_releases_hint');
   } else if (result.status === 'rate-limited') {
     statusLabel.textContent = t('update_rate_limited');
-    statusHint.textContent = t('update_rate_limited_hint');
+    statusHint.textContent = t('update_rate_limited_hint', { when });
+  } else if (result.status === 'checking') {
+    statusLabel.textContent = t('update_checking');
+    statusHint.textContent = t('update_checking_hint');
   } else {
     statusLabel.textContent = t('update_error');
     statusHint.textContent = result.error || t('update_error_hint');
+  }
+}
+
+function startUpdateRelativeTicker() {
+  if (updateRelativeTimer) return;
+  updateRelativeTimer = setInterval(() => {
+    if (!lastUpdateResult || !lastUpdateResult.lastCheck) return;
+    const panel = document.querySelector('.settings-panel[data-panel="about"]');
+    if (panel && panel.style.display !== 'none') renderUpdateState();
+  }, 30000);
+}
+
+async function checkForUpdate(force) {
+  lastUpdateResult = { status: 'checking' };
+  renderUpdateState();
+
+  const result = await window.api.checkUpdates(force);
+  lastUpdateResult = result;
+  renderUpdateState();
+  startUpdateRelativeTicker();
+
+  if (result.status === 'update-available') {
+    showUpdateBanner(result);
   }
 }
 
@@ -667,12 +730,9 @@ function cardHTML(s) {
           ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">
             ${ICONS.globe}
           </button>` : ''}
-          ${stateName === 'completed' ? `<button class="card-btn" onclick="handleResume('${sid}')" title="${t('action_resume')}">
-            ${ICONS.play}
-          </button>
-          <button class="card-btn" onclick="handleRemove('${sid}')" title="${t('action_delete')}">
-            ${ICONS.x}
-          </button>` : ''}
+          ${(stateName === 'completed' || stateName === 'error') ? `
+          ${stateName === 'completed' ? `<button class="card-btn" onclick="handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
+          <button class="card-btn" onclick="handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
           <button class="card-btn" onclick="showContextMenu(event, '${sid}')" title="${t('action_more')}">
             ${ICONS.moreVertical}
           </button>
@@ -750,12 +810,9 @@ function compactItemHTML(s) {
         <button class="card-btn" onclick="event.stopPropagation(); toggleNotifDropdown(event, '${sid}')" title="${t('action_notifications')}">
           ${ICONS.bell}
         </button>
-        ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">
-          ${ICONS.play}
-        </button>
-        <button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">
-          ${ICONS.x}
-        </button>` : ''}
+        ${(stateName === 'completed' || stateName === 'error') ? `
+        ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
+        <button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
         <button class="card-btn" onclick="event.stopPropagation(); showContextMenu(event, '${sid}')" title="${t('action_more')}">
           ${ICONS.moreVertical}
         </button>
@@ -781,8 +838,25 @@ function handleFocus(sessionId) {
 
 // ═══ Resume session ═══
 
+let resumePendingSessionId = null;
+
 function handleResume(sessionId) {
-  window.api.resumeSession(sessionId);
+  resumePendingSessionId = sessionId;
+  const $skip = document.getElementById('resumeSkipPerms');
+  if ($skip) $skip.checked = false;
+  document.getElementById('resumeModal').style.display = 'flex';
+}
+
+function closeResumeModal() {
+  resumePendingSessionId = null;
+  document.getElementById('resumeModal').style.display = 'none';
+}
+
+function confirmResume() {
+  if (!resumePendingSessionId) { closeResumeModal(); return; }
+  const skipPermissions = !!document.getElementById('resumeSkipPerms').checked;
+  window.api.resumeSession(resumePendingSessionId, { skipPermissions });
+  closeResumeModal();
 }
 
 // ═══ Open remote ═══
@@ -1241,6 +1315,8 @@ function showContextMenu(e, sessionId) {
       <div class="context-menu-item" onclick="handleResume('${sid}'); hideContextMenu();">${ICONS.play} ${t('action_resume')}</div>
       <div class="context-menu-item" onclick="handleRemove('${sid}'); hideContextMenu();">${ICONS.x} ${t('action_delete')}</div>
     `;
+  } else if (stateName === 'error') {
+    items += `<div class="context-menu-item" onclick="handleRemove('${sid}'); hideContextMenu();">${ICONS.x} ${t('action_delete')}</div>`;
   }
 
   menu.innerHTML = items;

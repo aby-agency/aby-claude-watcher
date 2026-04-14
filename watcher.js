@@ -58,6 +58,7 @@ class SessionWatcher extends EventEmitter {
           terminalApp: data.terminalApp || null,
           terminalId: data.terminalId || null,
           lastEventTime: Date.now(),
+          hasActivity: savedState.name !== 'error',
         });
         this.emit('session-added', this.sessions.get(id));
       }
@@ -120,6 +121,7 @@ class SessionWatcher extends EventEmitter {
               terminalApp: null,
               terminalId: null,
               lastEventTime: Date.now(),
+              hasActivity: false,
             });
             this.watchJsonl(sessionId);
             this.emit('session-added', this.sessions.get(sessionId));
@@ -134,9 +136,10 @@ class SessionWatcher extends EventEmitter {
               session.startedAt = startedAtISO;
             }
 
-            if (pidAlive && session.state === STATES.COMPLETED) {
-              // Session was marked completed but PID is alive — reactivate
+            if (pidAlive && (session.state === STATES.COMPLETED || session.state === STATES.ERROR)) {
+              // Session was completed/errored but PID is alive — reactivate
               session.endedAt = null;
+              session.hasActivity = false;
               this.setState(sessionId, STATES.WAITING, false);
             }
 
@@ -428,9 +431,11 @@ class SessionWatcher extends EventEmitter {
       case 'permission-mode':
         break;
       case 'assistant':
+        if (!event.isApiErrorMessage) session.hasActivity = true;
         this.processAssistantEvent(sessionId, session, event, isInitial);
         break;
       case 'user':
+        session.hasActivity = true;
         this.clearWaitingTimer(sessionId);
         const content = event.message && event.message.content;
         const isToolResult = Array.isArray(content) && content.some(c => c.type === 'tool_result');
@@ -483,6 +488,13 @@ class SessionWatcher extends EventEmitter {
       session.tokens.output += message.usage.output_tokens || 0;
     }
 
+    // API error (stream timeout, connection refused, quota exhausted, …)
+    if (event.isApiErrorMessage) {
+      this.clearWaitingTimer(sessionId);
+      this.setState(sessionId, STATES.ERROR, isInitial);
+      return;
+    }
+
     // Determine state from content
     const content = message.content || [];
     const hasThinking = content.some(c => c.type === 'thinking');
@@ -504,14 +516,6 @@ class SessionWatcher extends EventEmitter {
     } else if (hasThinking && !hasToolUse) {
       this.clearWaitingTimer(sessionId);
       this.setState(sessionId, STATES.THINKING, isInitial);
-    }
-
-    // Check for errors in content
-    for (const block of content) {
-      if (block.type === 'text' && block.text &&
-          (block.text.includes('Error:') || block.text.includes('error:'))) {
-        // Don't override running/thinking states for minor errors in text
-      }
     }
   }
 
@@ -596,8 +600,12 @@ class SessionWatcher extends EventEmitter {
   markCompleted(sessionId) {
     if (!sessionId) return;
     const session = this.sessions.get(sessionId);
-    if (session && session.state !== STATES.COMPLETED) {
-      this.setState(sessionId, STATES.COMPLETED, false);
+    if (!session) return;
+    // PID died + session file gone, but no user/assistant activity since last (re)start —
+    // likely a crash rather than a clean finish.
+    const target = session.hasActivity ? STATES.COMPLETED : STATES.ERROR;
+    if (session.state !== target) {
+      this.setState(sessionId, target, false);
     }
   }
 
@@ -654,6 +662,7 @@ class SessionWatcher extends EventEmitter {
           terminalApp: null,
           terminalId: null,
           lastEventTime: Date.now(),
+          hasActivity: false,
         });
         this.startFileWatch(sessionId, sessionIdOrPath);
         this.emit('session-added', this.sessions.get(sessionId));
@@ -682,6 +691,7 @@ class SessionWatcher extends EventEmitter {
           terminalApp: null,
           terminalId: null,
           lastEventTime: Date.now(),
+          hasActivity: false,
         });
         this.startFileWatch(sessionIdOrPath, jsonlPath);
         this.emit('session-added', this.sessions.get(sessionIdOrPath));

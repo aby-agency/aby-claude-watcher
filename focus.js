@@ -300,10 +300,12 @@ function runAppleScript(script) {
   });
 }
 
-function resumeSession(sessionId, cwd) {
+function resumeSession(sessionId, cwd, opts) {
   const safeId = sanitizeSessionId(sessionId);
   if (!safeId) return Promise.reject(new Error('Invalid session ID'));
-  const cmd = `claude --resume ${safeId}`;
+  const skipPerms = !!(opts && opts.skipPermissions);
+  const flags = skipPerms ? ' --dangerously-skip-permissions' : '';
+  const cmd = `claude --resume ${safeId}${flags}`;
   const dir = sanitizePath(cwd) || process.env.HOME;
 
   if (process.platform === 'darwin') {

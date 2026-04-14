@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('api', {
   setNotificationPrefs: (sessionId, prefs) => ipcRenderer.invoke('set-notification-prefs', sessionId, prefs),
   getNotificationPrefs: (sessionId) => ipcRenderer.invoke('get-notification-prefs', sessionId),
   addSession: (sessionIdOrPath) => ipcRenderer.invoke('add-session', sessionIdOrPath),
-  resumeSession: (sessionId) => ipcRenderer.invoke('resume-session', sessionId),
+  resumeSession: (sessionId, opts) => ipcRenderer.invoke('resume-session', sessionId, opts),
   setSessionOrder: (order) => ipcRenderer.invoke('set-session-order', order),
   setCustomName: (sessionId, name) => ipcRenderer.invoke('set-custom-name', sessionId, name),
   removeSession: (sessionId) => ipcRenderer.invoke('remove-session', sessionId),

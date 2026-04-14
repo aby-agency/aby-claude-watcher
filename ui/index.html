@@ -149,20 +149,43 @@
     </div>
   </div>
 
+  <!-- Resume session modal (hidden) -->
+  <div class="modal-backdrop" id="resumeModal" style="display:none;">
+    <div class="modal">
+      <h3 data-i18n="resume_title">Resume session</h3>
+      <p class="modal-hint" data-i18n="resume_hint">Open this session in a new terminal.</p>
+
+      <label class="resume-option">
+        <input type="checkbox" id="resumeSkipPerms">
+        <div>
+          <div class="resume-option-label">
+            <span class="resume-warn">⚠︎</span>
+            <span data-i18n="resume_skip_perms_label">Skip permission prompts</span>
+          </div>
+          <div class="resume-option-hint" data-i18n-html="resume_skip_perms_hint">
+            Runs Claude Code with <code>--dangerously-skip-permissions</code>. Use only in a worktree, container or sandbox.
+          </div>
+        </div>
+      </label>
+
+      <div class="modal-actions">
+        <button id="resumeCancel" data-i18n="cancel">Cancel</button>
+        <button class="primary" id="resumeConfirm" data-i18n="resume_confirm">Resume</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Context menu -->
   <div class="context-menu" id="contextMenu" style="display:none;"></div>
 
   <!-- Settings modal (hidden) -->
   <div class="modal-backdrop" id="settingsModal" style="display:none;">
     <div class="modal settings-modal">
-      <div class="modal-header">
-        <h3 data-i18n="settings_title">Settings</h3>
-        <button class="modal-close" id="settingsClose" data-i18n-title="close" title="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
-          </svg>
-        </button>
-      </div>
+      <button class="modal-close modal-close-floating" id="settingsClose" data-i18n-title="close" title="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+        </svg>
+      </button>
 
       <div class="settings-tabs">
         <button class="settings-tab active" data-tab="general" data-i18n="tab_general">General</button>

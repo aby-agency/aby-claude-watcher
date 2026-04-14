@@ -276,10 +276,10 @@ function setupIPC() {
     watcher.removeSession(sessionId);
   });
 
-  ipcMain.handle('resume-session', (_, sessionId) => {
+  ipcMain.handle('resume-session', (_, sessionId, opts) => {
     const s = watcher.getSessions().find(s => s.sessionId === sessionId);
     const cwd = s ? s.cwd : null;
-    return resumeSession(sessionId, cwd);
+    return resumeSession(sessionId, cwd, opts);
   });
 
   ipcMain.handle('launch-session', (_, cwd) => {

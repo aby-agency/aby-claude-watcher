@@ -14,7 +14,7 @@ let socketServer;
 let tray;
 
 function createWindow() {
-  const conf = config.load();
+  const conf = config.get();
   const bounds = config.getWindowBounds();
 
   const opts = {
@@ -343,6 +343,9 @@ app.whenReady().then(() => {
     const allowed = ['media', 'audioCapture', 'midi', 'speaker-selection'];
     callback(allowed.includes(permission));
   });
+
+  // Load config BEFORE applying settings that depend on it
+  config.load();
 
   // Apply language + auto-launch
   applyLanguage();

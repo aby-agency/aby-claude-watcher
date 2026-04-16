@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeImage, shell, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeImage, shell, screen, clipboard } = require('electron');
 const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
@@ -326,6 +326,12 @@ function setupIPC() {
       githubUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`,
       websiteUrl: WEBSITE_URL,
     };
+  });
+
+  ipcMain.handle('copy-to-clipboard', (_, text) => {
+    if (typeof text !== 'string') return false;
+    clipboard.writeText(text);
+    return true;
   });
 
   ipcMain.handle('popover-hide', () => {

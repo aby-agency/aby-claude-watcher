@@ -59,6 +59,7 @@ class SessionWatcher extends EventEmitter {
           terminalId: data.terminalId || null,
           lastEventTime: Date.now(),
           hasActivity: savedState.name !== 'error',
+          wasResumed: false,
         });
         this.emit('session-added', this.sessions.get(id));
       }
@@ -122,6 +123,7 @@ class SessionWatcher extends EventEmitter {
               terminalId: null,
               lastEventTime: Date.now(),
               hasActivity: false,
+              wasResumed: false,
             });
             this.watchJsonl(sessionId);
             this.emit('session-added', this.sessions.get(sessionId));
@@ -140,6 +142,7 @@ class SessionWatcher extends EventEmitter {
               // Session was completed/errored but PID is alive — reactivate
               session.endedAt = null;
               session.hasActivity = false;
+              session.wasResumed = true;
               this.setState(sessionId, STATES.WAITING, false);
             }
 
@@ -601,11 +604,19 @@ class SessionWatcher extends EventEmitter {
     if (!sessionId) return;
     const session = this.sessions.get(sessionId);
     if (!session) return;
-    // PID died + session file gone, but no user/assistant activity since last (re)start —
-    // likely a crash rather than a clean finish.
-    const target = session.hasActivity ? STATES.COMPLETED : STATES.ERROR;
-    if (session.state !== target) {
-      this.setState(sessionId, target, false);
+    if (!session.hasActivity) {
+      // User resumed the session but it died before writing anything — silent crash.
+      if (session.wasResumed) {
+        if (session.state !== STATES.ERROR) this.setState(sessionId, STATES.ERROR, false);
+        return;
+      }
+      // Otherwise it's a phantom (wrapper spawn that died, stale scan entry, …) —
+      // drop it entirely instead of surfacing a meaningless card.
+      this.removeSession(sessionId);
+      return;
+    }
+    if (session.state !== STATES.COMPLETED) {
+      this.setState(sessionId, STATES.COMPLETED, false);
     }
   }
 
@@ -663,6 +674,7 @@ class SessionWatcher extends EventEmitter {
           terminalId: null,
           lastEventTime: Date.now(),
           hasActivity: false,
+          wasResumed: false,
         });
         this.startFileWatch(sessionId, sessionIdOrPath);
         this.emit('session-added', this.sessions.get(sessionId));
@@ -692,6 +704,7 @@ class SessionWatcher extends EventEmitter {
           terminalId: null,
           lastEventTime: Date.now(),
           hasActivity: false,
+          wasResumed: false,
         });
         this.startFileWatch(sessionIdOrPath, jsonlPath);
         this.emit('session-added', this.sessions.get(sessionIdOrPath));

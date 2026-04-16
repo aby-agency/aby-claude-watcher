@@ -567,10 +567,17 @@ function showUpdateBanner(info) {
 
 // ═══ Rendering ═══
 
+function getRenderableSessions() {
+  const arr = getSortedSessions();
+  // Micro view hides completed sessions to keep the ambient signal clean
+  if (viewMode === 'micro') return arr.filter(s => s.state.name !== 'completed');
+  return arr;
+}
+
 function render() {
   const count = sessions.size;
   const filtersActive = activeFilters.size > 0 || searchQuery;
-  const visibleCount = getSortedSessions().length;
+  const visibleCount = getRenderableSessions().length;
 
   const showNoSessions = count === 0;
   const showNoResults = count > 0 && visibleCount === 0;
@@ -600,7 +607,7 @@ function viewItemHTML() {
 }
 
 function fullRender() {
-  const sorted = getSortedSessions();
+  const sorted = getRenderableSessions();
   const htmlFn = viewItemHTML();
   viewContainer().innerHTML = sorted.map(s => htmlFn(s)).join('');
 }
@@ -625,6 +632,7 @@ function updateSession(s) {
     fullRender();
     return;
   }
+
 
   // Patch in place — replace the element's HTML
   const htmlFn = viewItemHTML();
@@ -715,7 +723,7 @@ function cardHTML(s) {
       <div class="card-header">
         <div class="card-title">
           <div class="project-name">${esc(s.customName || s.projectName)}</div>
-          <div class="session-slug" onclick="handleCopyId('${sid}', event)" title="${t('action_copy_id')}">
+          <div class="session-slug" onclick="handleCopyId('${sid}', '${escAttr(s.slug || '')}', event)" title="${t('action_copy_id')}">
             ${esc(s.slug || s.sessionId.slice(0, 8))}
             <span class="copy-icon">${ICONS.copy}</span>
           </div>
@@ -905,14 +913,16 @@ function closeRenameModal() {
 
 // ═══ Copy session ID ═══
 
-function handleCopyId(sessionId, event) {
+function handleCopyId(sessionId, slug, event) {
   event.stopPropagation();
-  navigator.clipboard.writeText(sessionId).then(() => {
-    const el = event.currentTarget;
-    const original = el.innerHTML;
-    el.innerHTML = `<span style="color: var(--state-running)">${t('action_copied')}</span>`;
-    setTimeout(() => { el.innerHTML = original; }, 1200);
-  }).catch(() => {});
+  const el = event.currentTarget;
+  // Copy the slug if we have one (that's what the user sees);
+  // otherwise the full UUID is more useful than the 8-char prefix.
+  window.api.copyToClipboard(slug || sessionId);
+  if (!el) return;
+  const original = el.innerHTML;
+  el.innerHTML = `<span style="color: var(--state-running)">${t('action_copied')}</span>`;
+  setTimeout(() => { el.innerHTML = original; }, 1200);
 }
 
 // ═══ Remove session ═══

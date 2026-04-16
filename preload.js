@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('api', {
   launchSession: (cwd) => ipcRenderer.invoke('launch-session', cwd),
   getLanguage: () => ipcRenderer.invoke('get-language'),
   setLanguage: (lang) => ipcRenderer.invoke('set-language', lang),
+  copyToClipboard: (text) => ipcRenderer.invoke('copy-to-clipboard', text),
 
   onSessionAdded: (callback) => ipcRenderer.on('session-added', (_, data) => callback(data)),
   onSessionUpdated: (callback) => ipcRenderer.on('session-updated', (_, data) => callback(data)),

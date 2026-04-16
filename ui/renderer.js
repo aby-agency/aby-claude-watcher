@@ -677,7 +677,7 @@ function getSortedSessions() {
     arr = arr.filter(s => {
       const name = s.state.name;
       if (activeFilters.has('active') && (name === 'running' || name === 'thinking')) return true;
-      if (activeFilters.has('waiting') && name === 'waiting') return true;
+      if (activeFilters.has('waiting') && (name === 'waiting' || name === 'pending')) return true;
       if (activeFilters.has('completed') && name === 'completed') return true;
       return false;
     });

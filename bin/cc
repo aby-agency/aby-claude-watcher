@@ -3,6 +3,8 @@
 # Usage: cc [args...]
 
 SOCKET_PATH="/tmp/aby-claude-watcher.sock"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOK_PATH="$SCRIPT_DIR/aby-permission-hook.sh"
 
 # Detect terminal app
 detect_terminal() {
@@ -49,8 +51,62 @@ finally: s.close()
   fi
 }
 
+# Idempotently ensure the permission-detection hooks are installed in the
+# project-local .claude/settings.local.json. Never overwrites other user hooks.
+install_hooks() {
+  if [ ! -x "$HOOK_PATH" ]; then return; fi
+  if ! command -v python3 >/dev/null 2>&1; then return; fi
+  mkdir -p .claude 2>/dev/null
+  local settings=".claude/settings.local.json"
+  python3 - "$settings" "$HOOK_PATH" <<'PY'
+import json, os, sys
+path, hook_path = sys.argv[1], sys.argv[2]
+data = {}
+if os.path.exists(path):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except Exception:
+        data = {}
+hooks = data.setdefault('hooks', {})
+changed = False
+for event in ('PreToolUse', 'Notification'):
+    entries = hooks.setdefault(event, [])
+    if not isinstance(entries, list):
+        entries = []
+        hooks[event] = entries
+    # Look for an existing matcher block that already carries our hook
+    want_cmd = hook_path
+    already = False
+    for block in entries:
+        if not isinstance(block, dict):
+            continue
+        for h in (block.get('hooks') or []):
+            if isinstance(h, dict) and h.get('command') == want_cmd:
+                already = True
+                break
+        if already:
+            break
+    if not already:
+        entries.append({
+            'matcher': '*' if event == 'PreToolUse' else '',
+            'hooks': [{'type': 'command', 'command': want_cmd}],
+        })
+        changed = True
+if changed:
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+        f.write('\n')
+PY
+}
+
 TERMINAL_APP=$(detect_terminal)
 TERMINAL_ID=$(detect_terminal_id)
+
+# Ensure the permission hooks are in place for this project (cheap, idempotent)
+install_hooks
 
 # Notify Aby Claude Watcher in the background BEFORE launching Claude
 # We use $$ (our PID) — the watcher will find the session via the sessions dir

@@ -15,6 +15,7 @@ const STATES = {
   THINKING: { name: 'thinking', color: '#a78bfa' },
   RUNNING: { name: 'running', color: '#22c55e' },
   WAITING: { name: 'waiting', color: '#3b82f6' },
+  PENDING: { name: 'pending', color: '#f97316' },
   ERROR: { name: 'error', color: '#ef4444' },
   COMPLETED: { name: 'completed', color: '#4b5563' },
 };
@@ -567,17 +568,17 @@ class SessionWatcher extends EventEmitter {
       this.persistSession(session);
     }
 
-    // Trigger notification on waiting — with 30s cooldown to avoid spam
-    // This handles: stale timer → waiting, then end_turn → waiting again
-    if (!isInitial && newState.name === 'waiting') {
+    // Trigger notification on waiting/pending — with 30s cooldown to avoid spam
+    // Handles: stale timer → waiting, end_turn → waiting, permission hook → pending
+    if (!isInitial && (newState.name === 'waiting' || newState.name === 'pending')) {
       const lastNotif = this.lastNotifTime.get(sessionId) || 0;
       if (Date.now() - lastNotif > 30000) {
         this.lastNotifTime.set(sessionId, Date.now());
         this.emit('session-waiting', session);
       }
     }
-    // Reset cooldown when leaving waiting state
-    if (stateChanged && newState.name !== 'waiting') {
+    // Reset cooldown when leaving waiting/pending
+    if (stateChanged && newState.name !== 'waiting' && newState.name !== 'pending') {
       this.lastNotifTime.delete(sessionId);
     }
   }
@@ -646,6 +647,17 @@ class SessionWatcher extends EventEmitter {
       session.terminalId = terminalId;
       this.emit('session-updated', session);
     }
+  }
+
+  // Called by SocketServer when the permission hook fires (PreToolUse / Notification).
+  // The session is waiting for the user to answer something and no JSONL event
+  // will land until the user does — so we surface it explicitly.
+  markPending(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    if (session.state.name === 'pending') return;
+    this.clearWaitingTimer(sessionId);
+    this.setState(sessionId, STATES.PENDING, false);
   }
 
   // Manual session add from UI

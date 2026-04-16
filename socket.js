@@ -76,6 +76,16 @@ class SocketServer extends EventEmitter {
         conn.write(JSON.stringify({ status: 'ok' }) + '\n');
         break;
 
+      case 'permission-pending':
+        // Claude hook fired (PreToolUse / Notification) — session is waiting
+        // for the user to answer a permission prompt or a question.
+        this.emit('permission-pending', {
+          sessionId: msg.sessionId,
+          hookEvent: msg.hookEvent,
+        });
+        conn.write(JSON.stringify({ status: 'ok' }) + '\n');
+        break;
+
       case 'ping':
         conn.write(JSON.stringify({ status: 'pong' }) + '\n');
         break;

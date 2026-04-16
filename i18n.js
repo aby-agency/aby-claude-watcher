@@ -7,6 +7,7 @@
       state_thinking: 'Réflexion',
       state_running: 'Exécution',
       state_waiting: 'En attente',
+      state_pending: 'Action requise',
       state_error: 'Erreur',
       state_completed: 'Terminé',
 
@@ -146,6 +147,7 @@
       state_thinking: 'Thinking',
       state_running: 'Running',
       state_waiting: 'Waiting',
+      state_pending: 'Needs you',
       state_error: 'Error',
       state_completed: 'Completed',
 

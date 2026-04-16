@@ -162,6 +162,10 @@ function setupSocket() {
     watcher.registerTerminal(data.sessionId, data.terminalApp, data.terminalId);
   });
 
+  socketServer.on('permission-pending', (data) => {
+    if (data.sessionId) watcher.markPending(data.sessionId);
+  });
+
   // Resolve pending registrations when sessions are discovered
   watcher.on('session-added', (session) => {
     const pending = socketServer._pendingRegistrations || [];

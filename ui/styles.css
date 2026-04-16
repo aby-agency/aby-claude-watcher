@@ -16,6 +16,7 @@
   --state-thinking: #a78bfa;
   --state-running: #22c55e;
   --state-waiting: #3b82f6;
+  --state-pending: #f97316;
   --state-neutral: #94a3b8;
   --state-error: #ef4444;
   --state-completed: #4b5563;
@@ -137,6 +138,8 @@ body {
 .micro-item[data-state="running"] { color: var(--state-running); }
 .micro-item[data-state="running"] .micro-item-dot { background: var(--state-running); }
 .micro-item[data-state="waiting"] .micro-item-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
+.micro-item[data-state="pending"] { color: var(--state-pending); }
+.micro-item[data-state="pending"] .micro-item-dot { background: var(--state-pending); animation: breathe 1.4s ease-in-out infinite; }
 .micro-item[data-state="error"] .micro-item-dot { background: var(--state-error); animation: breathe 3s ease-in-out infinite; }
 .micro-item[data-state="completed"] .micro-item-dot { background: var(--state-completed); }
 
@@ -707,6 +710,7 @@ body.micro-mode .content {
 .state-badge.thinking { --badge-bg: var(--glow-thinking); --badge-color: var(--state-thinking); }
 .state-badge.running { --badge-bg: var(--glow-running); --badge-color: var(--state-running); }
 .state-badge.waiting { --badge-bg: var(--glow-waiting); --badge-color: var(--state-waiting); }
+.state-badge.pending { --badge-bg: rgba(249, 115, 22, 0.15); --badge-color: var(--state-pending); }
 .state-badge.completed { --badge-bg: var(--glow-completed); --badge-color: var(--state-completed); }
 .state-badge.error { --badge-bg: rgba(153, 27, 27, 0.15); --badge-color: var(--state-error); }
 
@@ -717,6 +721,10 @@ body.micro-mode .content {
 
 .state-badge.waiting .dot {
   animation: pulse-slow 2s ease-in-out infinite;
+}
+
+.state-badge.pending .dot {
+  animation: pulse 1.2s ease-in-out infinite;
 }
 
 @keyframes pulse-slow {
@@ -883,6 +891,8 @@ body.micro-mode .content {
 .compact-item[data-state="running"] { color: var(--state-running); }
 .compact-item[data-state="running"] .compact-dot { background: var(--state-running); }
 .compact-item[data-state="waiting"] .compact-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
+.compact-item[data-state="pending"] { color: var(--state-pending); }
+.compact-item[data-state="pending"] .compact-dot { background: var(--state-pending); animation: pulse 1.2s ease-in-out infinite; }
 .compact-item[data-state="error"] .compact-dot { background: var(--state-error); }
 .compact-item[data-state="completed"] .compact-dot { background: var(--state-completed); }
 
@@ -1443,6 +1453,7 @@ body.micro-mode .content {
 .card[data-state="thinking"] { --card-accent: var(--state-thinking); }
 .card[data-state="running"] { --card-accent: var(--state-running); }
 .card[data-state="waiting"] { --card-accent: var(--state-waiting); }
+.card[data-state="pending"] { --card-accent: var(--state-pending); }
 .card[data-state="completed"] { --card-accent: var(--state-completed); }
 .card[data-state="error"] { --card-accent: var(--state-error); }
 
@@ -1466,8 +1477,13 @@ body.micro-mode .content {
 .compact-item[data-state="thinking"] .state-dot { background: var(--state-thinking); }
 .compact-item[data-state="running"] .state-dot { background: var(--state-running); }
 .compact-item[data-state="waiting"] .state-dot { background: var(--state-waiting); }
+.compact-item[data-state="pending"] .state-dot { background: var(--state-pending); }
 .compact-item[data-state="completed"] .state-dot { background: var(--state-completed); }
 .compact-item[data-state="error"] .state-dot { background: var(--state-error); }
+
+.compact-item[data-state="pending"] .state-dot {
+  animation: pulse 1.2s ease-in-out infinite;
+}
 
 .compact-item[data-state="running"] .state-dot,
 .compact-item[data-state="thinking"] .state-dot {

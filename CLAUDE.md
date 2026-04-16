@@ -27,8 +27,8 @@ npm run dev      # with devtools
 | thinking | purple `#a78bfa` | Last event = `user` text (Claude processing) |
 | running | green `#22c55e` | Last event = `assistant` with `stop_reason: "tool_use"` |
 | waiting | blue `#3b82f6` | `end_turn` + 2s no activity |
-| error | red `#ef4444` | Error detected in events |
-| completed | dark grey `#4b5563` | `last-prompt` event OR session file gone + PID dead |
+| error | red `#ef4444` | `isApiErrorMessage` event OR silent crash after explicit resume |
+| completed | dark grey `#4b5563` | Session file gone + PID dead (with past activity) |
 
 ## Key decisions
 
@@ -38,7 +38,10 @@ npm run dev      # with devtools
 - Notifications: 30s cooldown per session to avoid spam
 - Polling at 250ms (`fs.watch` unreliable on macOS)
 - Config saves debounced 500ms, `saveSync` on shutdown
-- Session completed only when: `last-prompt` event OR (session file gone + PID dead)
+- `last-prompt` is metadata (records the latest user prompt) — NOT a session-end signal
+- Session completed only when: session file gone + PID dead + at least one user/assistant event happened
+- Session with no activity and no explicit resume → purged entirely (phantom)
+- Session with no activity but explicit resume → marked error (silent crash)
 - PID alive + session file gone = state unchanged (don't force a transition)
 - All data (model, slug, branch) uses latest value (resume-safe)
 - Input sanitization on all shell/AppleScript interpolation

@@ -463,7 +463,9 @@ class SessionWatcher extends EventEmitter {
         this.clearWaitingTimer(sessionId);
         break;
       case 'last-prompt':
-        this.setState(sessionId, STATES.COMPLETED, isInitial);
+        // Metadata event that records the latest user prompt — NOT a session-end
+        // signal. Claude writes one after every user message during normal work.
+        // Completion is detected via PID death + session file removal instead.
         break;
       case 'system':
         // Detect remote-control activation

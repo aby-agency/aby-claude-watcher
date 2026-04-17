@@ -28,6 +28,7 @@ class SessionWatcher extends EventEmitter {
     this.fileWatchers = new Map();
     this.fileOffsets = new Map();
     this.waitingTimers = new Map();
+    this.pendingTimers = new Map(); // deferred PENDING transitions from hook pings
     this.lastNotifTime = new Map(); // sessionId → timestamp of last notification
     this.scanTimer = null;
   }
@@ -74,9 +75,11 @@ class SessionWatcher extends EventEmitter {
     if (this.scanTimer) clearInterval(this.scanTimer);
     for (const watcher of this.fileWatchers.values()) watcher.close();
     for (const timer of this.waitingTimers.values()) clearTimeout(timer);
+    for (const timer of this.pendingTimers.values()) clearTimeout(timer);
     this.fileWatchers.clear();
     this.fileOffsets.clear();
     this.waitingTimers.clear();
+    this.pendingTimers.clear();
   }
 
   scan() {
@@ -421,6 +424,11 @@ class SessionWatcher extends EventEmitter {
     if (!session) return;
 
     session.lastEventTime = Date.now();
+    // Any real event means Claude is progressing on its own — cancel any
+    // deferred PENDING transition so we don't flicker into "needs you".
+    if (!isInitial && event.type && event.type !== 'attachment' && event.type !== 'permission-mode') {
+      this.clearPendingTimer(sessionId);
+    }
 
     // Extract slug
     if (event.slug) {
@@ -433,6 +441,7 @@ class SessionWatcher extends EventEmitter {
 
     switch (event.type) {
       case 'permission-mode':
+        if (event.permissionMode) session.permissionMode = event.permissionMode;
         break;
       case 'assistant':
         if (!event.isApiErrorMessage) session.hasActivity = true;
@@ -516,6 +525,14 @@ class SessionWatcher extends EventEmitter {
 
     if (message.stop_reason === 'tool_use') {
       this.clearWaitingTimer(sessionId);
+      // Interactive tools that block on user input — treat as "needs you".
+      // AskUserQuestion opens a multiple-choice picker; ExitPlanMode asks the
+      // user to approve a plan before continuing.
+      const INTERACTIVE_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
+      if (lastToolUse && INTERACTIVE_TOOLS.has(lastToolUse.name)) {
+        this.setState(sessionId, STATES.PENDING, isInitial);
+        return;
+      }
       this.setState(sessionId, STATES.RUNNING, isInitial);
     } else if (message.stop_reason === 'end_turn') {
       this.startWaitingTimer(sessionId, isInitial);
@@ -627,6 +644,7 @@ class SessionWatcher extends EventEmitter {
     const watcher = this.fileWatchers.get(sessionId);
     if (watcher) { watcher.close(); this.fileWatchers.delete(sessionId); }
     this.clearWaitingTimer(sessionId);
+    this.clearPendingTimer(sessionId);
     this.lastNotifTime.delete(sessionId);
     // Clean up file offsets for this session's JSONL
     const jsonlPath = this.findJsonlPath(sessionId);
@@ -652,12 +670,42 @@ class SessionWatcher extends EventEmitter {
   // Called by SocketServer when the permission hook fires (PreToolUse / Notification).
   // The session is waiting for the user to answer something and no JSONL event
   // will land until the user does — so we surface it explicitly.
-  markPending(sessionId) {
+  // Defer the pending transition by ~1s. If Claude writes any JSONL event
+  // in that window (auto-approved tool, immediate continuation, …), we cancel.
+  // Real permission prompts idle for seconds, so they comfortably survive.
+  markPending(sessionId, hookEvent) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     if (session.state.name === 'pending') return;
-    this.clearWaitingTimer(sessionId);
-    this.setState(sessionId, STATES.PENDING, false);
+    if (this.pendingTimers.has(sessionId)) return; // already scheduled
+
+    // In bypassPermissions mode, PreToolUse hooks fire but never actually
+    // block on the user — Claude auto-approves and proceeds. Only Notification
+    // hooks correspond to real user-input waits there.
+    if (hookEvent === 'PreToolUse' && session.permissionMode === 'bypassPermissions') return;
+
+    const lastEvent = session.lastEventTime || 0;
+    if (Date.now() - lastEvent < 1000) return; // Claude is actively writing — ignore
+
+    const timer = setTimeout(() => {
+      this.pendingTimers.delete(sessionId);
+      const s = this.sessions.get(sessionId);
+      if (!s) return;
+      if (s.state.name === 'pending') return;
+      // Final check: did an event arrive since we scheduled?
+      if (Date.now() - (s.lastEventTime || 0) < 1000) return;
+      this.clearWaitingTimer(sessionId);
+      this.setState(sessionId, STATES.PENDING, false);
+    }, 1000);
+    this.pendingTimers.set(sessionId, timer);
+  }
+
+  clearPendingTimer(sessionId) {
+    const timer = this.pendingTimers.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingTimers.delete(sessionId);
+    }
   }
 
   // Manual session add from UI

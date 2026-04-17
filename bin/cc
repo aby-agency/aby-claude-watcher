@@ -56,43 +56,57 @@ finally: s.close()
 install_hooks() {
   if [ ! -x "$HOOK_PATH" ]; then return; fi
   if ! command -v python3 >/dev/null 2>&1; then return; fi
-  mkdir -p .claude 2>/dev/null
+  # Refuse to install into $HOME — that's the global Claude Code config dir.
+  if [ "$(pwd -P)" = "$(cd "$HOME" && pwd -P)" ]; then return; fi
+  mkdir -p .claude 2>/dev/null || return
   local settings=".claude/settings.local.json"
-  python3 - "$settings" "$HOOK_PATH" <<'PY'
+  python3 - "$settings" "$HOOK_PATH" <<'PY' 2>/dev/null
 import json, os, sys
 path, hook_path = sys.argv[1], sys.argv[2]
+HOOK_FILENAME = os.path.basename(hook_path)
 data = {}
 if os.path.exists(path):
     try:
         with open(path) as f:
             data = json.load(f)
-        if not isinstance(data, dict):
-            data = {}
     except Exception:
-        data = {}
-hooks = data.setdefault('hooks', {})
+        # Don't clobber user data if parsing fails.
+        sys.exit(0)
+    if not isinstance(data, dict):
+        sys.exit(0)
+hooks = data.get('hooks')
+if not isinstance(hooks, dict):
+    hooks = {}
+    data['hooks'] = hooks
 changed = False
+
+def is_ours(block):
+    if not isinstance(block, dict):
+        return False
+    for h in (block.get('hooks') or []):
+        if isinstance(h, dict) and isinstance(h.get('command'), str) and h['command'].endswith('/' + HOOK_FILENAME):
+            return True
+    return False
+
 for event in ('PreToolUse', 'Notification'):
-    entries = hooks.setdefault(event, [])
+    entries = hooks.get(event)
     if not isinstance(entries, list):
         entries = []
         hooks[event] = entries
-    # Look for an existing matcher block that already carries our hook
-    want_cmd = hook_path
-    already = False
+    found = False
     for block in entries:
-        if not isinstance(block, dict):
-            continue
-        for h in (block.get('hooks') or []):
-            if isinstance(h, dict) and h.get('command') == want_cmd:
-                already = True
-                break
-        if already:
+        if is_ours(block):
+            found = True
+            # Self-heal: refresh the command path if the app was relocated.
+            for h in (block.get('hooks') or []):
+                if isinstance(h, dict) and h.get('command') != hook_path:
+                    h['command'] = hook_path
+                    changed = True
             break
-    if not already:
+    if not found:
         entries.append({
             'matcher': '*' if event == 'PreToolUse' else '',
-            'hooks': [{'type': 'command', 'command': want_cmd}],
+            'hooks': [{'type': 'command', 'command': hook_path}],
         })
         changed = True
 if changed:

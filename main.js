@@ -4,6 +4,7 @@ const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
 const { focusTerminal, resumeSession, launchSession } = require('./focus');
 const { checkForUpdates, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
+const { installHooks, getDefaultHookPath } = require('./install-hooks');
 const config = require('./config');
 const i18n = require('./i18n');
 
@@ -129,7 +130,7 @@ function setupWatcher() {
       });
     }
     if (prefs.sound) {
-      sendToRenderer('play-sound');
+      sendToRenderer('play-sound', session.state && session.state.name === 'pending' ? 'pending' : 'waiting');
     }
   });
 
@@ -163,7 +164,7 @@ function setupSocket() {
   });
 
   socketServer.on('permission-pending', (data) => {
-    if (data.sessionId) watcher.markPending(data.sessionId);
+    if (data.sessionId) watcher.markPending(data.sessionId, data.hookEvent);
   });
 
   // Resolve pending registrations when sessions are discovered
@@ -283,10 +284,18 @@ function setupIPC() {
   ipcMain.handle('resume-session', (_, sessionId, opts) => {
     const s = watcher.getSessions().find(s => s.sessionId === sessionId);
     const cwd = s ? s.cwd : null;
+    // Best-effort: ensure the permission-detection hook is installed in the
+    // project so the resumed Claude session can emit PENDING signals.
+    if (cwd) {
+      try { installHooks(cwd, getDefaultHookPath()); } catch {}
+    }
     return resumeSession(sessionId, cwd, opts);
   });
 
   ipcMain.handle('launch-session', (_, cwd) => {
+    if (cwd) {
+      try { installHooks(cwd, getDefaultHookPath()); } catch {}
+    }
     return launchSession(cwd);
   });
 

@@ -119,8 +119,8 @@ async function init() {
     showToast(data);
   });
 
-  window.api.onPlaySound(() => {
-    playNotificationSound();
+  window.api.onPlaySound((kind) => {
+    playNotificationSound(kind);
   });
 
   // Toolbar
@@ -781,9 +781,12 @@ function microItemHTML(s) {
   const sid = escAttr(s.sessionId);
   const name = s.customName || s.projectName;
   const isActive = stateName === 'running' || stateName === 'thinking';
+  const isPending = stateName === 'pending';
   const indicator = isActive
     ? '<span class="micro-item-spinner"></span>'
-    : '<span class="micro-item-dot"></span>';
+    : isPending
+      ? `<span class="pending-indicator">${ICONS.bellRing}</span>`
+      : '<span class="micro-item-dot"></span>';
   const tooltip = `${name} — ${t('state_' + stateName)}`;
   return `
     <div class="micro-item" data-state="${stateName}" data-session="${sid}"
@@ -806,7 +809,7 @@ function compactItemHTML(s) {
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
          oncontextmenu="showContextMenu(event, '${sid}')"
          ondblclick="handleFocus('${sid}')">
-      ${isActive ? '<span class="compact-spinner"></span>' : '<span class="compact-dot"></span>'}
+      ${isActive ? '<span class="compact-spinner"></span>' : stateName === 'pending' ? `<span class="pending-indicator">${ICONS.bellRing}</span>` : '<span class="compact-dot"></span>'}
       <div class="project-name">${esc(s.customName || s.projectName)}</div>
       <div class="compact-actions">
         <button class="card-btn" onclick="event.stopPropagation(); handleFocus('${sid}')" title="${t('action_focus_terminal')}">
@@ -1027,24 +1030,21 @@ function showToast(data) {
 // Generate chime WAV at startup — uses <audio> element so it follows
 // the system audio routing (headphones, bluetooth, etc.)
 
-function generateChimeWav() {
+function generateChimeWav(notes, duration) {
   const sampleRate = 44100;
-  const duration = 0.4;
   const numSamples = Math.floor(sampleRate * duration);
   const buffer = new Float32Array(numSamples);
-
-  const notes = [
-    { freq: 1047, start: 0, dur: 0.15 },     // C6
-    { freq: 1319, start: 0.12, dur: 0.25 },   // E6
-  ];
 
   for (const note of notes) {
     const startSample = Math.floor(note.start * sampleRate);
     const endSample = Math.min(startSample + Math.floor(note.dur * sampleRate), numSamples);
+    const decay = note.decay || 12;
+    const attack = note.attack || 50;
+    const amp = note.amp || 1;
     for (let i = startSample; i < endSample; i++) {
       const t = (i - startSample) / sampleRate;
-      const envelope = Math.exp(-t * 12) * Math.min(t * 50, 1); // fast attack, smooth decay
-      buffer[i] += Math.sin(2 * Math.PI * note.freq * t) * envelope;
+      const envelope = Math.exp(-t * decay) * Math.min(t * attack, 1);
+      buffer[i] += amp * Math.sin(2 * Math.PI * note.freq * t) * envelope;
     }
   }
 
@@ -1085,7 +1085,20 @@ function generateChimeWav() {
   return URL.createObjectURL(blob);
 }
 
-const chimeUrl = generateChimeWav();
+// Subtle two-note chime for "waiting" (end of turn)
+const chimeUrl = generateChimeWav([
+  { freq: 1047, start: 0,    dur: 0.15 },   // C6
+  { freq: 1319, start: 0.12, dur: 0.25 },   // E6
+], 0.4);
+
+// More insistent double-strike bell for "pending" (needs user action).
+// Two quick hits with a bell-like ring (fundamental + octave overtone).
+const pendingUrl = generateChimeWav([
+  { freq: 1568, start: 0,    dur: 0.35, decay: 9,  attack: 80, amp: 0.9 },  // G6 strike
+  { freq: 3136, start: 0,    dur: 0.25, decay: 14, attack: 80, amp: 0.35 }, // G7 overtone
+  { freq: 1568, start: 0.22, dur: 0.35, decay: 9,  attack: 80, amp: 0.9 },  // G6 second strike
+  { freq: 3136, start: 0.22, dur: 0.25, decay: 14, attack: 80, amp: 0.35 }, // G7 overtone
+], 0.7);
 
 async function getDefaultOutputDeviceId() {
   try {
@@ -1099,9 +1112,10 @@ async function getDefaultOutputDeviceId() {
   }
 }
 
-async function playNotificationSound() {
+async function playNotificationSound(kind) {
   try {
-    const audio = new Audio(chimeUrl);
+    const src = kind === 'pending' ? pendingUrl : chimeUrl;
+    const audio = new Audio(src);
     audio.volume = volume;
     // Route to the current default output device (headphones, bluetooth, etc.)
     const deviceId = await getDefaultOutputDeviceId();

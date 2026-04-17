@@ -17,6 +17,7 @@
   --state-running: #22c55e;
   --state-waiting: #3b82f6;
   --state-pending: #f97316;
+  --state-pending-contrast: #ffffff;
   --state-neutral: #94a3b8;
   --state-error: #ef4444;
   --state-completed: #4b5563;
@@ -122,6 +123,38 @@ body {
   background: var(--state-neutral);
 }
 
+/* Pending indicator — small bell icon that gently wiggles. Shown in compact
+   and micro views whenever a session is waiting for the user's input.
+   Uses currentColor so the orange state color propagates to the stroke. */
+.pending-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--state-pending);
+  transform-origin: 50% 15%;
+  animation: pending-wiggle 1.8s ease-in-out infinite;
+}
+
+.pending-indicator svg {
+  width: 13px;
+  height: 13px;
+}
+
+.micro-item .pending-indicator svg {
+  width: 12px;
+  height: 12px;
+}
+
+@keyframes pending-wiggle {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  65% { transform: rotate(-14deg); }
+  72% { transform: rotate(12deg); }
+  79% { transform: rotate(-8deg); }
+  86% { transform: rotate(6deg); }
+  93% { transform: rotate(-2deg); }
+}
+
 .micro-item .micro-item-spinner {
   width: 9px;
   height: 9px;
@@ -139,7 +172,7 @@ body {
 .micro-item[data-state="running"] .micro-item-dot { background: var(--state-running); }
 .micro-item[data-state="waiting"] .micro-item-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
 .micro-item[data-state="pending"] { color: var(--state-pending); }
-.micro-item[data-state="pending"] .micro-item-dot { background: var(--state-pending); animation: breathe 1.4s ease-in-out infinite; }
+.micro-item[data-state="pending"] .micro-item-dot { background: var(--state-pending); }
 .micro-item[data-state="error"] .micro-item-dot { background: var(--state-error); animation: breathe 3s ease-in-out infinite; }
 .micro-item[data-state="completed"] .micro-item-dot { background: var(--state-completed); }
 
@@ -235,6 +268,12 @@ body.micro-mode .content {
   background: var(--bg-tertiary);
   color: var(--text-primary);
   border-color: var(--border-light);
+}
+
+/* Pin button: green when active, matching the micro view's pin. */
+#btnPin.active {
+  color: var(--state-running);
+  border-color: color-mix(in srgb, var(--state-running) 40%, var(--border-light));
 }
 
 .toolbar-btn-text {
@@ -892,7 +931,7 @@ body.micro-mode .content {
 .compact-item[data-state="running"] .compact-dot { background: var(--state-running); }
 .compact-item[data-state="waiting"] .compact-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
 .compact-item[data-state="pending"] { color: var(--state-pending); }
-.compact-item[data-state="pending"] .compact-dot { background: var(--state-pending); animation: pulse 1.2s ease-in-out infinite; }
+.compact-item[data-state="pending"] .compact-dot { background: var(--state-pending); }
 .compact-item[data-state="error"] .compact-dot { background: var(--state-error); }
 .compact-item[data-state="completed"] .compact-dot { background: var(--state-completed); }
 

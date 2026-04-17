@@ -42,7 +42,7 @@ contextBridge.exposeInMainWorld('api', {
   onSessionUpdated: (callback) => ipcRenderer.on('session-updated', (_, data) => callback(data)),
   onSessionRemoved: (callback) => ipcRenderer.on('session-removed', (_, id) => callback(id)),
   onShowNotification: (callback) => ipcRenderer.on('show-notification', (_, data) => callback(data)),
-  onPlaySound: (callback) => ipcRenderer.on('play-sound', () => callback()),
+  onPlaySound: (callback) => ipcRenderer.on('play-sound', (_, kind) => callback(kind)),
   onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_, info) => callback(info)),
   onLanguageChanged: (callback) => ipcRenderer.on('language-changed', (_, lang) => callback(lang)),
 });

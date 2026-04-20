@@ -56,8 +56,8 @@ finally: s.close()
 install_hooks() {
   if [ ! -x "$HOOK_PATH" ]; then return; fi
   if ! command -v python3 >/dev/null 2>&1; then return; fi
-  # Refuse to install into $HOME — that's the global Claude Code config dir.
-  if [ "$(pwd -P)" = "$(cd "$HOME" && pwd -P)" ]; then return; fi
+  # $HOME/.claude/settings.local.json is the global Claude Code user config.
+  # Installing there is fine — it covers sessions started outside of a project.
   mkdir -p .claude 2>/dev/null || return
   local settings=".claude/settings.local.json"
   python3 - "$settings" "$HOOK_PATH" <<'PY' 2>/dev/null

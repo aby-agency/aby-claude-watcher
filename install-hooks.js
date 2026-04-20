@@ -53,10 +53,10 @@ function installHooks(cwd, hookPath) {
   if (!cwd || typeof cwd !== 'string') return { installed: false, reason: 'invalid-cwd' };
   if (!hookPath || !fs.existsSync(hookPath)) return { installed: false, reason: 'hook-missing' };
 
-  // Refuse to write into $HOME — that's the global Claude Code config dir.
-  if (path.resolve(cwd) === path.resolve(os.homedir())) {
-    return { installed: false, reason: 'home-dir-refused' };
-  }
+  // $HOME/.claude/settings.local.json is the global Claude Code user config.
+  // Installing there is intentional: it covers sessions started outside of a
+  // project directory.  The hook is lightweight (async socket ping, no-op if
+  // the watcher isn't running) so the impact on non-monitored sessions is nil.
 
   const settingsDir = path.join(cwd, '.claude');
   const settingsPath = path.join(settingsDir, 'settings.local.json');

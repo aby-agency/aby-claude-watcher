@@ -130,7 +130,10 @@ function setupWatcher() {
       });
     }
     if (prefs.sound) {
-      sendToRenderer('play-sound', session.state && session.state.name === 'pending' ? 'pending' : 'waiting');
+      sendToRenderer('play-sound', {
+        kind: session.state && session.state.name === 'pending' ? 'pending' : 'waiting',
+        sessionId: session.sessionId,
+      });
     }
   });
 
@@ -384,6 +387,7 @@ function serializeSession(session) {
     tokens: session.tokens,
     remoteUrl: session.remoteUrl || null,
     cwd: session.cwd,
+    notifEnabled: (() => { const p = config.getNotificationPrefs(session.sessionId); return !!(p.modal || p.sound); })(),
   };
 }
 
@@ -571,7 +575,7 @@ function setupTray() {
 
 function updateDockBadge() {
   if (process.platform !== 'darwin') return;
-  const waiting = watcher.getSessions().filter(s => s.state.name === 'waiting').length;
+  const waiting = watcher.getSessions().filter(s => s.state.name === 'waiting' || s.state.name === 'pending').length;
   app.dock.setBadge(waiting > 0 ? String(waiting) : '');
 }
 
@@ -580,7 +584,7 @@ function updateTrayMenu() {
 
   const sessions = watcher.getSessions();
   const activeCount = sessions.filter(s => s.state.name !== 'completed').length;
-  const waitingCount = sessions.filter(s => s.state.name === 'waiting').length;
+  const waitingCount = sessions.filter(s => s.state.name === 'waiting' || s.state.name === 'pending').length;
   let tooltip = i18n.t('tray_tooltip', { app: 'Aby Claude Watcher', n: activeCount });
   if (waitingCount > 0) tooltip += i18n.t('tray_tooltip_waiting', { n: waitingCount });
   tray.setToolTip(tooltip);

@@ -6,6 +6,7 @@
 const ICONS = {
   bell: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
   bellRing: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M2 8c0-2.2.7-4.3 2-6"/><path d="M22 8a10 10 0 0 0-2-6"/></svg>`,
+  bellOff: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`,
   externalLink: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>`,
   terminal: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
   check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
@@ -27,7 +28,6 @@ let alwaysOnTop = false;
 let volume = 0.7;
 let notifPosition = 'top-right';
 let autoLaunch = false;
-let openDropdown = null;
 let searchQuery = '';
 let sessionOrder = []; // User-defined order of session IDs
 let draggedId = null;
@@ -119,8 +119,11 @@ async function init() {
     showToast(data);
   });
 
-  window.api.onPlaySound((kind) => {
+  window.api.onPlaySound((data) => {
+    const kind = (data && data.kind) || 'waiting';
+    const sid = data && data.sessionId;
     playNotificationSound(kind);
+    if (sid) flashMicroBell(sid, kind);
   });
 
   // Toolbar
@@ -279,13 +282,6 @@ async function init() {
     render();
   });
 
-  // Close dropdowns on outside click
-  document.addEventListener('click', (e) => {
-    if (openDropdown && !e.target.closest('.notif-dropdown') && !e.target.closest('.card-btn')) {
-      closeDropdown();
-    }
-  });
-
   // Close context menu on any click
   document.addEventListener('click', () => hideContextMenu());
 
@@ -334,7 +330,6 @@ async function init() {
 
     // Escape: close modals/dropdowns
     if (e.key === 'Escape') {
-      closeDropdown();
       closeAddModal();
       closeRenameModal();
       closeResumeModal();
@@ -729,18 +724,16 @@ function cardHTML(s) {
           </div>
         </div>
         <div class="card-actions">
-          <button class="card-btn" onclick="toggleNotifDropdown(event, '${sid}')" title="${t('action_notifications')}">
-            ${ICONS.bell}
+          ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">${ICONS.globe}</button>` : ''}
+          ${(stateName === 'completed' || stateName === 'error') ? `
+          ${stateName === 'completed' ? `<button class="card-btn" onclick="handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
+          <button class="card-btn" onclick="handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
+          <button class="card-btn notif-btn ${s.notifEnabled ? 'notif-on' : ''}" onclick="toggleNotif(event, '${sid}')" title="${t('action_notifications')}">
+            ${s.notifEnabled ? ICONS.bell : ICONS.bellOff}
           </button>
           <button class="card-btn" onclick="handleFocus('${sid}')" title="${t('action_focus_terminal')}">
             ${ICONS.terminal}
           </button>
-          ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">
-            ${ICONS.globe}
-          </button>` : ''}
-          ${(stateName === 'completed' || stateName === 'error') ? `
-          ${stateName === 'completed' ? `<button class="card-btn" onclick="handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
-          <button class="card-btn" onclick="handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
           <button class="card-btn" onclick="showContextMenu(event, '${sid}')" title="${t('action_more')}">
             ${ICONS.moreVertical}
           </button>
@@ -788,12 +781,18 @@ function microItemHTML(s) {
       ? `<span class="pending-indicator">${ICONS.bellRing}</span>`
       : '<span class="micro-item-dot"></span>';
   const tooltip = `${name} — ${t('state_' + stateName)}`;
+  const notifIcon = s.notifEnabled
+    ? `<button class="micro-notif-btn notif-on" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">${ICONS.bell}</button>`
+    : `<button class="micro-notif-btn" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">${ICONS.bellOff}</button>`;
   return `
     <div class="micro-item" data-state="${stateName}" data-session="${sid}"
          title="${escAttr(tooltip)}"
+         draggable="${stateName !== 'completed' && !searchQuery}"
+         ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
          onclick="handleFocus('${sid}')">
       ${indicator}
       <span class="micro-item-name">${esc(name)}</span>
+      ${notifIcon}
     </div>
   `;
 }
@@ -812,18 +811,16 @@ function compactItemHTML(s) {
       ${isActive ? '<span class="compact-spinner"></span>' : stateName === 'pending' ? `<span class="pending-indicator">${ICONS.bellRing}</span>` : '<span class="compact-dot"></span>'}
       <div class="project-name">${esc(s.customName || s.projectName)}</div>
       <div class="compact-actions">
-        <button class="card-btn" onclick="event.stopPropagation(); handleFocus('${sid}')" title="${t('action_focus_terminal')}">
-          ${ICONS.terminal}
-        </button>
-        ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="event.stopPropagation(); handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">
-          ${ICONS.globe}
-        </button>` : ''}
-        <button class="card-btn" onclick="event.stopPropagation(); toggleNotifDropdown(event, '${sid}')" title="${t('action_notifications')}">
-          ${ICONS.bell}
-        </button>
+        ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="event.stopPropagation(); handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">${ICONS.globe}</button>` : ''}
         ${(stateName === 'completed' || stateName === 'error') ? `
         ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
         <button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
+        <button class="card-btn notif-btn ${s.notifEnabled ? 'notif-on' : ''}" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">
+          ${s.notifEnabled ? ICONS.bell : ICONS.bellOff}
+        </button>
+        <button class="card-btn" onclick="event.stopPropagation(); handleFocus('${sid}')" title="${t('action_focus_terminal')}">
+          ${ICONS.terminal}
+        </button>
         <button class="card-btn" onclick="event.stopPropagation(); showContextMenu(event, '${sid}')" title="${t('action_more')}">
           ${ICONS.moreVertical}
         </button>
@@ -845,6 +842,30 @@ function updateDurations() {
 
 function handleFocus(sessionId) {
   window.api.focusTerminal(sessionId);
+}
+
+// ═══ Micro bell flash ═══
+
+function flashMicroBell(sessionId, kind) {
+  const el = document.querySelector(`.micro-item[data-session="${sessionId}"]`);
+  if (!el) return;
+  const dot = el.querySelector('.micro-item-dot');
+  if (!dot) return;
+
+  // Replace dot with a temporary bell icon
+  const color = kind === 'pending' ? 'var(--state-pending)' : 'var(--state-waiting)';
+  const bellSvg = ICONS.bellRing.replace('width="14"', 'width="12"').replace('height="14"', 'height="12"');
+  const flash = document.createElement('span');
+  flash.className = 'micro-bell-flash';
+  flash.style.color = color;
+  flash.innerHTML = bellSvg;
+  dot.style.display = 'none';
+  dot.parentElement.insertBefore(flash, dot);
+
+  setTimeout(() => {
+    flash.remove();
+    dot.style.display = '';
+  }, 5000);
 }
 
 // ═══ Resume session ═══
@@ -936,50 +957,24 @@ function handleRemove(sessionId) {
 
 // ═══ Notifications ═══
 
-async function toggleNotifDropdown(event, sessionId) {
+async function toggleNotif(event, sessionId) {
   event.stopPropagation();
-  closeDropdown();
-
   const btn = event.currentTarget;
-  const card = btn.closest('.card, .compact-item');
-  if (!card) return;
-
   const prefs = await window.api.getNotificationPrefs(sessionId);
+  const wasOn = !!(prefs.modal || prefs.sound);
+  const newVal = !wasOn;
+  await window.api.setNotificationPrefs(sessionId, { modal: newVal, sound: newVal });
 
-  const dropdown = document.createElement('div');
-  dropdown.className = 'notif-dropdown';
-  dropdown.innerHTML = `
-    <div class="notif-option" onclick="toggleNotifPref(event, '${sessionId}', 'modal')">
-      <div class="notif-toggle ${prefs.modal ? 'on' : ''}" data-pref="modal"></div>
-      <span>${t('notif_modal')}</span>
-    </div>
-    <div class="notif-option" onclick="toggleNotifPref(event, '${sessionId}', 'sound')">
-      <div class="notif-toggle ${prefs.sound ? 'on' : ''}" data-pref="sound"></div>
-      <span>${t('notif_sound')}</span>
-    </div>
-  `;
+  // Update the session data in local cache
+  const s = sessions.get(sessionId);
+  if (s) s.notifEnabled = newVal;
 
-  btn.style.position = 'relative';
-  btn.appendChild(dropdown);
-  openDropdown = dropdown;
-}
+  // Update button visually in place
+  btn.classList.toggle('notif-on', newVal);
+  btn.innerHTML = newVal ? ICONS.bell : ICONS.bellOff;
 
-function closeDropdown() {
-  if (openDropdown) {
-    openDropdown.remove();
-    openDropdown = null;
-  }
-}
-
-async function toggleNotifPref(event, sessionId, pref) {
-  event.stopPropagation();
-  const toggle = event.currentTarget.querySelector('.notif-toggle');
-  const isOn = toggle.classList.toggle('on');
-  await window.api.setNotificationPrefs(sessionId, { [pref]: isOn });
   // Preview sound when enabling
-  if (pref === 'sound' && isOn) {
-    playNotificationSound();
-  }
+  if (newVal) playNotificationSound();
 }
 
 // ═══ Toast notifications ═══

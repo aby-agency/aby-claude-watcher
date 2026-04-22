@@ -97,20 +97,39 @@ class SessionWatcher extends EventEmitter {
 
           if (!sessionId) continue;
 
+          // Detect /clear: Claude keeps the PID but creates a new JSONL+sessionId.
+          // The session file isn't updated, so we check if a newer JSONL exists
+          // in the same project dir and swap our tracking to it.
+          const latestId = this.findLatestSessionIdForCwd(cwd);
+          const effectiveId = (latestId && latestId !== sessionId) ? latestId : sessionId;
+          if (effectiveId !== sessionId) {
+            // Migrate from the session-file ID if it's still tracked
+            if (this.sessions.has(sessionId)) {
+              this.migrateSession(sessionId, effectiveId);
+            }
+            // Also clean up any orphaned intermediate session from a previous
+            // /clear that left a stale entry with the same cwd but a different ID.
+            for (const [id, s] of this.sessions) {
+              if (id !== effectiveId && s.cwd === cwd) {
+                this.removeSession(id);
+              }
+            }
+          }
+
           // Session file exists — even if PID is dead, don't mark completed yet
           // The session file's presence means Claude Code hasn't fully cleaned up
-          activeSessionIds.add(sessionId);
+          activeSessionIds.add(effectiveId);
 
           const pidAlive = this.isPidAlive(pid);
 
-          if (!this.sessions.has(sessionId)) {
+          if (!this.sessions.has(effectiveId)) {
             const projectName = this.extractProjectName(cwd);
             // startedAt can be epoch ms or ISO string
             const startedAtISO = typeof startedAt === 'number'
               ? new Date(startedAt).toISOString()
               : (startedAt || new Date().toISOString());
-            this.sessions.set(sessionId, {
-              sessionId,
+            this.sessions.set(effectiveId, {
+              sessionId: effectiveId,
               pid,
               cwd,
               projectName,
@@ -125,14 +144,15 @@ class SessionWatcher extends EventEmitter {
               remoteUrl: null,
               terminalApp: null,
               terminalId: null,
+              permissionMode: this.detectBypassFromPid(pid) ? 'bypassPermissions' : null,
               lastEventTime: Date.now(),
               hasActivity: false,
               wasResumed: false,
             });
-            this.watchJsonl(sessionId);
-            this.emit('session-added', this.sessions.get(sessionId));
+            this.watchJsonl(effectiveId);
+            this.emit('session-added', this.sessions.get(effectiveId));
           } else {
-            const session = this.sessions.get(sessionId);
+            const session = this.sessions.get(effectiveId);
             // Always update from live session data (PID/cwd can change on resume)
             session.pid = pid;
             session.cwd = cwd;
@@ -147,11 +167,11 @@ class SessionWatcher extends EventEmitter {
               session.endedAt = null;
               session.hasActivity = false;
               session.wasResumed = true;
-              this.setState(sessionId, STATES.WAITING, false);
+              this.setState(effectiveId, STATES.WAITING, false);
             }
 
-            if (!this.fileWatchers.has(sessionId)) {
-              this.watchJsonl(sessionId);
+            if (!this.fileWatchers.has(effectiveId)) {
+              this.watchJsonl(effectiveId);
             }
           }
         } catch (e) {
@@ -173,7 +193,15 @@ class SessionWatcher extends EventEmitter {
         if (session._missingTicks < 2) continue;
 
         if (session.pid && this.isPidAlive(session.pid)) {
-          // PID alive but session file missing — leave state as-is
+          // PID alive but session file missing. If another session with the
+          // same PID is already tracked (= /clear created a new ID), this
+          // entry is a stale duplicate — remove it.
+          const dup = [...this.sessions.values()].some(
+            s => s.sessionId !== id && s.pid === session.pid && activeSessionIds.has(s.sessionId)
+          );
+          if (dup) {
+            this.removeSession(id);
+          }
           continue;
         }
         this.markCompleted(id);
@@ -183,6 +211,18 @@ class SessionWatcher extends EventEmitter {
       if (e.code !== 'ENOENT') {
         console.error('SessionWatcher scan error:', e.message);
       }
+    }
+  }
+
+  // Check if a PID was launched with --dangerously-skip-permissions
+  detectBypassFromPid(pid) {
+    if (!pid) return false;
+    try {
+      const { execSync } = require('child_process');
+      const args = execSync(`ps -p ${pid} -o args=`, { encoding: 'utf-8', timeout: 1000 }).trim();
+      return args.includes('--dangerously-skip-permissions');
+    } catch {
+      return false;
     }
   }
 
@@ -199,6 +239,38 @@ class SessionWatcher extends EventEmitter {
   extractProjectName(cwd) {
     if (!cwd) return 'Unknown';
     return path.basename(cwd);
+  }
+
+  // Resolve project dir slug from cwd (mirrors Claude Code's convention:
+  // ~/.claude/projects/-<path-with-dashes>/)
+  cwdToProjectDir(cwd) {
+    if (!cwd) return null;
+    const slug = cwd.replace(/\//g, '-');
+    const dir = path.join(PROJECTS_DIR, slug);
+    return fs.existsSync(dir) ? dir : null;
+  }
+
+  // Find the most recently written JSONL in a project dir.
+  // Returns the sessionId (filename minus .jsonl) or null.
+  findLatestSessionIdForCwd(cwd) {
+    const dir = this.cwdToProjectDir(cwd);
+    if (!dir) return null;
+    try {
+      let newest = null;
+      let newestMtime = 0;
+      for (const f of fs.readdirSync(dir)) {
+        if (!f.endsWith('.jsonl')) continue;
+        const full = path.join(dir, f);
+        const st = fs.statSync(full);
+        if (st.mtimeMs > newestMtime) {
+          newestMtime = st.mtimeMs;
+          newest = f.replace('.jsonl', '');
+        }
+      }
+      return newest;
+    } catch {
+      return null;
+    }
   }
 
   findJsonlPath(sessionId) {
@@ -307,6 +379,8 @@ class SessionWatcher extends EventEmitter {
             }
           } else if (event.type === 'user') {
             lastUser = event;
+          } else if (event.type === 'permission-mode' && event.permissionMode) {
+            session.permissionMode = event.permissionMode;
           } else if (event.type === 'last-prompt') {
             hasLastPrompt = true;
           }
@@ -316,7 +390,9 @@ class SessionWatcher extends EventEmitter {
       // Determine state from last events
       // Key insight: the LAST event type tells us the current state
       // Only mark COMPLETED on last-prompt if the PID is actually dead
-      if (hasLastPrompt && (!session.pid || !this.isPidAlive(session.pid))) {
+      if (lastAssistant && lastAssistant.isApiErrorMessage) {
+        session.state = STATES.ERROR;
+      } else if (hasLastPrompt && (!session.pid || !this.isPidAlive(session.pid))) {
         session.state = STATES.COMPLETED;
       } else if (lastUser && lastAssistant &&
                  new Date(lastUser.timestamp) > new Date(lastAssistant.timestamp)) {
@@ -334,7 +410,10 @@ class SessionWatcher extends EventEmitter {
         const lastToolUse = [...content].reverse().find(c => c.type === 'tool_use');
         if (lastToolUse) session.lastTool = lastToolUse.name;
 
-        if (msg.stop_reason === 'tool_use') {
+        const INTERACTIVE_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
+        if (msg.stop_reason === 'tool_use' && lastToolUse && INTERACTIVE_TOOLS.has(lastToolUse.name)) {
+          session.state = STATES.PENDING;
+        } else if (msg.stop_reason === 'tool_use') {
           session.state = STATES.RUNNING;
         } else if (msg.stop_reason === 'end_turn') {
           session.state = STATES.WAITING;
@@ -640,6 +719,54 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
+  // Swap a session's ID in place (e.g., after /clear). Preserves custom name,
+  // notification prefs, and position. Switches the JSONL file watcher.
+  migrateSession(oldId, newId) {
+    const session = this.sessions.get(oldId);
+    if (!session) return;
+
+    // Close old file watcher
+    const watcher = this.fileWatchers.get(oldId);
+    if (watcher) { watcher.close(); this.fileWatchers.delete(oldId); }
+    this.clearWaitingTimer(oldId);
+    this.clearPendingTimer(oldId);
+    const oldJsonl = this.findJsonlPath(oldId);
+    if (oldJsonl) this.fileOffsets.delete(oldJsonl);
+
+    // Move the Map entry
+    this.sessions.delete(oldId);
+    session.sessionId = newId;
+    session.tokens = { input: 0, output: 0 };
+    session.lastTool = null;
+    session.hasActivity = false;
+    session.endedAt = null;
+    this.sessions.set(newId, session);
+
+    // Migrate config (name, notif prefs, order, saved session data)
+    if (this.config) {
+      const name = this.config.getCustomName(oldId);
+      if (name) {
+        this.config.setCustomName(newId, name);
+      }
+      const notifPrefs = this.config.getNotificationPrefs(oldId);
+      if (notifPrefs.modal || notifPrefs.sound) {
+        this.config.setNotificationPrefs(newId, notifPrefs);
+      }
+      // Preserve position in session order
+      const cfg = this.config.get();
+      if (Array.isArray(cfg.sessionOrder)) {
+        const idx = cfg.sessionOrder.indexOf(oldId);
+        if (idx !== -1) cfg.sessionOrder[idx] = newId;
+      }
+      this.config.deleteSession(oldId);
+    }
+
+    // Start watching the new JSONL (replays events → updates state)
+    this.watchJsonl(newId);
+    this.emit('session-removed', oldId);
+    this.emit('session-added', session);
+  }
+
   removeSession(sessionId) {
     const watcher = this.fileWatchers.get(sessionId);
     if (watcher) { watcher.close(); this.fileWatchers.delete(sessionId); }
@@ -679,10 +806,11 @@ class SessionWatcher extends EventEmitter {
     if (session.state.name === 'pending') return;
     if (this.pendingTimers.has(sessionId)) return; // already scheduled
 
-    // In bypassPermissions mode, PreToolUse hooks fire but never actually
-    // block on the user — Claude auto-approves and proceeds. Only Notification
-    // hooks correspond to real user-input waits there.
-    if (hookEvent === 'PreToolUse' && session.permissionMode === 'bypassPermissions') return;
+    // In bypassPermissions mode, hooks fire but never actually block on the
+    // user — Claude auto-approves and proceeds. The real interactive tools
+    // (AskUserQuestion, ExitPlanMode) are handled by the JSONL tool-sniff
+    // path instead, so we can safely ignore all hooks for bypass sessions.
+    if (session.permissionMode === 'bypassPermissions') return;
 
     const lastEvent = session.lastEventTime || 0;
     if (Date.now() - lastEvent < 1000) return; // Claude is actively writing — ignore

@@ -65,6 +65,30 @@ class SessionWatcher extends EventEmitter {
         });
         this.emit('session-added', this.sessions.get(id));
       }
+
+      // Purge orphan notification/customName/order entries for sessions
+      // that no longer have any persisted state (deleted long ago, app
+      // crashed mid-cleanup, …). Safe at startup since the only sessions
+      // that should exist now are the ones just restored above.
+      const knownIds = new Set(Object.keys(saved));
+      const cfg = this.config.get();
+      let dirty = false;
+      if (cfg.notifications) {
+        for (const id of Object.keys(cfg.notifications)) {
+          if (!knownIds.has(id)) { delete cfg.notifications[id]; dirty = true; }
+        }
+      }
+      if (cfg.customNames) {
+        for (const id of Object.keys(cfg.customNames)) {
+          if (!knownIds.has(id)) { delete cfg.customNames[id]; dirty = true; }
+        }
+      }
+      if (Array.isArray(cfg.sessionOrder)) {
+        const before = cfg.sessionOrder.length;
+        cfg.sessionOrder = cfg.sessionOrder.filter(id => knownIds.has(id));
+        if (cfg.sessionOrder.length !== before) dirty = true;
+      }
+      if (dirty && this.config.save) this.config.save();
     }
 
     this.scan();
@@ -100,17 +124,21 @@ class SessionWatcher extends EventEmitter {
           // Detect /clear: Claude keeps the PID but creates a new JSONL+sessionId.
           // The session file isn't updated, so we check if a newer JSONL exists
           // in the same project dir and swap our tracking to it.
+          // Guard: only treat as /clear when the candidate session shares this PID
+          // (or is dead) — otherwise it's a separate Claude process in the same
+          // directory and we'd wrongly clobber it.
           const latestId = this.findLatestSessionIdForCwd(cwd);
           const effectiveId = (latestId && latestId !== sessionId) ? latestId : sessionId;
           if (effectiveId !== sessionId) {
-            // Migrate from the session-file ID if it's still tracked
-            if (this.sessions.has(sessionId)) {
+            const oldSession = this.sessions.get(sessionId);
+            if (oldSession && this._shouldMigrateOnClear(oldSession, pid)) {
               this.migrateSession(sessionId, effectiveId);
             }
-            // Also clean up any orphaned intermediate session from a previous
-            // /clear that left a stale entry with the same cwd but a different ID.
+            // Clean up orphaned intermediate sessions from previous /clears,
+            // but only when their PID is dead or matches this active PID —
+            // never remove a concurrent live Claude in the same cwd.
             for (const [id, s] of this.sessions) {
-              if (id !== effectiveId && s.cwd === cwd) {
+              if (id !== effectiveId && s.cwd === cwd && this._shouldMigrateOnClear(s, pid)) {
                 this.removeSession(id);
               }
             }
@@ -212,6 +240,16 @@ class SessionWatcher extends EventEmitter {
         console.error('SessionWatcher scan error:', e.message);
       }
     }
+  }
+
+  // /clear migration is safe only when the old tracked session shares the
+  // active session's PID (true /clear) or its PID is gone. A different
+  // alive PID in the same cwd is a concurrent Claude process — leave it.
+  _shouldMigrateOnClear(oldSession, activePid) {
+    if (!oldSession) return false;
+    if (!oldSession.pid) return true;
+    if (oldSession.pid === activePid) return true;
+    return !this.isPidAlive(oldSession.pid);
   }
 
   // Check if a PID was launched with --dangerously-skip-permissions
@@ -334,76 +372,85 @@ class SessionWatcher extends EventEmitter {
       const prevTokens = { ...session.tokens };
       session.tokens = { input: 0, output: 0 };
 
-      // Read last ~64KB for state detection (covers ~50 recent events)
-      const TAIL_SIZE = 64 * 1024;
-      const readStart = Math.max(0, stat.size - TAIL_SIZE);
-      const fd = fs.openSync(jsonlPath, 'r');
-      const buffer = Buffer.alloc(stat.size - readStart);
-      fs.readSync(fd, buffer, 0, buffer.length, readStart);
-      fs.closeSync(fd);
+      // Read tail with expanding window: a single assistant message can be
+      // larger than 64KB (long thinking blocks, big tool outputs). If the
+      // initial tail contains no user/assistant event, double the window
+      // until we find one or hit the cap (16MB) / file start.
+      const MIN_TAIL = 64 * 1024;
+      const MAX_TAIL = 16 * 1024 * 1024;
 
-      const text = buffer.toString('utf-8');
-      const lines = text.split('\n').filter(Boolean);
-
-      // If we started mid-line (readStart > 0), skip the first partial line
-      const startIdx = readStart > 0 ? 1 : 0;
-
-      // Quick token scan: search for "usage" in full file using streaming
-      // But only process tail lines for state
       let lastAssistant = null;
       let lastUser = null;
       let hasLastPrompt = false;
+      let readStart = 0;
+      let scanned = false;
 
-      for (let i = startIdx; i < lines.length; i++) {
-        try {
-          const event = JSON.parse(lines[i]);
+      let tailSize = MIN_TAIL;
+      while (!scanned) {
+        readStart = Math.max(0, stat.size - tailSize);
+        // Reset per-iteration accumulation (token accumulation moves with the window)
+        session.tokens = { input: 0, output: 0 };
+        lastAssistant = null;
+        lastUser = null;
+        hasLastPrompt = false;
 
-          if (event.slug) {
-            session.slug = event.slug;
-          }
+        const fd = fs.openSync(jsonlPath, 'r');
+        const buffer = Buffer.alloc(stat.size - readStart);
+        fs.readSync(fd, buffer, 0, buffer.length, readStart);
+        fs.closeSync(fd);
 
-          if (event.gitBranch) {
-            session.gitBranch = event.gitBranch;
-          }
+        const text = buffer.toString('utf-8');
+        const lines = text.split('\n').filter(Boolean);
+        const startIdx = readStart > 0 ? 1 : 0;
 
-          if (event.type === 'assistant') {
-            lastAssistant = event;
-            // Extract model
-            if (event.message && event.message.model) {
-              session.model = event.message.model;
+        for (let i = startIdx; i < lines.length; i++) {
+          try {
+            const event = JSON.parse(lines[i]);
+            if (event.slug) session.slug = event.slug;
+            if (event.gitBranch) session.gitBranch = event.gitBranch;
+
+            if (event.type === 'assistant') {
+              lastAssistant = event;
+              if (event.message && event.message.model) {
+                session.model = event.message.model;
+              }
+              if (event.message && event.message.usage) {
+                session.tokens.input += event.message.usage.input_tokens || 0;
+                session.tokens.output += event.message.usage.output_tokens || 0;
+              }
+            } else if (event.type === 'user') {
+              lastUser = event;
+            } else if (event.type === 'permission-mode' && event.permissionMode) {
+              session.permissionMode = event.permissionMode;
+            } else if (event.type === 'last-prompt') {
+              hasLastPrompt = true;
             }
-            // Accumulate tokens from tail
-            if (event.message && event.message.usage) {
-              session.tokens.input += event.message.usage.input_tokens || 0;
-              session.tokens.output += event.message.usage.output_tokens || 0;
-            }
-          } else if (event.type === 'user') {
-            lastUser = event;
-          } else if (event.type === 'permission-mode' && event.permissionMode) {
-            session.permissionMode = event.permissionMode;
-          } else if (event.type === 'last-prompt') {
-            hasLastPrompt = true;
-          }
-        } catch (e) {}
+          } catch (e) {}
+        }
+
+        // Stop if we have an assistant event (state can be determined),
+        // already read the whole file, or hit the cap.
+        if (lastAssistant || readStart === 0 || tailSize >= MAX_TAIL) {
+          scanned = true;
+        } else {
+          tailSize *= 4; // 64K → 256K → 1M → 4M → 16M
+        }
       }
 
       // Determine state from last events
       // Key insight: the LAST event type tells us the current state
       // Only mark COMPLETED on last-prompt if the PID is actually dead
+      let computedState = null;
       if (lastAssistant && lastAssistant.isApiErrorMessage) {
-        session.state = STATES.ERROR;
+        computedState = STATES.ERROR;
       } else if (hasLastPrompt && (!session.pid || !this.isPidAlive(session.pid))) {
-        session.state = STATES.COMPLETED;
+        computedState = STATES.COMPLETED;
       } else if (lastUser && lastAssistant &&
                  new Date(lastUser.timestamp) > new Date(lastAssistant.timestamp)) {
         // User event came AFTER last assistant — Claude is thinking/processing
         const userContent = lastUser.message && lastUser.message.content;
         const isToolResult = Array.isArray(userContent) && userContent.some(c => c.type === 'tool_result');
-        if (isToolResult) {
-          session.state = STATES.RUNNING;
-        } else {
-          session.state = STATES.THINKING;
-        }
+        computedState = isToolResult ? STATES.RUNNING : STATES.THINKING;
       } else if (lastAssistant && lastAssistant.message) {
         const msg = lastAssistant.message;
         const content = msg.content || [];
@@ -412,11 +459,11 @@ class SessionWatcher extends EventEmitter {
 
         const INTERACTIVE_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
         if (msg.stop_reason === 'tool_use' && lastToolUse && INTERACTIVE_TOOLS.has(lastToolUse.name)) {
-          session.state = STATES.PENDING;
+          computedState = STATES.PENDING;
         } else if (msg.stop_reason === 'tool_use') {
-          session.state = STATES.RUNNING;
+          computedState = STATES.RUNNING;
         } else if (msg.stop_reason === 'end_turn') {
-          session.state = STATES.WAITING;
+          computedState = STATES.WAITING;
         }
       }
 
@@ -430,7 +477,16 @@ class SessionWatcher extends EventEmitter {
       session.tokens.input = Math.max(session.tokens.input, prevTokens.input || 0);
       session.tokens.output = Math.max(session.tokens.output, prevTokens.output || 0);
 
-      this.emit('session-updated', session);
+      // Apply state via setState so the determination is persisted to config
+      // (otherwise the stale restored state survives across restarts and the
+      // session looks "stuck running"). isInitial=true skips the notification.
+      if (computedState) {
+        this.setState(sessionId, computedState, true);
+      } else {
+        // No determinable state — still emit so token/model/slug updates land
+        this.emit('session-updated', session);
+        this.persistSession(session);
+      }
     } catch (e) {
       // file access error
     }
@@ -548,8 +604,12 @@ class SessionWatcher extends EventEmitter {
         this.setState(sessionId, STATES.RUNNING, isInitial);
         break;
       case 'attachment':
-        // Attachment events (hooks, skills) indicate activity
-        this.clearWaitingTimer(sessionId);
+        // Attachments are message metadata (file refs, hook payloads) Claude
+        // appends to the JSONL right after a user/assistant event. They are
+        // NOT independent activity — the surrounding user/assistant event
+        // already drove the state. Clearing the waiting timer here would
+        // cancel the WAITING transition that follows an end_turn, leaving
+        // sessions stuck in THINKING. Treat as a no-op for state.
         break;
       case 'last-prompt':
         // Metadata event that records the latest user prompt — NOT a session-end

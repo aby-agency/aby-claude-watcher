@@ -183,6 +183,38 @@ test('shouldMigrateOnClear: true when old session has no PID', () => {
   if (w._shouldMigrateOnClear(old, 1234) !== true) throw new Error('expected true for null PID');
 });
 
+test('resolveEffectiveSessionId: keeps own id when latest jsonl belongs to concurrent live PID', () => {
+  // Two Claude processes in the same cwd. The newest jsonl is owned by
+  // process A — but process B's scan iteration must NOT treat that as a
+  // /clear and migrate B onto A's id (the bug that fused both sessions).
+  const w = new SessionWatcher(makeMockConfig());
+  w.findLatestSessionIdForCwd = () => 'A-id'; // newest jsonl in cwd
+  const liveSessions = [
+    { pid: 100, sessionId: 'A-id', cwd: '/tmp/proj' },
+    { pid: 200, sessionId: 'B-id', cwd: '/tmp/proj' },
+  ];
+  const eff = w._resolveEffectiveSessionId('B-id', 200, '/tmp/proj', liveSessions);
+  if (eff !== 'B-id') throw new Error(`expected B-id (no migration), got ${eff}`);
+});
+
+test('resolveEffectiveSessionId: migrates when latest jsonl is not claimed by any live session.json (real /clear)', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.findLatestSessionIdForCwd = () => 'NEW-id'; // post-/clear jsonl, no session.json points here
+  const liveSessions = [
+    { pid: 100, sessionId: 'OLD-id', cwd: '/tmp/proj' }, // session.json still names old id
+  ];
+  const eff = w._resolveEffectiveSessionId('OLD-id', 100, '/tmp/proj', liveSessions);
+  if (eff !== 'NEW-id') throw new Error(`expected NEW-id (real /clear), got ${eff}`);
+});
+
+test('resolveEffectiveSessionId: keeps own id when there is no newer jsonl', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.findLatestSessionIdForCwd = () => 'A-id';
+  const liveSessions = [{ pid: 100, sessionId: 'A-id', cwd: '/tmp/proj' }];
+  const eff = w._resolveEffectiveSessionId('A-id', 100, '/tmp/proj', liveSessions);
+  if (eff !== 'A-id') throw new Error(`expected A-id (no migration), got ${eff}`);
+});
+
 // ─── attachment doesn't kill waiting transition ──────────────────
 section('attachment + end_turn race:');
 

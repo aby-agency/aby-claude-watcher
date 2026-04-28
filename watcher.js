@@ -113,10 +113,20 @@ class SessionWatcher extends EventEmitter {
       const activeSessionIds = new Set();
       const files = fs.readdirSync(SESSIONS_DIR).filter(f => f.endsWith('.json'));
 
+      // Pre-read all session.json files so we can recognise concurrent Claude
+      // processes in the same cwd (different PIDs, different sessionIds) and
+      // avoid mistaking them for /clear migrations.
+      const liveSessions = [];
       for (const file of files) {
         try {
-          const filePath = path.join(SESSIONS_DIR, file);
-          const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+          const data = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR, file), 'utf-8'));
+          if (data && data.sessionId) liveSessions.push(data);
+        } catch (e) {}
+      }
+      const liveSessionIds = new Set(liveSessions.map(d => d.sessionId));
+
+      for (const data of liveSessions) {
+        try {
           const { pid, sessionId, cwd, startedAt } = data;
 
           if (!sessionId) continue;
@@ -127,8 +137,7 @@ class SessionWatcher extends EventEmitter {
           // Guard: only treat as /clear when the candidate session shares this PID
           // (or is dead) — otherwise it's a separate Claude process in the same
           // directory and we'd wrongly clobber it.
-          const latestId = this.findLatestSessionIdForCwd(cwd);
-          const effectiveId = (latestId && latestId !== sessionId) ? latestId : sessionId;
+          const effectiveId = this._resolveEffectiveSessionId(sessionId, pid, cwd, liveSessions);
           if (effectiveId !== sessionId) {
             const oldSession = this.sessions.get(sessionId);
             if (oldSession && this._shouldMigrateOnClear(oldSession, pid)) {
@@ -139,6 +148,7 @@ class SessionWatcher extends EventEmitter {
             // never remove a concurrent live Claude in the same cwd.
             for (const [id, s] of this.sessions) {
               if (id !== effectiveId && s.cwd === cwd && this._shouldMigrateOnClear(s, pid)) {
+                if (liveSessionIds.has(id)) continue;
                 this.removeSession(id);
               }
             }
@@ -240,6 +250,20 @@ class SessionWatcher extends EventEmitter {
         console.error('SessionWatcher scan error:', e.message);
       }
     }
+  }
+
+  // Resolve the sessionId we should track for a given (PID, cwd). Normally
+  // returns the JSONL id from session.json. After /clear, Claude keeps the
+  // PID but writes a newer JSONL with a fresh id — we follow that. But when
+  // multiple Claude processes run in the same cwd, the newest JSONL might
+  // belong to a *different* live PID; treating that as /clear would fuse
+  // the two sessions into one. `liveSessions` is the snapshot of all active
+  // session.json files this scan, used to detect that case.
+  _resolveEffectiveSessionId(sessionId, pid, cwd, liveSessions) {
+    const latestId = this.findLatestSessionIdForCwd(cwd);
+    if (!latestId || latestId === sessionId) return sessionId;
+    const concurrent = liveSessions.some(d => d.sessionId === latestId && d.pid !== pid);
+    return concurrent ? sessionId : latestId;
   }
 
   // /clear migration is safe only when the old tracked session shares the

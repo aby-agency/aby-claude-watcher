@@ -4,6 +4,26 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] — 2026-05-04
+
+### Fixed
+- **`/clear` made the card jump or stuck the session in WAITING** — Claude Code does not
+  update `session.json`'s `sessionId` after `/clear`; it stays frozen at the value the
+  process was launched with. The watcher's previous heuristic — pick the newest JSONL by
+  mtime in the project directory — produced false positives whenever an orphan JSONL from
+  a previously-killed Claude was the freshest on disk, causing the tracked session to
+  flap between sids. Detection is now driven by JSONL freshness per `(pid, cwd)`: the
+  watcher sticks with the tracked JSONL for as long as it keeps being written, and only
+  re-attributes to a fresh unclaimed JSONL in the same project dir once the tracked one
+  has gone stale (>30 s without writes). Multi-Claude attribution is resolved by sorting
+  data rows by `session.json` `updatedAt` (most-recently-active first) and excluding
+  JSONLs already claimed in the same scan. Migrations preserve UI position, custom name,
+  and notification preferences (already handled by `migrateSession`).
+
+### Removed
+- The mtime-based `_resolveEffectiveSessionId` and the PID-identity migration helper that
+  preceded this fix — both relied on `session.json` updating on `/clear`, which it doesn't.
+
 ## [1.4.1] — 2026-04-23
 
 ### Fixed

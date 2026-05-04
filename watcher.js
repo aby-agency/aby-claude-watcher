@@ -11,6 +11,8 @@ const SCAN_INTERVAL = 2000;
 const POLL_INTERVAL = 250;
 const WAITING_DELAY = 2000;
 
+const DEBUG = process.argv.includes('--dev') || !!process.env.ABY_DEBUG;
+
 const STATES = {
   THINKING: { name: 'thinking', color: '#a78bfa' },
   RUNNING: { name: 'running', color: '#22c55e' },
@@ -115,7 +117,7 @@ class SessionWatcher extends EventEmitter {
 
       // Pre-read all session.json files so we can recognise concurrent Claude
       // processes in the same cwd (different PIDs, different sessionIds) and
-      // avoid mistaking them for /clear migrations.
+      // resolve /clear targets unambiguously across multiple Claudes.
       const liveSessions = [];
       for (const file of files) {
         try {
@@ -125,38 +127,58 @@ class SessionWatcher extends EventEmitter {
       }
       const liveSessionIds = new Set(liveSessions.map(d => d.sessionId));
 
+      // Process most-recently-active session.json files first so they get
+      // first dibs on the freshest unclaimed JSONL in their cwd. Critical when
+      // multiple Claudes in the same cwd have all /clear'd at different times.
+      liveSessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+      // Track which JSONLs we've already attributed to a data row this scan,
+      // so two Claudes in the same cwd don't both claim the same fresh JSONL.
+      const claimedJsonls = new Set();
+
       for (const data of liveSessions) {
         try {
           const { pid, sessionId, cwd, startedAt } = data;
 
           if (!sessionId) continue;
 
-          // Detect /clear: Claude keeps the PID but creates a new JSONL+sessionId.
-          // The session file isn't updated, so we check if a newer JSONL exists
-          // in the same project dir and swap our tracking to it.
-          // Guard: only treat as /clear when the candidate session shares this PID
-          // (or is dead) — otherwise it's a separate Claude process in the same
-          // directory and we'd wrongly clobber it.
-          const effectiveId = this._resolveEffectiveSessionId(sessionId, pid, cwd, liveSessions);
-          if (effectiveId !== sessionId) {
-            const oldSession = this.sessions.get(sessionId);
-            if (oldSession && this._shouldMigrateOnClear(oldSession, pid)) {
-              this.migrateSession(sessionId, effectiveId);
-            }
-            // Clean up orphaned intermediate sessions from previous /clears,
-            // but only when their PID is dead or matches this active PID —
-            // never remove a concurrent live Claude in the same cwd.
-            for (const [id, s] of this.sessions) {
-              if (id !== effectiveId && s.cwd === cwd && this._shouldMigrateOnClear(s, pid)) {
-                if (liveSessionIds.has(id)) continue;
-                this.removeSession(id);
-              }
-            }
+          // Find any existing tracked session for this (pid, cwd) BEFORE
+          // picking a target — once we've attributed a JSONL to a Claude
+          // process, we stick with it for as long as that JSONL stays fresh.
+          // This prevents flapping when both Claudes in the same cwd write
+          // alternately and the "freshest unclaimed" oscillates between them.
+          let trackedId = null;
+          for (const [id, s] of this.sessions) {
+            if (s.pid === pid && s.cwd === cwd) { trackedId = id; break; }
           }
 
-          // Session file exists — even if PID is dead, don't mark completed yet
-          // The session file's presence means Claude Code hasn't fully cleaned up
+          // Determine the JSONL Claude is currently writing to for this PID:
+          //   - If we already track this (pid, cwd), prefer the tracked sid
+          //     unless we can find a fresher unclaimed JSONL to migrate to.
+          //     Critically, never abandon a trackedId for the lagged session.json
+          //     sid (which would create a duplicate tracked entry that the dup-
+          //     remove fallback then has to clean up 4s later).
+          //   - If we don't track this (pid, cwd) yet, trust session.json's sid
+          //     unless it's stale, in which case look for a fresh unclaimed JSONL.
+          let effectiveId = sessionId;
+          if (trackedId) {
+            if (!this._isSidStale(trackedId, cwd)) {
+              effectiveId = trackedId;
+            } else {
+              const fresh = this._findFreshUnclaimedJsonl(cwd, liveSessionIds, claimedJsonls);
+              effectiveId = fresh || trackedId;
+            }
+          } else if (this._isSidStale(sessionId, cwd)) {
+            const fresh = this._findFreshUnclaimedJsonl(cwd, liveSessionIds, claimedJsonls);
+            if (fresh) effectiveId = fresh;
+          }
+          claimedJsonls.add(effectiveId);
           activeSessionIds.add(effectiveId);
+
+          if (trackedId && trackedId !== effectiveId && !this._isSidStale(effectiveId, cwd)) {
+            if (DEBUG) console.log(`[watcher] /clear migrate ${trackedId.slice(0, 8)} → ${effectiveId.slice(0, 8)} (pid=${pid}, cwd=${cwd})`);
+            this.migrateSession(trackedId, effectiveId);
+          }
 
           const pidAlive = this.isPidAlive(pid);
 
@@ -252,28 +274,66 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
-  // Resolve the sessionId we should track for a given (PID, cwd). Normally
-  // returns the JSONL id from session.json. After /clear, Claude keeps the
-  // PID but writes a newer JSONL with a fresh id — we follow that. But when
-  // multiple Claude processes run in the same cwd, the newest JSONL might
-  // belong to a *different* live PID; treating that as /clear would fuse
-  // the two sessions into one. `liveSessions` is the snapshot of all active
-  // session.json files this scan, used to detect that case.
-  _resolveEffectiveSessionId(sessionId, pid, cwd, liveSessions) {
-    const latestId = this.findLatestSessionIdForCwd(cwd);
-    if (!latestId || latestId === sessionId) return sessionId;
-    const concurrent = liveSessions.some(d => d.sessionId === latestId && d.pid !== pid);
-    return concurrent ? sessionId : latestId;
+  // True if the JSONL for `sid` exists in `cwd`'s project dir but hasn't been
+  // modified within STALE_MS — meaning Claude has /clear'd away from it.
+  // Assumption: only Claude itself writes to JSONLs in `~/.claude/projects/`.
+  // External tools touching these files (backup, indexers, manual edits) would
+  // create false-positive freshness signals — accepted as the tradeoff for
+  // not requiring per-event content parsing to attribute jsonls to PIDs.
+  _isSidStale(sid, cwd) {
+    const STALE_MS = 30 * 1000;
+    const projDir = this._cwdToProjectDir(cwd);
+    if (!projDir) return false;
+    try {
+      const st = fs.statSync(path.join(projDir, `${sid}.jsonl`));
+      return (Date.now() - st.mtimeMs) > STALE_MS;
+    } catch {
+      return false; // missing JSONL: not stale, just absent
+    }
   }
 
-  // /clear migration is safe only when the old tracked session shares the
-  // active session's PID (true /clear) or its PID is gone. A different
-  // alive PID in the same cwd is a concurrent Claude process — leave it.
-  _shouldMigrateOnClear(oldSession, activePid) {
-    if (!oldSession) return false;
-    if (!oldSession.pid) return true;
-    if (oldSession.pid === activePid) return true;
-    return !this.isPidAlive(oldSession.pid);
+  // Find the freshest JSONL in `cwd` that is NOT:
+  //   - named in any live session.json (a different Claude's startup sid),
+  //   - already claimed by an earlier data row in this scan,
+  //   - already tracked by some session in our session map (another Claude).
+  // Returns the sid (filename without .jsonl) or null. Used to resolve /clear
+  // targets when session.json's sid is lagged.
+  _findFreshUnclaimedJsonl(cwd, liveSessionIds, claimedJsonls) {
+    const STALE_MS = 30 * 1000;
+    const now = Date.now();
+    const projDir = this._cwdToProjectDir(cwd);
+    if (!projDir) return null;
+    const trackedInCwd = new Set();
+    for (const [id, s] of this.sessions) {
+      if (s.cwd === cwd) trackedInCwd.add(id);
+    }
+    let best = null;
+    try {
+      for (const f of fs.readdirSync(projDir)) {
+        if (!f.endsWith('.jsonl')) continue;
+        const sid = f.slice(0, -'.jsonl'.length);
+        if (liveSessionIds.has(sid)) continue;
+        if (claimedJsonls.has(sid)) continue;
+        if (trackedInCwd.has(sid)) continue;
+        try {
+          const st = fs.statSync(path.join(projDir, f));
+          if ((now - st.mtimeMs) > STALE_MS) continue; // stale
+          if (!best || st.mtimeMs > best.mtime) {
+            best = { sid, mtime: st.mtimeMs };
+          }
+        } catch {}
+      }
+    } catch { return null; }
+    return best ? best.sid : null;
+  }
+
+  // Resolve project dir slug from cwd (mirrors Claude Code's convention:
+  // ~/.claude/projects/-<path-with-dashes>/)
+  _cwdToProjectDir(cwd) {
+    if (!cwd) return null;
+    const slug = cwd.replace(/\//g, '-');
+    const dir = path.join(PROJECTS_DIR, slug);
+    return fs.existsSync(dir) ? dir : null;
   }
 
   // Check if a PID was launched with --dangerously-skip-permissions
@@ -301,38 +361,6 @@ class SessionWatcher extends EventEmitter {
   extractProjectName(cwd) {
     if (!cwd) return 'Unknown';
     return path.basename(cwd);
-  }
-
-  // Resolve project dir slug from cwd (mirrors Claude Code's convention:
-  // ~/.claude/projects/-<path-with-dashes>/)
-  cwdToProjectDir(cwd) {
-    if (!cwd) return null;
-    const slug = cwd.replace(/\//g, '-');
-    const dir = path.join(PROJECTS_DIR, slug);
-    return fs.existsSync(dir) ? dir : null;
-  }
-
-  // Find the most recently written JSONL in a project dir.
-  // Returns the sessionId (filename minus .jsonl) or null.
-  findLatestSessionIdForCwd(cwd) {
-    const dir = this.cwdToProjectDir(cwd);
-    if (!dir) return null;
-    try {
-      let newest = null;
-      let newestMtime = 0;
-      for (const f of fs.readdirSync(dir)) {
-        if (!f.endsWith('.jsonl')) continue;
-        const full = path.join(dir, f);
-        const st = fs.statSync(full);
-        if (st.mtimeMs > newestMtime) {
-          newestMtime = st.mtimeMs;
-          newest = f.replace('.jsonl', '');
-        }
-      }
-      return newest;
-    } catch {
-      return null;
-    }
   }
 
   findJsonlPath(sessionId) {

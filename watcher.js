@@ -331,7 +331,7 @@ class SessionWatcher extends EventEmitter {
   // ~/.claude/projects/-<path-with-dashes>/)
   _cwdToProjectDir(cwd) {
     if (!cwd) return null;
-    const slug = cwd.replace(/\//g, '-');
+    const slug = cwd.replace(/[^a-zA-Z0-9_-]/g, '-');
     const dir = path.join(PROJECTS_DIR, slug);
     return fs.existsSync(dir) ? dir : null;
   }

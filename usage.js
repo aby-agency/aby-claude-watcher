@@ -24,19 +24,25 @@ class UsageMonitor extends EventEmitter {
   constructor() {
     super();
     this.timer = null;
+    this.firstPollTimer = null;
     this.latest = null;
     this.lastError = null;
   }
 
   start() {
     if (this.timer) return;
-    setTimeout(() => this.poll(), FIRST_POLL_DELAY_MS);
+    this.firstPollTimer = setTimeout(() => {
+      this.firstPollTimer = null;
+      this.poll();
+    }, FIRST_POLL_DELAY_MS);
     this.timer = setInterval(() => this.poll(), POLL_MS);
   }
 
   stop() {
     if (this.timer) clearInterval(this.timer);
+    if (this.firstPollTimer) clearTimeout(this.firstPollTimer);
     this.timer = null;
+    this.firstPollTimer = null;
   }
 
   getLatest() {

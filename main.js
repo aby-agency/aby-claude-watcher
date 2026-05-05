@@ -610,5 +610,6 @@ app.on('will-quit', () => {
   config.saveSync();
   if (watcher) watcher.stop();
   if (socketServer) socketServer.stop();
+  if (usageMonitor) usageMonitor.stop();
   if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.destroy();
 });

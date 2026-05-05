@@ -1374,16 +1374,16 @@ function formatResetTime(iso) {
 
 function formatUsageTooltip(d) {
   const lines = [];
-  const fmt = (label, win) => {
+  const fmt = (key, win) => {
     if (!win) return;
     const pct = Math.round(win.utilization);
-    const reset = win.resetsAt ? new Date(win.resetsAt).toLocaleString() : '?';
-    lines.push(`${label}: ${pct}% — reset ${reset}`);
+    const time = win.resetsAt ? new Date(win.resetsAt).toLocaleString() : '?';
+    lines.push(t(key, { pct, time }));
   };
-  fmt('5h', d.fiveHour);
-  fmt('7d', d.sevenDay);
-  fmt('7d Sonnet', d.sevenDaySonnet);
-  fmt('7d Opus', d.sevenDayOpus);
+  fmt('usage_tooltip_5h', d.fiveHour);
+  fmt('usage_tooltip_7d', d.sevenDay);
+  fmt('usage_tooltip_7d_sonnet', d.sevenDaySonnet);
+  fmt('usage_tooltip_7d_opus', d.sevenDayOpus);
   return lines.join('\n');
 }
 
@@ -1393,7 +1393,7 @@ function handleUsageError(code) {
   if (!group || !fallback) return;
   group.style.display = 'none';
   fallback.style.display = '';
-  fallback.title = `Claude usage unavailable (${code})`;
+  fallback.title = t('usage_unavailable', { code });
   updateStatusBar();
 }
 

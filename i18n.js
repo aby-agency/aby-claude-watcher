@@ -128,6 +128,11 @@
       status_waiting: '{n} en attente',
       status_tokens: '{n} tokens',
       status_filtered: '{visible}/{total} affichées',
+      usage_tooltip_5h: '5h : {pct}% — reset {time}',
+      usage_tooltip_7d: '7j : {pct}% — reset {time}',
+      usage_tooltip_7d_sonnet: '7j Sonnet : {pct}% — reset {time}',
+      usage_tooltip_7d_opus: '7j Opus : {pct}% — reset {time}',
+      usage_unavailable: 'Quota Claude indisponible ({code})',
 
       // Tray
       tray_tooltip: '{app} — {n} active{s}',
@@ -268,6 +273,11 @@
       status_waiting: '{n} waiting',
       status_tokens: '{n} tokens',
       status_filtered: '{visible}/{total} shown',
+      usage_tooltip_5h: '5h: {pct}% — reset {time}',
+      usage_tooltip_7d: '7d: {pct}% — reset {time}',
+      usage_tooltip_7d_sonnet: '7d Sonnet: {pct}% — reset {time}',
+      usage_tooltip_7d_opus: '7d Opus: {pct}% — reset {time}',
+      usage_unavailable: 'Claude usage unavailable ({code})',
 
       // Tray
       tray_tooltip: '{app} — {n} active',

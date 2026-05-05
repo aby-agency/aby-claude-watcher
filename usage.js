@@ -19,30 +19,42 @@ const ENDPOINT = 'https://api.anthropic.com/api/oauth/usage';
 const BETA_HEADER = 'oauth-2025-04-20';
 const POLL_MS = 60 * 1000;
 const FIRST_POLL_DELAY_MS = 2000;
+// Exponential backoff: double the interval on each consecutive failure
+// up to MAX_BACKOFF_MS, then cap. Resets to POLL_MS on first success.
+const MAX_BACKOFF_MS = 15 * 60 * 1000;
 
 class UsageMonitor extends EventEmitter {
   constructor() {
     super();
-    this.timer = null;
-    this.firstPollTimer = null;
+    this.nextTimer = null;
     this.latest = null;
     this.lastError = null;
+    this.consecutiveFailures = 0;
+    this.stopped = false;
   }
 
   start() {
-    if (this.timer) return;
-    this.firstPollTimer = setTimeout(() => {
-      this.firstPollTimer = null;
-      this.poll();
-    }, FIRST_POLL_DELAY_MS);
-    this.timer = setInterval(() => this.poll(), POLL_MS);
+    if (this.nextTimer || this.stopped) return;
+    this._scheduleNext(FIRST_POLL_DELAY_MS);
   }
 
   stop() {
-    if (this.timer) clearInterval(this.timer);
-    if (this.firstPollTimer) clearTimeout(this.firstPollTimer);
-    this.timer = null;
-    this.firstPollTimer = null;
+    this.stopped = true;
+    if (this.nextTimer) clearTimeout(this.nextTimer);
+    this.nextTimer = null;
+  }
+
+  _scheduleNext(delayMs) {
+    if (this.stopped) return;
+    this.nextTimer = setTimeout(async () => {
+      this.nextTimer = null;
+      await this.poll();
+      if (this.stopped) return;
+      const next = this.consecutiveFailures > 0
+        ? Math.min(POLL_MS * 2 ** Math.min(this.consecutiveFailures - 1, 8), MAX_BACKOFF_MS)
+        : POLL_MS;
+      this._scheduleNext(next);
+    }, delayMs);
   }
 
   getLatest() {
@@ -53,6 +65,7 @@ class UsageMonitor extends EventEmitter {
     try {
       const token = await this._readToken();
       if (!token) {
+        this.consecutiveFailures += 1;
         this._setError('no-token');
         return;
       }
@@ -60,8 +73,10 @@ class UsageMonitor extends EventEmitter {
       const normalized = this._normalize(data);
       this.latest = normalized;
       this.lastError = null;
+      this.consecutiveFailures = 0;
       this.emit('update', normalized);
     } catch (e) {
+      this.consecutiveFailures += 1;
       this._setError(e.code || e.message || 'unknown');
     }
   }

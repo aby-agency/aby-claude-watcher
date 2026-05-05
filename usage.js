@@ -17,11 +17,11 @@ const https = require('https');
 
 const ENDPOINT = 'https://api.anthropic.com/api/oauth/usage';
 const BETA_HEADER = 'oauth-2025-04-20';
-const POLL_MS = 60 * 1000;
+const POLL_MS = 5 * 60 * 1000;
 const FIRST_POLL_DELAY_MS = 2000;
 // Exponential backoff: double the interval on each consecutive failure
 // up to MAX_BACKOFF_MS, then cap. Resets to POLL_MS on first success.
-const MAX_BACKOFF_MS = 15 * 60 * 1000;
+const MAX_BACKOFF_MS = 60 * 60 * 1000;
 
 class UsageMonitor extends EventEmitter {
   constructor() {

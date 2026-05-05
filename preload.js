@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('api', {
   getLanguage: () => ipcRenderer.invoke('get-language'),
   setLanguage: (lang) => ipcRenderer.invoke('set-language', lang),
   copyToClipboard: (text) => ipcRenderer.invoke('copy-to-clipboard', text),
+  getUsage: () => ipcRenderer.invoke('get-usage'),
 
   onSessionAdded: (callback) => ipcRenderer.on('session-added', (_, data) => callback(data)),
   onSessionUpdated: (callback) => ipcRenderer.on('session-updated', (_, data) => callback(data)),
@@ -45,4 +46,6 @@ contextBridge.exposeInMainWorld('api', {
   onPlaySound: (callback) => ipcRenderer.on('play-sound', (_, data) => callback(data)),
   onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_, info) => callback(info)),
   onLanguageChanged: (callback) => ipcRenderer.on('language-changed', (_, lang) => callback(lang)),
+  onUsageUpdate: (callback) => ipcRenderer.on('usage-update', (_, data) => callback(data)),
+  onUsageError: (callback) => ipcRenderer.on('usage-error', (_, code) => callback(code)),
 });

@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeIm
 const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
+const { UsageMonitor } = require('./usage');
 const { focusTerminal, resumeSession, launchSession } = require('./focus');
 const { checkForUpdates, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
 const { installHooks, getDefaultHookPath } = require('./install-hooks');
@@ -12,6 +13,7 @@ let mainWindow;
 let popoverWindow;
 let watcher;
 let socketServer;
+let usageMonitor;
 let tray;
 let currentViewMode = 'grid';
 const MICRO_DEFAULT_BOUNDS = { width: 260, height: 200 };
@@ -183,6 +185,13 @@ function setupSocket() {
   socketServer.start();
 }
 
+function setupUsageMonitor() {
+  usageMonitor = new UsageMonitor();
+  usageMonitor.on('update', (data) => sendToRenderer('usage-update', data));
+  usageMonitor.on('error', (code) => sendToRenderer('usage-error', code));
+  usageMonitor.start();
+}
+
 function setupIPC() {
   ipcMain.handle('get-sessions', () => {
     return watcher.getSessions().map(serializeSession);
@@ -190,6 +199,10 @@ function setupIPC() {
 
   ipcMain.handle('get-config', () => {
     return config.get();
+  });
+
+  ipcMain.handle('get-usage', () => {
+    return usageMonitor ? usageMonitor.getLatest() : null;
   });
 
   ipcMain.handle('focus-terminal', (_, sessionId) => {
@@ -448,6 +461,7 @@ app.whenReady().then(() => {
   setupIPC();
   setupWatcher();
   setupSocket();
+  setupUsageMonitor();
   setupTray();
   createPopoverWindow();
 

@@ -233,14 +233,47 @@ body {
 /* ═══ Hide regular chrome in micro mode ═══ */
 
 body.micro-mode .toolbar,
-body.micro-mode .status-bar,
 body.micro-mode .empty-state {
   display: none !important;
 }
 
 body.micro-mode .content {
-  height: calc(100vh - 36px);
+  height: calc(100vh - 36px - 30px);
   padding: 0;
+}
+
+body.micro-mode .status-bar {
+  padding: 4px 8px;
+  gap: 5px;
+  font-size: 10px;
+}
+
+body.micro-mode .usage-group {
+  gap: 4px;
+}
+
+body.micro-mode .usage-bar {
+  width: 38px;
+  height: 5px;
+}
+
+body.micro-mode .usage-label {
+  font-size: 9px;
+}
+
+body.micro-mode .usage-pct {
+  font-size: 10px;
+  min-width: 26px;
+}
+
+body.micro-mode .usage-reset {
+  font-size: 10px;
+  gap: 2px;
+}
+
+body.micro-mode .usage-reset-icon {
+  width: 11px;
+  height: 11px;
 }
 
 /* ═══ Toolbar ═══ */
@@ -541,7 +574,7 @@ body.micro-mode .content {
   padding: 16px;
   overflow-y: auto;
   overflow-x: hidden;
-  height: calc(100vh - 45px - 24px);
+  height: calc(100vh - 45px - 30px);
 }
 
 .content::-webkit-scrollbar {
@@ -1796,9 +1829,9 @@ body.micro-mode .content {
 .status-bar {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 4px 16px;
-  padding-left: 96px;
+  padding: 6px 96px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
   font-size: 11px;
@@ -1808,11 +1841,64 @@ body.micro-mode .content {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 24px;
+  height: 30px;
 }
 
 .status-sep {
   color: var(--border);
+}
+
+.usage-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.usage-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.usage-bar {
+  width: 90px;
+  height: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.usage-bar-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent, #22c55e);
+  transition: width 250ms ease, background-color 250ms ease;
+}
+
+.usage-bar-fill.warn { background: #f59e0b; }
+.usage-bar-fill.danger { background: #ef4444; }
+
+.usage-pct {
+  font-size: 11px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+}
+
+.usage-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+.usage-reset-icon {
+  color: var(--text-secondary, var(--text-primary));
+  flex-shrink: 0;
 }
 
 .search-input {

@@ -126,6 +126,11 @@ async function init() {
     if (sid) flashMicroBell(sid, kind);
   });
 
+  const initialUsage = await window.api.getUsage();
+  if (initialUsage) renderUsage(initialUsage);
+  window.api.onUsageUpdate(renderUsage);
+  window.api.onUsageError(handleUsageError);
+
   // Toolbar
   $btnGrid.addEventListener('click', () => setView('grid'));
   $btnCompact.addEventListener('click', () => setView('compact'));
@@ -1290,13 +1295,16 @@ function saveCurrentOrder() {
 // ═══ Status bar ═══
 
 function updateStatusBar() {
+  // Fallback (no usage data) only — populated by renderUsage() / handleUsageError().
+  const fallback = document.getElementById('statusFallback');
+  if (!fallback || fallback.style.display === 'none') return;
+
   const all = Array.from(sessions.values());
   const active = all.filter(s => s.state.name !== 'completed');
   const waiting = all.filter(s => s.state.name === 'waiting');
   const totalInput = all.reduce((sum, s) => sum + (s.tokens?.input || 0), 0);
   const totalOutput = all.reduce((sum, s) => sum + (s.tokens?.output || 0), 0);
 
-  // Show filtered count when filters are active
   const filtersActive = activeFilters.size > 0 || searchQuery;
   const visibleCount = filtersActive ? getSortedSessions().length : all.length;
 
@@ -1308,6 +1316,85 @@ function updateStatusBar() {
   document.getElementById('statWaiting').textContent = t('status_waiting', { n: waiting.length });
   const tokensText = formatTokens({ input: totalInput, output: totalOutput });
   document.getElementById('statTokens').textContent = t('status_tokens', { n: tokensText });
+}
+
+function renderUsage(data) {
+  const group = document.getElementById('usageGroup');
+  const fallback = document.getElementById('statusFallback');
+  if (!group) return;
+  group.style.display = '';
+  if (fallback) fallback.style.display = 'none';
+
+  const set = (barId, pctId, win) => {
+    const bar = document.getElementById(barId);
+    const pct = document.getElementById(pctId);
+    if (!bar || !pct) return;
+    if (!win || typeof win.utilization !== 'number') {
+      bar.style.width = '0%';
+      bar.classList.remove('warn', 'danger');
+      pct.textContent = '—';
+      return;
+    }
+    const u = Math.max(0, Math.min(100, win.utilization));
+    bar.style.width = `${u}%`;
+    bar.classList.toggle('warn', u >= 70 && u < 90);
+    bar.classList.toggle('danger', u >= 90);
+    pct.textContent = `${Math.round(u)}%`;
+  };
+
+  set('usageBar5h', 'usagePct5h', data.fiveHour);
+  set('usageBar7d', 'usagePct7d', data.sevenDay);
+
+  const reset = document.getElementById('usageReset');
+  if (reset) {
+    const next = data.fiveHour && data.fiveHour.resetsAt;
+    const txt = reset.querySelector('.usage-reset-text');
+    if (next) {
+      reset.style.display = '';
+      if (txt) txt.textContent = formatResetTime(next);
+    } else {
+      reset.style.display = 'none';
+    }
+  }
+  group.title = formatUsageTooltip(data);
+}
+
+function formatResetTime(iso) {
+  try {
+    const d = new Date(iso);
+    const diffMs = d.getTime() - Date.now();
+    if (diffMs <= 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const mins = Math.round(diffMs / 60000);
+    if (mins < 60) return `${mins}m`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
+  } catch { return ''; }
+}
+
+function formatUsageTooltip(d) {
+  const lines = [];
+  const fmt = (label, win) => {
+    if (!win) return;
+    const pct = Math.round(win.utilization);
+    const reset = win.resetsAt ? new Date(win.resetsAt).toLocaleString() : '?';
+    lines.push(`${label}: ${pct}% — reset ${reset}`);
+  };
+  fmt('5h', d.fiveHour);
+  fmt('7d', d.sevenDay);
+  fmt('7d Sonnet', d.sevenDaySonnet);
+  fmt('7d Opus', d.sevenDayOpus);
+  return lines.join('\n');
+}
+
+function handleUsageError(code) {
+  const group = document.getElementById('usageGroup');
+  const fallback = document.getElementById('statusFallback');
+  if (!group || !fallback) return;
+  group.style.display = 'none';
+  fallback.style.display = '';
+  fallback.title = `Claude usage unavailable (${code})`;
+  updateStatusBar();
 }
 
 // ═══ Context menu ═══

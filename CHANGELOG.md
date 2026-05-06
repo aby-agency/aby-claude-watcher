@@ -4,6 +4,23 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.8] — 2026-05-06
+
+### Changed
+- **Compact view → mini cards** — the previous compact view was a single
+  line per session that landed visually almost on top of the micro view.
+  It's now a true intermediate density: a small card with a header
+  (project + slug + actions) and two metadata lines (state · duration ·
+  tool · tokens, then branch · model). The list uses the same
+  responsive auto-fill grid as the macro view but with narrower
+  minimum (260 px vs 320 px), so a typical 13" screen fits 8-10 cards
+  vs 3-4 in macro. Macro and micro views are unchanged.
+- **Settings modal: fixed content height** — the modal used to resize
+  itself depending on which tab (Général, Notifications, À propos) was
+  active. Cycling through tabs forced you to chase the tab buttons with
+  the mouse. The content area is now a fixed 440 px with internal
+  scrolling for tabs that overflow, so the tab row stays anchored.
+
 ## [1.5.7] — 2026-05-06
 
 ### Added

@@ -866,29 +866,58 @@ function compactItemHTML(s) {
   const stateName = s.state.name;
   const sid = escAttr(s.sessionId);
   const isActive = stateName === 'running' || stateName === 'thinking';
+  const stateLabel = t('state_' + stateName);
+  const duration = stateName === 'completed' && s.endedAt
+    ? formatDuration(s.startedAt, s.endedAt)
+    : formatDuration(s.startedAt);
+  const tokens = formatTokens(s.tokens);
+
+  const stateIndicator = isActive
+    ? '<span class="compact-spinner"></span>'
+    : stateName === 'pending'
+      ? `<span class="pending-indicator">${ICONS.bellRing}</span>`
+      : '<span class="compact-dot"></span>';
 
   return `
-    <div class="compact-item" data-state="${stateName}" data-session="${sid}"
+    <div class="compact-card" data-state="${stateName}" data-session="${sid}"
          draggable="${stateName !== 'completed' && !searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
          oncontextmenu="showContextMenu(event, '${sid}')"
          ondblclick="handleFocus('${sid}')">
-      ${isActive ? '<span class="compact-spinner"></span>' : stateName === 'pending' ? `<span class="pending-indicator">${ICONS.bellRing}</span>` : '<span class="compact-dot"></span>'}
-      <div class="project-name">${esc(s.customName || s.projectName)}</div>
-      <div class="compact-actions">
-        ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="event.stopPropagation(); handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">${ICONS.globe}</button>` : ''}
-        ${(stateName === 'completed' || stateName === 'error') ? `
-        ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
-        <button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
-        <button class="card-btn notif-btn ${s.notifEnabled ? 'notif-on' : ''}" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">
-          ${s.notifEnabled ? ICONS.bell : ICONS.bellOff}
-        </button>
-        <button class="card-btn" onclick="event.stopPropagation(); handleFocus('${sid}')" title="${t('action_focus_terminal')}">
-          ${ICONS.terminal}
-        </button>
-        <button class="card-btn" onclick="event.stopPropagation(); showContextMenu(event, '${sid}')" title="${t('action_more')}">
-          ${ICONS.moreVertical}
-        </button>
+      <div class="compact-card-header">
+        <div class="compact-card-title">
+          <div class="project-name">${esc(s.customName || s.projectName)}</div>
+          <div class="session-slug" onclick="handleCopyId('${sid}', '${escAttr(s.slug || '')}', event)" title="${t('action_copy_id')}">
+            ${esc(s.slug || s.sessionId.slice(0, 8))}
+          </div>
+        </div>
+        <div class="compact-card-actions">
+          ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="event.stopPropagation(); handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">${ICONS.globe}</button>` : ''}
+          ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
+          ${(stateName === 'completed' || stateName === 'error') ? `<button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
+          <button class="card-btn notif-btn ${s.notifEnabled ? 'notif-on' : ''}" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">
+            ${s.notifEnabled ? ICONS.bell : ICONS.bellOff}
+          </button>
+          <button class="card-btn" onclick="event.stopPropagation(); handleFocus('${sid}')" title="${t('action_focus_terminal')}">
+            ${ICONS.terminal}
+          </button>
+          <button class="card-btn" onclick="event.stopPropagation(); showContextMenu(event, '${sid}')" title="${t('action_more')}">
+            ${ICONS.moreVertical}
+          </button>
+        </div>
+      </div>
+      <div class="compact-card-meta">
+        <span class="compact-meta-state">${stateIndicator}<span class="compact-meta-state-label">${stateLabel}</span></span>
+        <span class="compact-meta-sep">·</span>
+        <span class="compact-meta-item ${stateName !== 'completed' ? 'duration-value' : ''}" ${stateName !== 'completed' ? `data-started="${s.startedAt}"` : ''}>${duration}</span>
+        ${isActive && s.lastTool ? `<span class="compact-meta-sep">·</span>${toolPill(s.lastTool)}` : ''}
+        <span class="compact-meta-sep">·</span>
+        <span class="compact-meta-item">${tokens}</span>
+      </div>
+      <div class="compact-card-meta-secondary">
+        <span class="compact-meta-item branch-value">${esc(s.gitBranch || '—')}</span>
+        <span class="compact-meta-sep">·</span>
+        <span class="compact-meta-item">${formatModel(s.model)}</span>
       </div>
     </div>
   `;

@@ -738,7 +738,7 @@ body.micro-mode .usage-reset-icon {
 }
 
 /* Waiting list items — pulsing dot */
-.compact-item[data-state="waiting"] .state-dot {
+.compact-card[data-state="waiting"] .state-dot {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
@@ -755,7 +755,7 @@ body.micro-mode .usage-reset-icon {
 /* ═══ State transition animation ═══ */
 
 .card.state-changed,
-.compact-item.state-changed {
+.compact-card.state-changed {
   animation: stateFlash 0.8s ease-out;
 }
 
@@ -829,17 +829,17 @@ body.micro-mode .usage-reset-icon {
 /* ═══ Drag & Drop ═══ */
 
 .card[draggable="true"],
-.compact-item[draggable="true"] {
+.compact-card[draggable="true"] {
   cursor: grab;
 }
 
 .card[draggable="true"]:active,
-.compact-item[draggable="true"]:active {
+.compact-card[draggable="true"]:active {
   cursor: grabbing;
 }
 
 .card.dragging,
-.compact-item.dragging,
+.compact-card.dragging,
 .micro-item.dragging {
   opacity: 0.4;
   border-style: dashed;
@@ -851,28 +851,137 @@ body.micro-mode .usage-reset-icon {
   color: var(--text-muted);
 }
 
-/* ═══ List view ═══ */
+/* ═══ Compact view — mini cards (denser than grid, richer than micro) ═══ */
 
 .compact-view {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 8px;
 }
 
-.compact-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
+.compact-card {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
   cursor: pointer;
+  transition: border-color var(--transition);
+  overflow: hidden;
+}
+
+.compact-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--card-accent, var(--state-neutral));
   transition: background var(--transition);
 }
 
-.compact-item:hover {
-  background: var(--bg-secondary);
+.compact-card:hover {
+  border-color: var(--border-light);
 }
 
+.compact-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.compact-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.compact-card .project-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.compact-card .session-slug {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.compact-card .session-slug:hover {
+  color: var(--text-secondary);
+}
+
+.compact-card-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.compact-card-meta,
+.compact-card-meta-secondary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.compact-card-meta-secondary {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.compact-meta-sep {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.compact-meta-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.compact-meta-state-label {
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.compact-card-meta .compact-meta-item.branch-value {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-card-meta-secondary .branch-value {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Indicator dot/spinner inherited shape — colour comes from data-state */
 .compact-dot {
   width: 8px;
   height: 8px;
@@ -892,42 +1001,35 @@ body.micro-mode .usage-reset-icon {
   flex-shrink: 0;
 }
 
-.compact-item[data-state="thinking"] { color: var(--state-thinking); }
-.compact-item[data-state="thinking"] .compact-dot { background: var(--state-thinking); }
-.compact-item[data-state="running"] { color: var(--state-running); }
-.compact-item[data-state="running"] .compact-dot { background: var(--state-running); }
-.compact-item[data-state="waiting"] .compact-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
-.compact-item[data-state="pending"] { color: var(--state-pending); }
-.compact-item[data-state="pending"] .compact-dot { background: var(--state-pending); }
-.compact-item[data-state="error"] .compact-dot { background: var(--state-error); }
-.compact-item[data-state="completed"] .compact-dot { background: var(--state-completed); }
+/* State-driven colours */
+.compact-card[data-state="thinking"] { --card-accent: var(--state-thinking); }
+.compact-card[data-state="thinking"] .compact-meta-state { color: var(--state-thinking); }
+.compact-card[data-state="thinking"] .compact-dot { background: var(--state-thinking); }
+.compact-card[data-state="running"] { --card-accent: var(--state-running); }
+.compact-card[data-state="running"] .compact-meta-state { color: var(--state-running); }
+.compact-card[data-state="running"] .compact-dot { background: var(--state-running); }
+.compact-card[data-state="waiting"] { --card-accent: var(--state-waiting); }
+.compact-card[data-state="waiting"] .compact-meta-state { color: var(--state-waiting); }
+.compact-card[data-state="waiting"] .compact-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
+.compact-card[data-state="pending"] { --card-accent: var(--state-pending); }
+.compact-card[data-state="pending"] .compact-meta-state { color: var(--state-pending); }
+.compact-card[data-state="pending"] .compact-dot { background: var(--state-pending); }
+.compact-card[data-state="error"] { --card-accent: var(--state-error); }
+.compact-card[data-state="error"] .compact-meta-state { color: var(--state-error); }
+.compact-card[data-state="error"] .compact-dot { background: var(--state-error); }
+.compact-card[data-state="completed"] { --card-accent: var(--state-completed); }
+.compact-card[data-state="completed"] .compact-dot { background: var(--state-completed); }
 
-.compact-item .project-name {
-  font-size: 13px;
-  flex: 1;
-  min-width: 0;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.compact-card[data-state="completed"] {
+  opacity: 0.55;
 }
 
-.compact-item[data-state="completed"] {
-  opacity: 0.5;
+.compact-card[data-state="completed"]:hover {
+  opacity: 0.85;
 }
 
-.compact-item[data-state="completed"]:hover {
-  opacity: 0.75;
-}
-
-.compact-item[data-state="completed"] .project-name {
+.compact-card[data-state="completed"] .project-name {
   color: var(--text-muted);
-}
-
-.compact-actions {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
 }
 
 /* ═══ Notification modal ═══ */
@@ -1156,7 +1258,9 @@ body.micro-mode .usage-reset-icon {
 }
 
 .settings-content {
-  min-height: 200px;
+  height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 /* About section */
@@ -1609,25 +1713,25 @@ body.micro-mode .usage-reset-icon {
 
 /* ═══ List state dots ═══ */
 
-.compact-item[data-state="thinking"] .state-dot { background: var(--state-thinking); }
-.compact-item[data-state="running"] .state-dot { background: var(--state-running); }
-.compact-item[data-state="waiting"] .state-dot { background: var(--state-waiting); }
-.compact-item[data-state="pending"] .state-dot { background: var(--state-pending); }
-.compact-item[data-state="completed"] .state-dot { background: var(--state-completed); }
-.compact-item[data-state="error"] .state-dot { background: var(--state-error); }
+.compact-card[data-state="thinking"] .state-dot { background: var(--state-thinking); }
+.compact-card[data-state="running"] .state-dot { background: var(--state-running); }
+.compact-card[data-state="waiting"] .state-dot { background: var(--state-waiting); }
+.compact-card[data-state="pending"] .state-dot { background: var(--state-pending); }
+.compact-card[data-state="completed"] .state-dot { background: var(--state-completed); }
+.compact-card[data-state="error"] .state-dot { background: var(--state-error); }
 
-.compact-item[data-state="pending"] .state-dot {
+.compact-card[data-state="pending"] .state-dot {
   animation: pulse 1.2s ease-in-out infinite;
 }
 
-.compact-item[data-state="running"] .state-dot,
-.compact-item[data-state="thinking"] .state-dot {
+.compact-card[data-state="running"] .state-dot,
+.compact-card[data-state="thinking"] .state-dot {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 /* Waiting/error dots — slow gentle breathing */
-.compact-item[data-state="waiting"] .state-dot,
-.compact-item[data-state="error"] .state-dot {
+.compact-card[data-state="waiting"] .state-dot,
+.compact-card[data-state="error"] .state-dot {
   animation: breathe 3s ease-in-out infinite;
 }
 
@@ -1637,15 +1741,15 @@ body.micro-mode .usage-reset-icon {
 }
 
 /* Completed list items — greyed out */
-.compact-item[data-state="completed"] {
+.compact-card[data-state="completed"] {
   opacity: 0.6;
 }
 
-.compact-item[data-state="completed"]:hover {
+.compact-card[data-state="completed"]:hover {
   opacity: 0.75;
 }
 
-.compact-item[data-state="completed"] .project-name {
+.compact-card[data-state="completed"] .project-name {
   color: var(--text-muted);
 }
 

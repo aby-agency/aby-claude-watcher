@@ -10,7 +10,7 @@ cd "$(dirname "$0")"
 
 render() {
   local out="$1" w="$2" h="$3" s="$4"   # s = scale (1 ou 2)
-  local box_x1=$((40 * s)) box_y1=$((290 * s)) box_x2=$((500 * s)) box_y2=$((480 * s))
+  local box_x1=$((40 * s)) box_y1=$((280 * s)) box_x2=$((500 * s)) box_y2=$((480 * s))
   local arrow_y=$((200 * s))
 
   local args=(
@@ -20,12 +20,19 @@ render() {
     -stroke none -gravity North
     -font Arial-Gras -pointsize $((20*s)) -fill '#1f2937'
     -annotate "+0+$((30*s))" "1. Glissez l'app dans Applications"
-    -font Arial-Gras -pointsize $((16*s)) -fill '#9a3412'
-    -annotate "+0+$((305*s))" "2. Si macOS refuse l'ouverture"
-    -font Arial -pointsize $((13*s)) -fill '#7c2d12'
-    -annotate "+0+$((340*s))" "Double-cliquez sur le script ci-dessous (deverrouille puis lance l'app)."
+    -font Arial-Gras -pointsize $((15*s)) -fill '#9a3412'
+    -annotate "+0+$((298*s))" "2. Si macOS refuse l'ouverture, ouvrez Terminal et tapez :"
+    -fill '#fef3e8' -stroke '#fdba74' -strokewidth $((s == 2 ? 2 : 1))
+    -draw "roundrectangle $((60*s)),$((325*s)) $((480*s)),$((400*s)) $((6*s)),$((6*s))"
+    -stroke none -gravity North
+    -font Courier-Gras -pointsize $((11*s)) -fill '#1f2937'
+    -annotate "+0+$((342*s))" "xattr -dr com.apple.quarantine \\\\"
+    -annotate "+0+$((360*s))" "  \"/Applications/Aby Claude Watcher.app\""
+    -annotate "+0+$((378*s))" "&& open \"/Applications/Aby Claude Watcher.app\""
     -font Arial -pointsize $((11*s)) -fill '#9a3412'
-    -annotate "+0+$((365*s))" "Sans toucher au reste du Mac."
+    -annotate "+0+$((420*s))" "puis Entree. L'app sera deverrouillee et lancee."
+    -font Arial -pointsize $((10*s)) -fill '#9a3412'
+    -annotate "+0+$((445*s))" "(necessaire seulement la 1re fois — les MAJ futures se font dans l'app)"
     -fill '#a78bfa' -stroke none
   )
   # Pointilles : 7 segments de 12px espaces de 8px, partant de x=200

@@ -791,8 +791,8 @@ function cardHTML(s) {
       </div>
       <div class="card-details">
         <div class="detail">
-          <span class="detail-label">${t('tool')}</span>
-          <span class="detail-value">${(stateName === 'running' || stateName === 'thinking') ? toolPill(s.lastTool) : toolPill(null)}</span>
+          <span class="detail-label">${t('branch')}</span>
+          <span class="detail-value branch-value">${esc(s.gitBranch || '—')}</span>
         </div>
         <div class="detail">
           <span class="detail-label">${t('duration')}</span>
@@ -807,8 +807,8 @@ function cardHTML(s) {
           <span class="detail-value">${formatModel(s.model)}</span>
         </div>
         <div class="detail">
-          <span class="detail-label">${t('branch')}</span>
-          <span class="detail-value branch-value">${esc(s.gitBranch || '—')}</span>
+          <span class="detail-label">${t('tool')}</span>
+          <span class="detail-value">${(stateName === 'running' || stateName === 'thinking') ? toolPill(s.lastTool) : toolPill(null)}</span>
         </div>
       </div>
     </div>

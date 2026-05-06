@@ -4,6 +4,36 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] — 2026-05-06
+
+### Fixed
+- **DMG helper blocked by Gatekeeper on Sequoia** — the `Fix Gatekeeper.command`
+  shipped in 1.5.3 was itself flagged by macOS Gatekeeper on first launch (same
+  quarantine attribute applied to every file in a downloaded DMG). Removed.
+  The DMG background now shows the unlock command directly so the user can
+  read it and paste it into Terminal (signed by Apple, no Gatekeeper prompt).
+  This is only needed for the first install — subsequent updates go through
+  the in-app updater which doesn't trigger quarantine.
+- **Hidden DMG metadata files appearing in the layout** — `.background.tiff`,
+  `.VolumeIcon.icns`, `.fseventsd`, and `.Trashes` were placed by Finder right
+  on top of the visible icons whenever the user had `Cmd+Shift+.` active. A
+  post-build hook now repacks each DMG and moves these entries to (2000, 2000)
+  in the `.DS_Store`, well outside the window's visible area.
+
+### Changed
+- **Card details: branch first, tool last** — the tool chip can grow long
+  (e.g. `WebFetch`, `TodoWrite`); promoting it to the last row of the
+  2-column grid (where it sits alone) gives it the full card width to
+  breathe. Branch moves to the first row where its short text fits the
+  narrower cell better.
+
+### Added
+- `build/push-hidden-offscreen.py` — repacks a DMG with hidden metadata
+  files moved off-screen. Wired into `electron-builder` via the
+  `afterAllArtifactBuild` hook in `build/after-artifact-build.js`.
+  Requires Python 3 with `ds-store` and `mac_alias` installed
+  (`pip3 install --user ds-store mac_alias`).
+
 ## [1.5.3] — 2026-05-06
 
 ### Added

@@ -215,6 +215,10 @@ class SessionWatcher extends EventEmitter {
               wasResumed: false,
             });
             this.watchJsonl(effectiveId);
+            // Persist immediately so a fresh session that hasn't yet transitioned
+            // state is known to config.sessions. Otherwise the startup orphan
+            // purge would nuke its notif/name/order prefs on next launch.
+            this.persistSession(this.sessions.get(effectiveId));
             this.emit('session-added', this.sessions.get(effectiveId));
           } else {
             const session = this.sessions.get(effectiveId);

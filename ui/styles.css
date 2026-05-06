@@ -1271,6 +1271,37 @@ body.micro-mode .usage-reset-icon {
   text-decoration: underline;
 }
 
+.update-link-secondary {
+  color: var(--text-secondary);
+  text-decoration: none;
+  margin-left: 4px;
+}
+
+.update-link-secondary:hover {
+  text-decoration: underline;
+  color: var(--text-primary);
+}
+
+.update-progress {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.update-progress-bar {
+  height: 100%;
+  background: var(--state-running);
+  transition: width 0.15s ease-out;
+}
+
+.update-banner-btn:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
 .modal h3 {
   font-size: 16px;
   margin-bottom: 16px;

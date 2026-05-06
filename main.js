@@ -4,7 +4,7 @@ const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
 const { UsageMonitor } = require('./usage');
 const { focusTerminal, resumeSession, launchSession } = require('./focus');
-const { checkForUpdates, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
+const { checkForUpdates, downloadAndInstall, abortActiveDownload, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
 const { installHooks, getDefaultHookPath } = require('./install-hooks');
 const config = require('./config');
 const i18n = require('./i18n');
@@ -346,6 +346,33 @@ function setupIPC() {
 
   ipcMain.handle('check-updates', async (_, force) => {
     return checkForUpdates(!!force);
+  });
+
+  ipcMain.handle('download-update', async (_, release) => {
+    if (!release || !release.dmgUrl) {
+      return { ok: false, error: 'no-asset' };
+    }
+    try {
+      let lastSent = 0;
+      const onProgress = (p) => {
+        // Throttle to ~10 fps to avoid IPC flooding
+        const now = Date.now();
+        if (now - lastSent < 100 && p.percent < 100) return;
+        lastSent = now;
+        sendToRenderer('update-progress', p);
+      };
+      sendToRenderer('update-progress', { received: 0, total: release.dmgSize || 0, percent: 0 });
+      await downloadAndInstall(release, onProgress);
+      sendToRenderer('update-installing', { version: release.latest });
+      return { ok: true };
+    } catch (e) {
+      sendToRenderer('update-error', { message: e.message });
+      return { ok: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('abort-update', () => {
+    return { aborted: abortActiveDownload() };
   });
 
   ipcMain.handle('get-app-info', () => {

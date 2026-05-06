@@ -4,6 +4,28 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] — 2026-05-06
+
+### Added
+- **One-click in-app updates** — the updater now downloads the matching DMG
+  asset directly from the GitHub release and replaces the running app via a
+  detached install script (mount → copy → unmount → relaunch). No more manual
+  re-download on every release. Works with ad-hoc signing (no Apple Developer
+  ID required). Falls back to the GitHub link if no DMG asset matches the
+  running architecture.
+- **Custom DMG layout** — visual install instructions (drag-to-Applications
+  arrow) and a `Fix Gatekeeper.command` script bundled in the DMG that removes
+  the macOS quarantine attribute and launches the app, for first-install users
+  blocked by Gatekeeper.
+
+### Changed
+- `checkForUpdates()` response now includes `dmgUrl`, `dmgName`, `dmgSize`, and
+  a `canAutoInstall` flag so the renderer can branch between in-app install
+  and the legacy GitHub link.
+- The "About" panel and the update banner now show a download progress bar
+  during the update download, and an "Installing…" state right before the
+  app quits to relaunch on the new version.
+
 ## [1.4.3] — 2026-05-04
 
 ### Fixed

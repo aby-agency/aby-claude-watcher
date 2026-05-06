@@ -242,6 +242,34 @@ async function init() {
     showUpdateBanner(info);
   });
 
+  window.api.onUpdateProgress((p) => {
+    if (lastUpdateResult) {
+      lastUpdateResult = { ...lastUpdateResult, status: 'downloading', percent: p.percent, received: p.received, total: p.total };
+      renderUpdateState();
+    }
+    updateBannerProgress(p.percent);
+  });
+
+  window.api.onUpdateInstalling(() => {
+    if (lastUpdateResult) {
+      lastUpdateResult = { ...lastUpdateResult, status: 'installing' };
+      renderUpdateState();
+    }
+    updateBannerInstalling();
+  });
+
+  window.api.onUpdateError((info) => {
+    if (lastUpdateResult) {
+      lastUpdateResult = { ...lastUpdateResult, status: 'install-error', error: info && info.message };
+      renderUpdateState();
+    }
+    const btn = document.getElementById('updateDownload');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = t('update_install_failed');
+    }
+  });
+
   // Shortcuts modal
   const $shortcutsModal = document.getElementById('shortcutsModal');
   const $shortcutsClose = document.getElementById('shortcutsClose');
@@ -464,11 +492,34 @@ function renderUpdateState() {
 
   if (result.status === 'update-available') {
     statusLabel.textContent = t('update_available', { version: result.latest });
-    statusHint.innerHTML = `<a href="#" class="update-link">${t('update_download_link')}</a>`;
-    statusHint.querySelector('.update-link').addEventListener('click', (e) => {
-      e.preventDefault();
-      window.api.openExternalUrl(result.url);
-    });
+    if (result.canAutoInstall) {
+      statusHint.innerHTML = `<a href="#" class="update-link" data-action="install">${t('update_install_btn')}</a> · <a href="#" class="update-link-secondary" data-action="github">${t('update_open_github')}</a>`;
+      statusHint.querySelector('[data-action="install"]').addEventListener('click', (e) => {
+        e.preventDefault();
+        startUpdateDownload(result);
+      });
+      statusHint.querySelector('[data-action="github"]').addEventListener('click', (e) => {
+        e.preventDefault();
+        window.api.openExternalUrl(result.url);
+      });
+    } else {
+      // Fallback: no DMG asset for this arch — link to GitHub.
+      statusHint.innerHTML = `<a href="#" class="update-link">${t('update_download_link')}</a>`;
+      statusHint.querySelector('.update-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        window.api.openExternalUrl(result.url);
+      });
+    }
+  } else if (result.status === 'downloading') {
+    const pct = Math.round(result.percent || 0);
+    statusLabel.textContent = t('update_downloading', { percent: pct });
+    statusHint.innerHTML = `<div class="update-progress"><div class="update-progress-bar" style="width:${pct}%"></div></div>`;
+  } else if (result.status === 'installing') {
+    statusLabel.textContent = t('update_installing');
+    statusHint.textContent = '';
+  } else if (result.status === 'install-error') {
+    statusLabel.textContent = t('update_install_failed');
+    statusHint.textContent = result.error || '';
   } else if (result.status === 'up-to-date') {
     statusLabel.textContent = t('update_up_to_date', { app: 'Aby Claude Watcher' });
     statusHint.textContent = t('update_up_to_date_hint', { version: result.current, when });
@@ -512,24 +563,60 @@ async function checkForUpdate(force) {
 
 function showUpdateBanner(info) {
   const existing = document.getElementById('updateBanner');
-  if (existing) return; // already shown
+  if (existing) return;
 
   const banner = document.createElement('div');
   banner.id = 'updateBanner';
   banner.className = 'update-banner';
+  const btnLabel = info.canAutoInstall ? t('update_install_btn') : t('update_banner_download');
   banner.innerHTML = `
-    <span>${t('update_available', { version: `<strong>${esc(info.latest)}</strong>` })}</span>
-    <button class="update-banner-btn" id="updateDownload">${t('update_banner_download')}</button>
+    <span class="update-banner-text">${t('update_available', { version: `<strong>${esc(info.latest)}</strong>` })}</span>
+    <button class="update-banner-btn" id="updateDownload">${btnLabel}</button>
     <button class="update-banner-close" id="updateDismiss">${ICONS.x}</button>
   `;
   document.body.appendChild(banner);
 
   document.getElementById('updateDownload').addEventListener('click', () => {
-    window.api.openExternalUrl(info.url);
+    if (info.canAutoInstall) {
+      startUpdateDownload(info);
+    } else {
+      window.api.openExternalUrl(info.url);
+    }
   });
   document.getElementById('updateDismiss').addEventListener('click', () => {
     banner.remove();
   });
+}
+
+function updateBannerProgress(percent) {
+  const banner = document.getElementById('updateBanner');
+  if (!banner) return;
+  const btn = document.getElementById('updateDownload');
+  const text = banner.querySelector('.update-banner-text');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t('update_downloading', { percent: Math.round(percent) });
+  }
+  if (text) {
+    text.innerHTML = `<div class="update-progress"><div class="update-progress-bar" style="width:${percent}%"></div></div>`;
+  }
+}
+
+function updateBannerInstalling() {
+  const banner = document.getElementById('updateBanner');
+  if (!banner) return;
+  const btn = document.getElementById('updateDownload');
+  const text = banner.querySelector('.update-banner-text');
+  if (btn) { btn.disabled = true; btn.textContent = t('update_installing'); }
+  if (text) text.textContent = '';
+}
+
+function startUpdateDownload(info) {
+  // Move the settings panel into "downloading" state
+  lastUpdateResult = { ...info, status: 'downloading', percent: 0 };
+  renderUpdateState();
+  updateBannerProgress(0);
+  window.api.downloadUpdate(info);
 }
 
 // ═══ Rendering ═══

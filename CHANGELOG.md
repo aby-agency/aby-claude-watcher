@@ -4,6 +4,31 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.7] — 2026-05-06
+
+### Added
+- **Active-session count header** above the list (`X active sessions`) so a
+  glance at the dashboard tells you immediately how busy you are.
+- **Old sessions divider** — completed sessions are now visually separated
+  from active ones with a divider that includes a **Clear all** button. A
+  confirmation modal protects against fat-finger purges. The clear only
+  removes sessions from the dashboard's view (and their custom names /
+  notification preferences); the underlying Claude Code session files on
+  disk are untouched, so `claude --resume` still works.
+- **About panel** describing what the app does — replaces the keyboard
+  shortcuts modal in the toolbar's "?" button.
+
+### Changed
+- **Update check cadence** — first check at startup is now 10 s (was 30 s),
+  and the app re-checks every 2 hours while it's running (previously only
+  on launch). The internal 1 h rate limit on the manual "Check" button is
+  unchanged.
+- **Removed Cmd-* keyboard shortcuts** (⌘1-9, ⌘G, ⌘P, ⌘F, ⌘?). They were
+  rarely used, took inventory in the modal that was better spent on app
+  context, and added behaviour that interfered with macOS Cmd-key
+  conventions. <kbd>Esc</kbd> still closes any open modal — that's UX
+  baseline, not a "shortcut".
+
 ## [1.5.6] — 2026-05-06
 
 ### Changed

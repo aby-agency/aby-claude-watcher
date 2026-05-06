@@ -297,6 +297,14 @@ function setupIPC() {
     watcher.removeSession(sessionId);
   });
 
+  ipcMain.handle('clear-completed-sessions', () => {
+    const ids = watcher.getSessions()
+      .filter(s => s.state && s.state.name === 'completed')
+      .map(s => s.sessionId);
+    for (const id of ids) watcher.removeSession(id);
+    return { count: ids.length };
+  });
+
   ipcMain.handle('resume-session', (_, sessionId, opts) => {
     const s = watcher.getSessions().find(s => s.sessionId === sessionId);
     const cwd = s ? s.cwd : null;
@@ -492,13 +500,17 @@ app.whenReady().then(() => {
   setupTray();
   createPopoverWindow();
 
-  // Check for updates 30s after startup (non-blocking)
-  setTimeout(async () => {
+  // Update check: first attempt 10s after startup, then every 2 hours.
+  // The 1h rate limit inside checkForUpdates(false) will skip checks that
+  // arrive too close together, so the 2h interval is the upper bound.
+  const checkAndNotify = async () => {
     const result = await checkForUpdates(false);
     if (result.status === 'update-available') {
       sendToRenderer('update-available', result);
     }
-  }, 30000);
+  };
+  setTimeout(checkAndNotify, 10_000);
+  setInterval(checkAndNotify, 2 * 60 * 60 * 1000);
 
   app.on('activate', () => {
     if (!mainWindow) createWindow();

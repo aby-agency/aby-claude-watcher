@@ -37,6 +37,8 @@ let draggedId = null;
 const $content = document.getElementById('content');
 const $emptyState = document.getElementById('emptyState');
 const $emptyFiltered = document.getElementById('emptyFiltered');
+const $sessionsHeader = document.getElementById('sessionsHeader');
+const $sessionsHeaderCount = document.getElementById('sessionsHeaderCount');
 const $gridView = document.getElementById('gridView');
 const $compactView = document.getElementById('compactView');
 const $microView = document.getElementById('microView');
@@ -149,6 +151,29 @@ async function init() {
   document.getElementById('resumeCancel').addEventListener('click', closeResumeModal);
   document.getElementById('resumeModal').addEventListener('click', (e) => {
     if (e.target.id === 'resumeModal') closeResumeModal();
+  });
+
+  // Clear-completed modal — the trigger button (#clearCompletedBtn) lives
+  // inside fullRender() output and gets re-created on every render, so we
+  // delegate from document. The modal's own buttons are static.
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'clearCompletedBtn') {
+      const completed = Array.from(sessions.values()).filter(s => s.state.name === 'completed');
+      document.getElementById('clearCompletedCount').textContent = completed.length;
+      document.getElementById('clearCompletedModal').style.display = 'flex';
+    }
+  });
+  document.getElementById('clearCompletedCancel').addEventListener('click', () => {
+    document.getElementById('clearCompletedModal').style.display = 'none';
+  });
+  document.getElementById('clearCompletedConfirm').addEventListener('click', async () => {
+    document.getElementById('clearCompletedModal').style.display = 'none';
+    await window.api.clearCompletedSessions();
+  });
+  document.getElementById('clearCompletedModal').addEventListener('click', (e) => {
+    if (e.target.id === 'clearCompletedModal') {
+      document.getElementById('clearCompletedModal').style.display = 'none';
+    }
   });
 
   // Rename modal
@@ -270,13 +295,13 @@ async function init() {
     }
   });
 
-  // Shortcuts modal
-  const $shortcutsModal = document.getElementById('shortcutsModal');
-  const $shortcutsClose = document.getElementById('shortcutsClose');
-  document.getElementById('btnShortcuts').addEventListener('click', () => $shortcutsModal.style.display = 'flex');
-  $shortcutsClose.addEventListener('click', () => $shortcutsModal.style.display = 'none');
-  $shortcutsModal.addEventListener('click', (e) => {
-    if (e.target === $shortcutsModal) $shortcutsModal.style.display = 'none';
+  // About modal
+  const $aboutModal = document.getElementById('aboutModal');
+  const $aboutClose = document.getElementById('aboutClose');
+  document.getElementById('btnAbout').addEventListener('click', () => $aboutModal.style.display = 'flex');
+  $aboutClose.addEventListener('click', () => $aboutModal.style.display = 'none');
+  $aboutModal.addEventListener('click', (e) => {
+    if (e.target === $aboutModal) $aboutModal.style.display = 'none';
   });
 
   // Search input
@@ -288,56 +313,17 @@ async function init() {
   // Close context menu on any click
   document.addEventListener('click', () => hideContextMenu());
 
-  // Keyboard shortcuts
+  // Escape closes whichever modal/dropdown is open. The Cmd-* shortcuts
+  // were removed in 1.5.7 — see CHANGELOG.
   document.addEventListener('keydown', (e) => {
-    // Cmd+1-9: focus nth active session
-    if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
-      e.preventDefault();
-      const sorted = getSortedSessions().filter(s => s.state.name !== 'completed');
-      const idx = parseInt(e.key) - 1;
-      if (sorted[idx]) handleFocus(sorted[idx].sessionId);
-    }
-
-    // Cmd+G: toggle grid/list view
-    if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
-      e.preventDefault();
-      setView(viewMode === 'grid' ? 'compact' : 'grid');
-    }
-
-    // Cmd+P: toggle always-on-top (pin)
-    if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
-      e.preventDefault();
-      togglePin();
-    }
-
-    // Cmd+F: toggle search
-    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-      e.preventDefault();
-      const search = document.getElementById('searchInput');
-      if (search.style.display === 'none') {
-        search.style.display = 'block';
-        search.focus();
-      } else {
-        closeSearch();
-      }
-    }
-
-    // Cmd+? or Cmd+/: show shortcuts
-    if ((e.metaKey || e.ctrlKey) && (e.key === '?' || e.key === '/')) {
-      e.preventDefault();
-      document.getElementById('shortcutsModal').style.display = 'flex';
-    }
-
-    // Escape: close modals/dropdowns
-    if (e.key === 'Escape') {
-      closeAddModal();
-      closeRenameModal();
-      closeResumeModal();
-      const settingsModal = document.getElementById('settingsModal');
-      if (settingsModal) settingsModal.style.display = 'none';
-      const shortcutsModal = document.getElementById('shortcutsModal');
-      if (shortcutsModal) shortcutsModal.style.display = 'none';
-    }
+    if (e.key !== 'Escape') return;
+    closeAddModal();
+    closeRenameModal();
+    closeResumeModal();
+    const settingsModal = document.getElementById('settingsModal');
+    if (settingsModal) settingsModal.style.display = 'none';
+    const aboutModal = document.getElementById('aboutModal');
+    if (aboutModal) aboutModal.style.display = 'none';
   });
 
   // Update durations every second
@@ -630,7 +616,8 @@ function getRenderableSessions() {
 
 function render() {
   const count = sessions.size;
-  const visibleCount = getRenderableSessions().length;
+  const renderable = getRenderableSessions();
+  const visibleCount = renderable.length;
 
   const showNoSessions = count === 0;
   const showNoResults = count > 0 && visibleCount === 0;
@@ -641,6 +628,15 @@ function render() {
   $gridView.style.display = showItems && viewMode === 'grid' ? 'grid' : 'none';
   $compactView.style.display = showItems && viewMode === 'compact' ? 'flex' : 'none';
   $microView.style.display = showItems && viewMode === 'micro' ? 'flex' : 'none';
+
+  // Header showing the active-session count, hidden in micro view (which already
+  // filters completed) and when no session is visible.
+  const activeCount = renderable.filter(s => s.state.name !== 'completed').length;
+  if ($sessionsHeader) {
+    const showHeader = showItems && viewMode !== 'micro' && activeCount > 0;
+    $sessionsHeader.style.display = showHeader ? 'flex' : 'none';
+    if (showHeader) $sessionsHeaderCount.textContent = activeCount;
+  }
 
   // Full rebuild — used for initial load, view switch, add/remove
   fullRender();
@@ -662,7 +658,30 @@ function viewItemHTML() {
 function fullRender() {
   const sorted = getRenderableSessions();
   const htmlFn = viewItemHTML();
-  viewContainer().innerHTML = sorted.map(s => htmlFn(s)).join('');
+
+  // Micro view filters completed already, no divider needed.
+  if (viewMode === 'micro') {
+    viewContainer().innerHTML = sorted.map(s => htmlFn(s)).join('');
+    return;
+  }
+
+  const active = sorted.filter(s => s.state.name !== 'completed');
+  const completed = sorted.filter(s => s.state.name === 'completed');
+
+  const fragments = active.map(s => htmlFn(s));
+  if (completed.length > 0) {
+    fragments.push(dividerHTML(completed.length));
+    for (const s of completed) fragments.push(htmlFn(s));
+  }
+  viewContainer().innerHTML = fragments.join('');
+}
+
+function dividerHTML(count) {
+  return `<div class="sessions-divider" data-skip-render="1">
+    <span class="sessions-divider-line"></span>
+    <span class="sessions-divider-label">${t('sessions_old_label', { n: count })}</span>
+    <button class="sessions-divider-action" id="clearCompletedBtn">${t('clear_completed_action')}</button>
+  </div>`;
 }
 
 function updateSession(s) {

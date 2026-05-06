@@ -60,7 +60,7 @@
           <circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>
         </svg>
       </button>
-      <button class="toolbar-btn" id="btnShortcuts" data-i18n-title="shortcuts_title" title="Keyboard shortcuts">
+      <button class="toolbar-btn" id="btnAbout" data-i18n-title="about_title" title="About this app">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
@@ -94,9 +94,26 @@
       <p class="hint" data-i18n="empty_filtered_hint">Try a different search</p>
       <button class="empty-action" id="btnClearAllFilters" data-i18n="reset">Reset</button>
     </div>
+    <div class="sessions-header" id="sessionsHeader" style="display:none;">
+      <span class="sessions-header-dot"></span>
+      <span class="sessions-header-count" id="sessionsHeaderCount">0</span>
+      <span class="sessions-header-label" data-i18n="sessions_active_label">active sessions</span>
+    </div>
     <div class="grid-view" id="gridView" style="display:none;"></div>
     <div class="compact-view" id="compactView" style="display:none;"></div>
     <div class="micro-view" id="microView" style="display:none;"></div>
+  </div>
+
+  <!-- Confirm clear-completed modal -->
+  <div class="modal-backdrop" id="clearCompletedModal" style="display:none;">
+    <div class="modal">
+      <h3 data-i18n="clear_completed_title">Clear old sessions?</h3>
+      <p class="modal-body" data-i18n-html="clear_completed_body">Completed sessions will be removed from this view…</p>
+      <div class="modal-actions">
+        <button id="clearCompletedCancel" data-i18n="cancel">Cancel</button>
+        <button class="danger" id="clearCompletedConfirm"><span data-i18n="clear_completed_confirm">Clear</span> (<span id="clearCompletedCount">0</span>)</button>
+      </div>
+    </div>
   </div>
 
   <!-- Notification overlay -->
@@ -311,24 +328,27 @@
     </span>
   </div>
 
-  <!-- Shortcuts modal -->
-  <div class="modal-backdrop" id="shortcutsModal" style="display:none;">
+  <!-- About modal -->
+  <div class="modal-backdrop" id="aboutModal" style="display:none;">
     <div class="modal">
       <div class="modal-header">
-        <h3 data-i18n="shortcuts_title">Keyboard shortcuts</h3>
-        <button class="modal-close" id="shortcutsClose" data-i18n-title="close" title="Close">
+        <h3 data-i18n="about_title">About Aby Claude Watcher</h3>
+        <button class="modal-close" id="aboutClose" data-i18n-title="close" title="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
           </svg>
         </button>
       </div>
-      <div class="shortcuts-list">
-        <div class="shortcut-row"><kbd>&#8984;1</kbd> — <kbd>&#8984;9</kbd><span data-i18n="shortcut_focus_sessions">Focus session 1-9</span></div>
-        <div class="shortcut-row"><kbd>&#8984;G</kbd><span data-i18n="shortcut_toggle_view">Toggle grid / compact</span></div>
-        <div class="shortcut-row"><kbd>&#8984;P</kbd><span data-i18n="shortcut_pin">Always on top (pin)</span></div>
-        <div class="shortcut-row"><kbd>&#8984;F</kbd><span data-i18n="shortcut_search">Search</span></div>
-        <div class="shortcut-row"><kbd>&#8984;?</kbd><span data-i18n="shortcut_shortcuts">Keyboard shortcuts</span></div>
-        <div class="shortcut-row"><kbd>Esc</kbd><span data-i18n="shortcut_escape">Close modal / dropdown</span></div>
+      <div class="about-body">
+        <p class="about-tagline" data-i18n="about_tagline">Real-time dashboard for your Claude Code sessions.</p>
+        <ul class="about-features">
+          <li data-i18n="about_feature_detect">Auto-detects every Claude Code session as it spawns</li>
+          <li data-i18n="about_feature_state">Live state per session: thinking, running, waiting, completed</li>
+          <li data-i18n="about_feature_notify">Notifies you when Claude is waiting for your input</li>
+          <li data-i18n="about_feature_focus">One click to focus the originating terminal, or to resume</li>
+          <li data-i18n="about_feature_usage">Tracks 5h and 7-day usage windows with countdown to reset</li>
+        </ul>
+        <p class="about-hint" data-i18n="about_hint">Press <kbd>Esc</kbd> to close any panel.</p>
       </div>
     </div>
   </div>

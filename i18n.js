@@ -19,7 +19,6 @@
       micro_back: 'Retour',
       pin_title: 'Always on top',
       add_session: 'Ajouter une session',
-      shortcuts_title: 'Raccourcis clavier',
       settings_title: 'Paramètres',
 
       // Empty states
@@ -138,13 +137,23 @@
       tray_tooltip: '{app} — {n} active{s}',
       tray_tooltip_waiting: ' ({n} en attente)',
 
-      // Keyboard shortcuts
-      shortcut_focus_sessions: 'Focus session 1-9',
-      shortcut_toggle_view: 'Basculer grille / compact',
-      shortcut_pin: 'Always on top (pin)',
-      shortcut_search: 'Rechercher',
-      shortcut_shortcuts: 'Raccourcis clavier',
-      shortcut_escape: 'Fermer modale / dropdown',
+      // Sessions list
+      sessions_active_label: 'sessions actives',
+      sessions_old_label: 'Anciennes sessions ({n})',
+      clear_completed_action: 'Tout effacer',
+      clear_completed_title: 'Effacer les anciennes sessions ?',
+      clear_completed_body: 'Les sessions terminées seront retirées de cette vue (les noms personnalisés et préférences de notification seront perdus). Les fichiers de session Claude Code sur disque ne sont pas touchés — vous pouvez toujours les reprendre avec <code>claude --resume</code>.',
+      clear_completed_confirm: 'Effacer',
+
+      // About modal
+      about_title: 'À propos d\'Aby Claude Watcher',
+      about_tagline: 'Tableau de bord temps réel pour vos sessions Claude Code.',
+      about_feature_detect: 'Détecte automatiquement chaque nouvelle session Claude Code',
+      about_feature_state: 'État live par session : reflechit, exécute, attend, terminée',
+      about_feature_notify: 'Notifie quand Claude attend votre saisie',
+      about_feature_focus: 'Un clic pour revenir au terminal d\'origine, ou pour relancer',
+      about_feature_usage: 'Suit les fenêtres 5h et 7 jours avec décompte avant reset',
+      about_hint: 'Appuyez sur <kbd>Esc</kbd> pour fermer un panneau.',
     },
 
     en: {
@@ -164,7 +173,6 @@
       micro_back: 'Back',
       pin_title: 'Always on top',
       add_session: 'Add session',
-      shortcuts_title: 'Keyboard shortcuts',
       settings_title: 'Settings',
 
       // Empty states
@@ -283,13 +291,23 @@
       tray_tooltip: '{app} — {n} active',
       tray_tooltip_waiting: ' ({n} waiting)',
 
-      // Keyboard shortcuts
-      shortcut_focus_sessions: 'Focus session 1-9',
-      shortcut_toggle_view: 'Toggle grid / compact',
-      shortcut_pin: 'Always on top (pin)',
-      shortcut_search: 'Search',
-      shortcut_shortcuts: 'Keyboard shortcuts',
-      shortcut_escape: 'Close modal / dropdown',
+      // Sessions list
+      sessions_active_label: 'active sessions',
+      sessions_old_label: 'Old sessions ({n})',
+      clear_completed_action: 'Clear all',
+      clear_completed_title: 'Clear old sessions?',
+      clear_completed_body: 'Completed sessions will be removed from this view (custom names and notification preferences will be lost). Claude Code session files on disk are not touched — you can still resume them with <code>claude --resume</code>.',
+      clear_completed_confirm: 'Clear',
+
+      // About modal
+      about_title: 'About Aby Claude Watcher',
+      about_tagline: 'Real-time dashboard for your Claude Code sessions.',
+      about_feature_detect: 'Auto-detects every new Claude Code session as it spawns',
+      about_feature_state: 'Live state per session: thinking, running, waiting, completed',
+      about_feature_notify: 'Notifies you when Claude is waiting for your input',
+      about_feature_focus: 'One click to focus the originating terminal, or to resume',
+      about_feature_usage: 'Tracks 5h and 7-day usage windows with countdown to reset',
+      about_hint: 'Press <kbd>Esc</kbd> to close any panel.',
     },
   };
 

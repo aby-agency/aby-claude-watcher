@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('api', {
   setSessionOrder: (order) => ipcRenderer.invoke('set-session-order', order),
   setCustomName: (sessionId, name) => ipcRenderer.invoke('set-custom-name', sessionId, name),
   removeSession: (sessionId) => ipcRenderer.invoke('remove-session', sessionId),
+  clearCompletedSessions: () => ipcRenderer.invoke('clear-completed-sessions'),
   openRemote: (url) => ipcRenderer.invoke('open-remote', url),
   setVolume: (value) => ipcRenderer.invoke('set-volume', value),
   setNotifPosition: (value) => ipcRenderer.invoke('set-notif-position', value),

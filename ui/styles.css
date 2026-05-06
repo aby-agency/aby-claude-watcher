@@ -1207,21 +1207,26 @@ body.micro-mode .usage-reset-icon {
 /* Update banner */
 .update-banner {
   position: fixed;
-  bottom: 34px;
+  bottom: 44px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 14px;
+  gap: 16px;
+  padding: 12px 16px 12px 20px;
   background: var(--bg-secondary);
   border: 1px solid var(--state-running);
   border-radius: var(--radius);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  font-size: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  font-size: 13px;
   color: var(--text-primary);
   z-index: 500;
   animation: slideUp 0.3s ease-out;
+}
+
+.update-banner-text {
+  min-width: 220px;
+  line-height: 1.4;
 }
 
 @keyframes slideUp {
@@ -1230,31 +1235,40 @@ body.micro-mode .usage-reset-icon {
 }
 
 .update-banner-btn {
-  padding: 4px 12px;
+  padding: 8px 18px;
   background: var(--state-running);
   border: none;
   border-radius: var(--radius-sm);
   color: white;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
   cursor: pointer;
-  transition: opacity var(--transition);
+  transition: opacity var(--transition), transform var(--transition);
+  white-space: nowrap;
 }
 
-.update-banner-btn:hover {
-  opacity: 0.85;
+.update-banner-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.update-banner-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .update-banner-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   background: transparent;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
+  flex-shrink: 0;
 }
 
 .update-banner-close:hover {

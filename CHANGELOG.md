@@ -4,6 +4,18 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.6] — 2026-05-06
+
+### Changed
+- **Update banner padding and typography** — the "Installer maintenant"
+  button felt cramped, especially during the long-text states
+  ("Téléchargement 47 %", "Installation et redémarrage…"). Roughly
+  doubled the button's vertical padding, bumped font sizes by 1 px,
+  added `font-weight: 500` and `white-space: nowrap` so the label
+  doesn't wrap, and gave the banner itself more breathing room
+  (gap 12→16, padding 8/14→12/20). Hover now lifts the button by 1 px
+  for tactile feedback.
+
 ## [1.5.5] — 2026-05-06
 
 ### Added

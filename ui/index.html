@@ -55,12 +55,7 @@
           <line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
         </svg>
       </button>
-      <button class="toolbar-btn" id="btnAdd" data-i18n-title="add_session" title="Add session">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>
-        </svg>
-      </button>
-      <button class="toolbar-btn" id="btnAbout" data-i18n-title="about_title" title="About this app">
+<button class="toolbar-btn" id="btnAbout" data-i18n-title="about_title" title="About this app">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
@@ -83,7 +78,7 @@
         <line x1="12" y1="17" x2="12" y2="21"/>
       </svg>
       <p data-i18n="empty_title">No Claude Code sessions</p>
-      <p class="hint" data-i18n-html="empty_hint">Run <code>claude</code> in a terminal or use the + button</p>
+      <p class="hint" data-i18n-html="empty_hint">Run <code>claude</code> in a terminal — sessions appear here automatically</p>
     </div>
     <div class="empty-state" id="emptyFiltered" style="display:none;">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -93,11 +88,6 @@
       <p data-i18n="empty_filtered_title">No results</p>
       <p class="hint" data-i18n="empty_filtered_hint">Try a different search</p>
       <button class="empty-action" id="btnClearAllFilters" data-i18n="reset">Reset</button>
-    </div>
-    <div class="sessions-header" id="sessionsHeader" style="display:none;">
-      <span class="sessions-header-dot"></span>
-      <span class="sessions-header-count" id="sessionsHeaderCount">0</span>
-      <span class="sessions-header-label" data-i18n="sessions_active_label">active sessions</span>
     </div>
     <div class="grid-view" id="gridView" style="display:none;"></div>
     <div class="compact-view" id="compactView" style="display:none;"></div>
@@ -119,32 +109,7 @@
   <!-- Notification overlay -->
   <div class="notification-overlay" id="notificationOverlay"></div>
 
-  <!-- Add session modal (hidden) -->
-  <div class="modal-backdrop" id="addModal" style="display:none;">
-    <div class="modal">
-      <h3 data-i18n="add_session">Add session</h3>
-      <input type="text" id="addInput" data-i18n-placeholder="add_placeholder" placeholder="Session ID, .jsonl file, or project folder">
-      <div class="modal-actions">
-        <button id="addCancel" data-i18n="cancel">Cancel</button>
-        <button class="primary" id="addConfirm" data-i18n="add_confirm">Add</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Rename modal (hidden) -->
-  <div class="modal-backdrop" id="renameModal" style="display:none;">
-    <div class="modal">
-      <h3 data-i18n="rename_title">Rename session</h3>
-      <input type="text" id="renameInput" data-i18n-placeholder="rename_placeholder" placeholder="Custom name">
-      <div class="modal-actions">
-        <button id="renameReset" data-i18n="reset">Reset</button>
-        <button id="renameCancel" data-i18n="cancel">Cancel</button>
-        <button class="primary" id="renameConfirm" data-i18n="rename_confirm">Rename</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Resume session modal (hidden) -->
+<!-- Resume session modal (hidden) -->
   <div class="modal-backdrop" id="resumeModal" style="display:none;">
     <div class="modal">
       <h3 data-i18n="resume_title">Resume session</h3>
@@ -169,9 +134,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Context menu -->
-  <div class="context-menu" id="contextMenu" style="display:none;"></div>
 
   <!-- Settings modal (hidden) -->
   <div class="modal-backdrop" id="settingsModal" style="display:none;">

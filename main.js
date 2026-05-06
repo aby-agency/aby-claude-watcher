@@ -3,7 +3,7 @@ const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
 const { UsageMonitor } = require('./usage');
-const { focusTerminal, resumeSession, launchSession } = require('./focus');
+const { focusTerminal, resumeSession } = require('./focus');
 const { checkForUpdates, downloadAndInstall, abortActiveDownload, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
 const { installHooks, getDefaultHookPath } = require('./install-hooks');
 const config = require('./config');
@@ -258,11 +258,7 @@ function setupIPC() {
     return config.getNotificationPrefs(sessionId);
   });
 
-  ipcMain.handle('add-session', (_, sessionIdOrPath) => {
-    return watcher.addSession(sessionIdOrPath);
-  });
-
-  ipcMain.handle('set-session-order', (_, order) => {
+ipcMain.handle('set-session-order', (_, order) => {
     config.setSessionOrder(order);
   });
 
@@ -316,14 +312,7 @@ function setupIPC() {
     return resumeSession(sessionId, cwd, opts);
   });
 
-  ipcMain.handle('launch-session', (_, cwd) => {
-    if (cwd) {
-      try { installHooks(cwd, getDefaultHookPath()); } catch {}
-    }
-    return launchSession(cwd);
-  });
-
-  ipcMain.handle('set-volume', (_, value) => {
+ipcMain.handle('set-volume', (_, value) => {
     config.setVolume(value);
   });
 
@@ -433,7 +422,6 @@ function serializeSession(session) {
     startedAt: session.startedAt,
     endedAt: session.endedAt,
     tokens: session.tokens,
-    remoteUrl: session.remoteUrl || null,
     cwd: session.cwd,
     notifEnabled: (() => { const p = config.getNotificationPrefs(session.sessionId); return !!(p.modal || p.sound); })(),
   };

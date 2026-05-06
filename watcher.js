@@ -58,7 +58,6 @@ class SessionWatcher extends EventEmitter {
           startedAt: data.startedAt || new Date().toISOString(),
           endedAt: data.endedAt || null,
           tokens: data.tokens || { input: 0, output: 0 },
-          remoteUrl: data.remoteUrl || null,
           terminalApp: data.terminalApp || null,
           terminalId: data.terminalId || null,
           lastEventTime: Date.now(),
@@ -206,7 +205,6 @@ class SessionWatcher extends EventEmitter {
               startedAt: startedAtISO,
               endedAt: null,
               tokens: { input: 0, output: 0 },
-              remoteUrl: null,
               terminalApp: null,
               terminalId: null,
               permissionMode: this.detectBypassFromPid(pid) ? 'bypassPermissions' : null,
@@ -678,12 +676,7 @@ class SessionWatcher extends EventEmitter {
         // Completion is detected via PID death + session file removal instead.
         break;
       case 'system':
-        // Detect remote-control activation
-        if (event.subtype === 'bridge_status' && event.url) {
-          session.remoteUrl = event.url;
-          this.emit('session-updated', session);
-          this.persistSession(session);
-        }
+        // No-op: remote-control bridge detection was removed in 1.5.9.
         break;
     }
   }
@@ -814,7 +807,6 @@ class SessionWatcher extends EventEmitter {
       startedAt: session.startedAt,
       endedAt: session.endedAt,
       tokens: session.tokens,
-      remoteUrl: session.remoteUrl,
       terminalApp: session.terminalApp,
       terminalId: session.terminalId,
     });
@@ -957,76 +949,7 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
-  // Manual session add from UI
-  addSession(sessionIdOrPath) {
-    // If it's a path to a JSONL file — validate it's within Claude's projects dir
-    if (sessionIdOrPath.endsWith('.jsonl')) {
-      const resolved = path.resolve(sessionIdOrPath);
-      if (!resolved.startsWith(PROJECTS_DIR)) {
-        return false; // reject paths outside Claude projects
-      }
-      const sessionId = path.basename(sessionIdOrPath, '.jsonl');
-      if (!this.sessions.has(sessionId)) {
-        this.sessions.set(sessionId, {
-          sessionId,
-          pid: null,
-          cwd: null,
-          projectName: 'Manual',
-          slug: '',
-          state: STATES.WAITING,
-          lastTool: null,
-          model: null,
-          gitBranch: null,
-          startedAt: new Date().toISOString(),
-          endedAt: null,
-          tokens: { input: 0, output: 0 },
-          remoteUrl: null,
-          terminalApp: null,
-          terminalId: null,
-          lastEventTime: Date.now(),
-          hasActivity: false,
-          wasResumed: false,
-        });
-        this.startFileWatch(sessionId, sessionIdOrPath);
-        this.emit('session-added', this.sessions.get(sessionId));
-      }
-      return true;
-    }
-
-    // If it's a session ID, try to find its JSONL
-    const jsonlPath = this.findJsonlPath(sessionIdOrPath);
-    if (jsonlPath) {
-      if (!this.sessions.has(sessionIdOrPath)) {
-        this.sessions.set(sessionIdOrPath, {
-          sessionId: sessionIdOrPath,
-          pid: null,
-          cwd: null,
-          projectName: 'Manual',
-          slug: '',
-          state: STATES.WAITING,
-          lastTool: null,
-          model: null,
-          gitBranch: null,
-          startedAt: new Date().toISOString(),
-          endedAt: null,
-          tokens: { input: 0, output: 0 },
-          remoteUrl: null,
-          terminalApp: null,
-          terminalId: null,
-          lastEventTime: Date.now(),
-          hasActivity: false,
-          wasResumed: false,
-        });
-        this.startFileWatch(sessionIdOrPath, jsonlPath);
-        this.emit('session-added', this.sessions.get(sessionIdOrPath));
-      }
-      return true;
-    }
-
-    return false;
-  }
-
-  getSessions() {
+getSessions() {
     return Array.from(this.sessions.values());
   }
 }

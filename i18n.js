@@ -18,12 +18,11 @@
       view_micro: 'Vue micro',
       micro_back: 'Retour',
       pin_title: 'Always on top',
-      add_session: 'Ajouter une session',
-      settings_title: 'Paramètres',
+settings_title: 'Paramètres',
 
       // Empty states
       empty_title: 'Aucune session Claude Code',
-      empty_hint: 'Lancez <code>claude</code> dans un terminal ou utilisez le bouton +',
+      empty_hint: 'Lancez <code>claude</code> dans un terminal — les sessions apparaissent ici automatiquement',
       empty_filtered_title: 'Aucun résultat',
       empty_filtered_hint: 'Essayez une autre recherche',
       reset: 'Réinitialiser',
@@ -38,7 +37,6 @@
       // Card actions
       action_notifications: 'Notifications',
       action_focus_terminal: 'Focus terminal',
-      action_remote: 'Ouvrir remote control',
       action_resume: 'Reprendre la session',
       action_delete: 'Supprimer',
       action_more: "Plus d'options",
@@ -46,16 +44,13 @@
       action_copied: '✓ Copié',
 
       // Modals
-      rename_title: 'Renommer la session',
-      rename_placeholder: 'Nom personnalisé',
-      rename_confirm: 'Renommer',
+      action_rename: 'Renommer',
+      action_rename_hint: 'Cliquer pour renommer',
       resume_title: 'Reprendre la session',
       resume_hint: 'Ouvre la session dans un nouveau terminal.',
       resume_skip_perms_label: 'Ignorer les demandes de permission',
       resume_skip_perms_hint: 'Lance Claude Code avec <code>--dangerously-skip-permissions</code>. À utiliser uniquement dans une worktree, un container ou un sandbox.',
       resume_confirm: 'Reprendre',
-      add_placeholder: 'Session ID, fichier .jsonl, ou dossier projet',
-      add_confirm: 'Ajouter',
       cancel: 'Annuler',
       close: 'Fermer',
 
@@ -138,7 +133,6 @@
       tray_tooltip_waiting: ' ({n} en attente)',
 
       // Sessions list
-      sessions_active_label: 'sessions actives',
       sessions_old_label: 'Anciennes sessions ({n})',
       clear_completed_action: 'Tout effacer',
       clear_completed_title: 'Effacer les anciennes sessions ?',
@@ -172,12 +166,11 @@
       view_micro: 'Micro view',
       micro_back: 'Back',
       pin_title: 'Always on top',
-      add_session: 'Add session',
-      settings_title: 'Settings',
+settings_title: 'Settings',
 
       // Empty states
       empty_title: 'No Claude Code sessions',
-      empty_hint: 'Run <code>claude</code> in a terminal or use the + button',
+      empty_hint: 'Run <code>claude</code> in a terminal — sessions appear here automatically',
       empty_filtered_title: 'No results',
       empty_filtered_hint: 'Try a different search',
       reset: 'Reset',
@@ -192,7 +185,6 @@
       // Card actions
       action_notifications: 'Notifications',
       action_focus_terminal: 'Focus terminal',
-      action_remote: 'Open remote control',
       action_resume: 'Resume session',
       action_delete: 'Delete',
       action_more: 'More options',
@@ -200,16 +192,13 @@
       action_copied: '✓ Copied',
 
       // Modals
-      rename_title: 'Rename session',
-      rename_placeholder: 'Custom name',
-      rename_confirm: 'Rename',
+      action_rename: 'Rename',
+      action_rename_hint: 'Click to rename',
       resume_title: 'Resume session',
       resume_hint: 'Open this session in a new terminal.',
       resume_skip_perms_label: 'Skip permission prompts',
       resume_skip_perms_hint: 'Runs Claude Code with <code>--dangerously-skip-permissions</code>. Use only in a worktree, container or sandbox.',
       resume_confirm: 'Resume',
-      add_placeholder: 'Session ID, .jsonl file, or project folder',
-      add_confirm: 'Add',
       cancel: 'Cancel',
       close: 'Close',
 
@@ -292,7 +281,6 @@
       tray_tooltip_waiting: ' ({n} waiting)',
 
       // Sessions list
-      sessions_active_label: 'active sessions',
       sessions_old_label: 'Old sessions ({n})',
       clear_completed_action: 'Clear all',
       clear_completed_title: 'Clear old sessions?',

@@ -43,7 +43,6 @@ function makeSession(id, overrides = {}) {
     startedAt: new Date().toISOString(),
     endedAt: null,
     tokens: { input: 0, output: 0 },
-    remoteUrl: null,
     terminalApp: null,
     terminalId: null,
     lastEventTime: Date.now(),

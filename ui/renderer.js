@@ -19,6 +19,8 @@ const ICONS = {
   copy: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
   edit: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
   moreVertical: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>`,
+  branch: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>`,
+  wrench: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
 };
 
 const sessions = new Map();
@@ -37,8 +39,6 @@ let draggedId = null;
 const $content = document.getElementById('content');
 const $emptyState = document.getElementById('emptyState');
 const $emptyFiltered = document.getElementById('emptyFiltered');
-const $sessionsHeader = document.getElementById('sessionsHeader');
-const $sessionsHeaderCount = document.getElementById('sessionsHeaderCount');
 const $gridView = document.getElementById('gridView');
 const $compactView = document.getElementById('compactView');
 const $microView = document.getElementById('microView');
@@ -49,11 +49,6 @@ const $btnMicro = document.getElementById('btnMicro');
 const $btnBack = document.getElementById('btnBack');
 const $btnPinMicro = document.getElementById('btnPinMicro');
 const $btnPin = document.getElementById('btnPin');
-const $btnAdd = document.getElementById('btnAdd');
-const $addModal = document.getElementById('addModal');
-const $addInput = document.getElementById('addInput');
-const $addConfirm = document.getElementById('addConfirm');
-const $addCancel = document.getElementById('addCancel');
 const $notificationOverlay = document.getElementById('notificationOverlay');
 const $btnSettings = document.getElementById('btnSettings');
 const $settingsModal = document.getElementById('settingsModal');
@@ -142,9 +137,6 @@ async function init() {
   // Clear search from empty state
   document.getElementById('btnClearAllFilters').addEventListener('click', closeSearch);
   $btnPin.addEventListener('click', togglePin);
-  $btnAdd.addEventListener('click', () => $addModal.style.display = 'flex');
-  $addCancel.addEventListener('click', closeAddModal);
-  $addConfirm.addEventListener('click', confirmAdd);
 
   // Resume modal
   document.getElementById('resumeConfirm').addEventListener('click', confirmResume);
@@ -174,25 +166,6 @@ async function init() {
     if (e.target.id === 'clearCompletedModal') {
       document.getElementById('clearCompletedModal').style.display = 'none';
     }
-  });
-
-  // Rename modal
-  document.getElementById('renameConfirm').addEventListener('click', confirmRename);
-  document.getElementById('renameCancel').addEventListener('click', closeRenameModal);
-  document.getElementById('renameReset').addEventListener('click', resetRename);
-  document.getElementById('renameInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') confirmRename();
-    if (e.key === 'Escape') closeRenameModal();
-  });
-  document.getElementById('renameModal').addEventListener('click', (e) => {
-    if (e.target === document.getElementById('renameModal')) closeRenameModal();
-  });
-  $addInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') confirmAdd();
-    if (e.key === 'Escape') closeAddModal();
-  });
-  $addModal.addEventListener('click', (e) => {
-    if (e.target === $addModal) closeAddModal();
   });
 
   // Settings
@@ -310,15 +283,10 @@ async function init() {
     render();
   });
 
-  // Close context menu on any click
-  document.addEventListener('click', () => hideContextMenu());
-
   // Escape closes whichever modal/dropdown is open. The Cmd-* shortcuts
   // were removed in 1.5.7 — see CHANGELOG.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    closeAddModal();
-    closeRenameModal();
     closeResumeModal();
     const settingsModal = document.getElementById('settingsModal');
     if (settingsModal) settingsModal.style.display = 'none';
@@ -616,8 +584,7 @@ function getRenderableSessions() {
 
 function render() {
   const count = sessions.size;
-  const renderable = getRenderableSessions();
-  const visibleCount = renderable.length;
+  const visibleCount = getRenderableSessions().length;
 
   const showNoSessions = count === 0;
   const showNoResults = count > 0 && visibleCount === 0;
@@ -626,17 +593,8 @@ function render() {
   $emptyState.style.display = showNoSessions ? 'flex' : 'none';
   $emptyFiltered.style.display = showNoResults ? 'flex' : 'none';
   $gridView.style.display = showItems && viewMode === 'grid' ? 'grid' : 'none';
-  $compactView.style.display = showItems && viewMode === 'compact' ? 'flex' : 'none';
+  $compactView.style.display = showItems && viewMode === 'compact' ? 'grid' : 'none';
   $microView.style.display = showItems && viewMode === 'micro' ? 'flex' : 'none';
-
-  // Header showing the active-session count, hidden in micro view (which already
-  // filters completed) and when no session is visible.
-  const activeCount = renderable.filter(s => s.state.name !== 'completed').length;
-  if ($sessionsHeader) {
-    const showHeader = showItems && viewMode !== 'micro' && activeCount > 0;
-    $sessionsHeader.style.display = showHeader ? 'flex' : 'none';
-    if (showHeader) $sessionsHeaderCount.textContent = activeCount;
-  }
 
   // Full rebuild — used for initial load, view switch, add/remove
   fullRender();
@@ -778,29 +736,19 @@ function cardHTML(s) {
     <div class="card" data-state="${stateName}" data-session="${sid}"
          draggable="${stateName !== 'completed' && !searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
-         oncontextmenu="showContextMenu(event, '${sid}')"
-         ondblclick="handleFocus('${sid}')">
+onclick="handleCardClick(event, '${sid}')">
       <div class="card-header">
         <div class="card-title">
-          <div class="project-name">${esc(s.customName || s.projectName)}</div>
-          <div class="session-slug" onclick="handleCopyId('${sid}', '${escAttr(s.slug || '')}', event)" title="${t('action_copy_id')}">
-            ${esc(s.slug || s.sessionId.slice(0, 8))}
-            <span class="copy-icon">${ICONS.copy}</span>
+          <div class="project-name editable-name" onclick="event.stopPropagation(); startInlineRename(event, '${sid}')" title="${t('action_rename_hint')}">
+            <span class="project-name-text">${esc(s.customName || s.projectName)}</span>
+            <span class="edit-hint">${ICONS.edit}</span>
           </div>
         </div>
         <div class="card-actions">
-          ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">${ICONS.globe}</button>` : ''}
-          ${(stateName === 'completed' || stateName === 'error') ? `
-          ${stateName === 'completed' ? `<button class="card-btn" onclick="handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
-          <button class="card-btn" onclick="handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
-          <button class="card-btn notif-btn ${s.notifEnabled ? 'notif-on' : ''}" onclick="toggleNotif(event, '${sid}')" title="${t('action_notifications')}">
+          ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
+          ${(stateName === 'completed' || stateName === 'error') ? `<button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
+          <button class="card-btn notif-btn ${s.notifEnabled ? 'notif-on' : ''}" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">
             ${s.notifEnabled ? ICONS.bell : ICONS.bellOff}
-          </button>
-          <button class="card-btn" onclick="handleFocus('${sid}')" title="${t('action_focus_terminal')}">
-            ${ICONS.terminal}
-          </button>
-          <button class="card-btn" onclick="showContextMenu(event, '${sid}')" title="${t('action_more')}">
-            ${ICONS.moreVertical}
           </button>
         </div>
       </div>
@@ -867,10 +815,6 @@ function compactItemHTML(s) {
   const sid = escAttr(s.sessionId);
   const isActive = stateName === 'running' || stateName === 'thinking';
   const stateLabel = t('state_' + stateName);
-  const duration = stateName === 'completed' && s.endedAt
-    ? formatDuration(s.startedAt, s.endedAt)
-    : formatDuration(s.startedAt);
-  const tokens = formatTokens(s.tokens);
 
   const stateIndicator = isActive
     ? '<span class="compact-spinner"></span>'
@@ -878,46 +822,38 @@ function compactItemHTML(s) {
       ? `<span class="pending-indicator">${ICONS.bellRing}</span>`
       : '<span class="compact-dot"></span>';
 
+  const toolDisplay = isActive && s.lastTool
+    ? toolPill(s.lastTool)
+    : '<span class="compact-card-muted">—</span>';
+
   return `
     <div class="compact-card" data-state="${stateName}" data-session="${sid}"
          draggable="${stateName !== 'completed' && !searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
-         oncontextmenu="showContextMenu(event, '${sid}')"
-         ondblclick="handleFocus('${sid}')">
+onclick="handleCardClick(event, '${sid}')">
       <div class="compact-card-header">
-        <div class="compact-card-title">
-          <div class="project-name">${esc(s.customName || s.projectName)}</div>
-          <div class="session-slug" onclick="handleCopyId('${sid}', '${escAttr(s.slug || '')}', event)" title="${t('action_copy_id')}">
-            ${esc(s.slug || s.sessionId.slice(0, 8))}
-          </div>
+        <div class="compact-card-name editable-name" onclick="event.stopPropagation(); startInlineRename(event, '${sid}')" title="${t('action_rename_hint')}">
+          <span class="project-name-text">${esc(s.customName || s.projectName)}</span>
+          <span class="edit-hint">${ICONS.edit}</span>
         </div>
         <div class="compact-card-actions">
-          ${s.remoteUrl ? `<button class="card-btn remote-active" onclick="event.stopPropagation(); handleOpenRemote('${escAttr(s.remoteUrl)}')" title="${t('action_remote')}">${ICONS.globe}</button>` : ''}
           ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
           ${(stateName === 'completed' || stateName === 'error') ? `<button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
           <button class="card-btn notif-btn ${s.notifEnabled ? 'notif-on' : ''}" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">
             ${s.notifEnabled ? ICONS.bell : ICONS.bellOff}
           </button>
-          <button class="card-btn" onclick="event.stopPropagation(); handleFocus('${sid}')" title="${t('action_focus_terminal')}">
-            ${ICONS.terminal}
-          </button>
-          <button class="card-btn" onclick="event.stopPropagation(); showContextMenu(event, '${sid}')" title="${t('action_more')}">
-            ${ICONS.moreVertical}
-          </button>
         </div>
       </div>
-      <div class="compact-card-meta">
-        <span class="compact-meta-state">${stateIndicator}<span class="compact-meta-state-label">${stateLabel}</span></span>
+      <div class="compact-card-row">
+        <span class="compact-card-state">
+          ${stateIndicator}<span class="compact-card-state-label">${stateLabel}</span>
+        </span>
         <span class="compact-meta-sep">·</span>
-        <span class="compact-meta-item ${stateName !== 'completed' ? 'duration-value' : ''}" ${stateName !== 'completed' ? `data-started="${s.startedAt}"` : ''}>${duration}</span>
-        ${isActive && s.lastTool ? `<span class="compact-meta-sep">·</span>${toolPill(s.lastTool)}` : ''}
-        <span class="compact-meta-sep">·</span>
-        <span class="compact-meta-item">${tokens}</span>
+        <span class="compact-card-tool">${toolDisplay}</span>
       </div>
-      <div class="compact-card-meta-secondary">
-        <span class="compact-meta-item branch-value">${esc(s.gitBranch || '—')}</span>
-        <span class="compact-meta-sep">·</span>
-        <span class="compact-meta-item">${formatModel(s.model)}</span>
+      <div class="compact-card-branch">
+        <span class="compact-card-branch-icon">${ICONS.branch || '⎇'}</span>
+        <span class="branch-value">${esc(s.gitBranch || '—')}</span>
       </div>
     </div>
   `;
@@ -985,48 +921,68 @@ function confirmResume() {
   closeResumeModal();
 }
 
-// ═══ Open remote ═══
+// ═══ Card click — focus terminal (suppressed if user is dragging) ═══
 
-function handleOpenRemote(url) {
-  window.api.openRemote(url);
+function handleCardClick(event, sessionId) {
+  // The handler is attached to the whole card, so any element inside that
+  // wants different behaviour must call event.stopPropagation() first
+  // (handled by the action buttons + the editable name).
+  if (event.defaultPrevented) return;
+  handleFocus(sessionId);
 }
 
-// ═══ Rename session ═══
+// ═══ Inline rename — replaces the project name with an input ═══
 
-let renamingId = null;
-
-function renameSession(sessionId) {
+function startInlineRename(event, sessionId) {
+  if (event && event.stopPropagation) event.stopPropagation();
   const s = sessions.get(sessionId);
   if (!s) return;
-  renamingId = sessionId;
-  const modal = document.getElementById('renameModal');
-  const input = document.getElementById('renameInput');
-  input.value = s.customName || s.projectName;
-  input.placeholder = s.projectName;
-  modal.style.display = 'flex';
-  setTimeout(() => { input.focus(); input.select(); }, 50);
-}
 
-function confirmRename() {
-  if (!renamingId) return;
-  const s = sessions.get(renamingId);
-  const input = document.getElementById('renameInput');
-  const name = input.value.trim();
-  // If empty or matches project name, clear custom name
-  const nameToSet = (!name || (s && name === s.projectName)) ? '' : name;
-  window.api.setCustomName(renamingId, nameToSet);
-  closeRenameModal();
-}
+  // Find the .editable-name container — works for both grid and compact cards.
+  const card = document.querySelector(`[data-session="${sessionId}"] .editable-name`);
+  if (!card || card.classList.contains('renaming')) return;
 
-function resetRename() {
-  if (!renamingId) return;
-  window.api.setCustomName(renamingId, '');
-  closeRenameModal();
-}
+  const currentName = s.customName || s.projectName;
+  const placeholder = s.projectName;
 
-function closeRenameModal() {
-  document.getElementById('renameModal').style.display = 'none';
-  renamingId = null;
+  card.classList.add('renaming');
+  card.innerHTML = `<input class="inline-rename-input" type="text" value="${escAttr(currentName)}" placeholder="${escAttr(placeholder)}" />`;
+  const input = card.querySelector('.inline-rename-input');
+  input.focus();
+  input.select();
+
+  let finished = false;
+  const finish = (commit) => {
+    if (finished) return;
+    finished = true;
+    if (commit) {
+      const value = input.value.trim();
+      const nameToSet = (!value || value === s.projectName) ? '' : value;
+      const current = s.customName || '';
+      if (nameToSet !== current) {
+        window.api.setCustomName(sessionId, nameToSet);
+      }
+    }
+    // The next session-updated render will replace the inline input with
+    // the static span. If no update arrives (no-op rename), restore manually.
+    setTimeout(() => {
+      const stillThere = document.querySelector(`[data-session="${sessionId}"] .editable-name.renaming`);
+      if (stillThere) {
+        const updated = sessions.get(sessionId);
+        const display = updated ? (updated.customName || updated.projectName) : currentName;
+        stillThere.classList.remove('renaming');
+        stillThere.innerHTML = `<span class="project-name-text">${esc(display)}</span><span class="edit-hint">${ICONS.edit}</span>`;
+      }
+    }, 100);
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  // Prevent the card click from firing when interacting with the input.
+  input.addEventListener('click', (e) => e.stopPropagation());
 }
 
 // ═══ Copy session ID ═══
@@ -1214,33 +1170,6 @@ async function playNotificationSound(kind) {
     await audio.play();
   } catch (e) {
     console.error('Audio error:', e);
-  }
-}
-
-// ═══ Add session modal ═══
-
-function closeAddModal() {
-  $addModal.style.display = 'none';
-  $addInput.value = '';
-}
-
-async function confirmAdd() {
-  const value = $addInput.value.trim();
-  if (!value) return;
-
-  // If it looks like a directory path, launch a new session there
-  if (!value.endsWith('.jsonl') && !value.match(/^[a-f0-9-]{36}$/i) && value.startsWith('/')) {
-    window.api.launchSession(value);
-    closeAddModal();
-    return;
-  }
-
-  const success = await window.api.addSession(value);
-  if (success) {
-    closeAddModal();
-  } else {
-    $addInput.style.borderColor = '#ef4444';
-    setTimeout(() => $addInput.style.borderColor = '', 1500);
   }
 }
 
@@ -1483,44 +1412,6 @@ function handleUsageError(code) {
   fallback.style.display = '';
   fallback.title = t('usage_unavailable', { code });
   updateStatusBar();
-}
-
-// ═══ Context menu ═══
-
-function showContextMenu(e, sessionId) {
-  e.preventDefault();
-  e.stopPropagation();
-  const s = sessions.get(sessionId);
-  if (!s) return;
-  const sid = escAttr(sessionId);
-  const menu = document.getElementById('contextMenu');
-  const stateName = s.state.name;
-
-  let items = `
-    <div class="context-menu-item" onclick="handleFocus('${sid}'); hideContextMenu();">${ICONS.terminal} ${t('action_focus_terminal')}</div>
-    <div class="context-menu-item" onclick="renameSession('${sid}'); hideContextMenu();">${ICONS.edit} ${t('rename_confirm')}</div>
-  `;
-  if (s.remoteUrl) {
-    items += `<div class="context-menu-item" onclick="handleOpenRemote('${escAttr(s.remoteUrl)}'); hideContextMenu();">${ICONS.globe} ${t('action_remote')}</div>`;
-  }
-  items += `<div class="context-menu-sep"></div>`;
-  if (stateName === 'completed') {
-    items += `
-      <div class="context-menu-item" onclick="handleResume('${sid}'); hideContextMenu();">${ICONS.play} ${t('action_resume')}</div>
-      <div class="context-menu-item" onclick="handleRemove('${sid}'); hideContextMenu();">${ICONS.x} ${t('action_delete')}</div>
-    `;
-  } else if (stateName === 'error') {
-    items += `<div class="context-menu-item" onclick="handleRemove('${sid}'); hideContextMenu();">${ICONS.x} ${t('action_delete')}</div>`;
-  }
-
-  menu.innerHTML = items;
-  menu.style.display = 'block';
-  menu.style.left = `${Math.min(e.clientX, window.innerWidth - 200)}px`;
-  menu.style.top = `${Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 10)}px`;
-}
-
-function hideContextMenu() {
-  document.getElementById('contextMenu').style.display = 'none';
 }
 
 // ═══ Start ═══

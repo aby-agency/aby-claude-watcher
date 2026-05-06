@@ -4,6 +4,71 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.9] — 2026-05-06
+
+This is a UX-driven cleanup release. The cards lost about half their
+controls and the codebase about 200 net lines, while the experience
+becomes more direct: one click on a card opens its terminal, one click
+on the name renames it inline, no context menus, no "+" to add sessions
+manually, no remote-control bouton.
+
+### Removed
+- **Remote-control feature** — `session.remoteUrl`, the globe button on
+  cards, the context-menu entry, and the watcher's `bridge_status` event
+  detection are gone. The internal `open-remote` IPC stays as the
+  underlying transport for `openExternalUrl` (still used for the GitHub
+  link in About).
+- **Manual "Add session" `+` button** — the toolbar action and its modal,
+  along with the `add-session` / `launch-session` IPC, the
+  `watcher.addSession()` method, and `focus.launchSession()`. Sessions
+  are auto-detected; the empty state now reads "Lancez `claude` dans un
+  terminal — les sessions apparaissent ici automatiquement".
+- **Rename modal** — replaced by inline rename (see Added).
+- **Right-click context menu** — `showContextMenu` / `hideContextMenu`,
+  the `<div class="context-menu">` placeholder, the `oncontextmenu`
+  attribute on cards, and the global click listener that hid the menu.
+  Every action that lived there is now reachable directly: focus
+  terminal = click on the card, rename = click on the name, resume /
+  delete = the existing buttons on completed/error cards.
+- **Terminal `>_` button and "more" `⋯` button** on macro and compact
+  cards. Card click handles focus.
+- **`X sessions actives` header** above the list (was a 1.5.7 add).
+- **Session slug** display on cards (the small grey hex string under the
+  name). `handleCopyId` is left as dead code for now.
+- **Pointer cursor** on hover of `.card` / `.compact-card` (it implied
+  reorder), and the `cursor: grab` on draggable cards. `cursor: grabbing`
+  is kept while a drag is actively happening.
+
+### Added
+- **Inline rename** — hover the project name and a pencil icon fades in;
+  click to convert the span into an `<input>` in place. Enter saves,
+  Esc cancels, blur saves. Skips the IPC roundtrip if the value didn't
+  change.
+- **Multi-window VS Code / Cursor focus** — the editor case in `focus.js`
+  was rewritten around `open -a "<App>" "<cwd>"`. macOS LaunchServices
+  routes the call to the window that already has that workspace open, so
+  clicking a card reliably brings the right Code/Cursor window forward
+  even when several windows are open. **Crucially, this needs no
+  Accessibility nor Automation permission**, which the previous
+  `System Events` / `AXRaise` approach did, and which broke during
+  `npm run dev` because the dev Electron binary wasn't authorised.
+- **`detectTerminalFromPid` reads `ps -o command=`** in addition to
+  `comm=`. The truncated `comm=` is just `Electron` for both Code and
+  Cursor main processes; the full command path
+  (`/Applications/Visual Studio Code.app/...`) reliably distinguishes
+  them.
+
+### Changed
+- **Compact view layout** is now 3 lines: `name + actions` / `état ·
+  outil` / `branch`. The branch line wraps freely when the name is long
+  (no more ellipsis cutting it off — there's room on its own line).
+- **Status bar typography unified** — every label, percentage, reset
+  countdown and clock icon now inherits the bar's `10 px / text-muted`,
+  matching the `5h` / `7D` labels. One source of truth in `.status-bar`.
+- **Card click = focus terminal** (single click) on macro and compact
+  cards, matching the existing micro behaviour. Buttons inside the card
+  call `event.stopPropagation()` so they keep their own actions.
+
 ## [1.5.8] — 2026-05-06
 
 ### Changed

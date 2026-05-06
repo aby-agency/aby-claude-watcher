@@ -601,34 +601,71 @@ body.micro-mode .usage-reset-icon {
   text-overflow: ellipsis;
 }
 
-.session-slug {
+/* Cards are clickable (focus terminal), but we deliberately don't show a
+   pointer cursor — it reads "reorder me" and clashes with the drag affordance.
+   The hover border-light shift + the editable name's pencil hint are enough
+   signal that something interactive is happening. */
+
+/* Editable name — only the text+pencil region is hoverable/clickable; the
+   surrounding card area stays neutral so the hover highlight reads as
+   "click here to rename" rather than "the whole row is interactive". */
+.editable-name {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px 4px;
-  margin-left: -4px;
+  gap: 6px;
+  cursor: text;
   border-radius: var(--radius-sm);
-  transition: all var(--transition);
+  padding: 2px 6px;
+  margin: -2px -6px;
+  transition: background var(--transition);
+  min-width: 0;
+  max-width: 100%;
   width: fit-content;
+  align-self: flex-start;
 }
 
-.session-slug:hover {
+.editable-name:hover {
   background: var(--bg-tertiary);
-  color: var(--text-secondary);
 }
 
-.session-slug .copy-icon {
-  opacity: 0;
-  transition: opacity var(--transition);
+.editable-name .project-name-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.editable-name .edit-hint {
   display: inline-flex;
+  opacity: 0;
+  color: var(--text-muted);
+  transition: opacity var(--transition);
+  flex-shrink: 0;
 }
 
-.session-slug:hover .copy-icon {
-  opacity: 1;
+.editable-name:hover .edit-hint {
+  opacity: 0.7;
+}
+
+.editable-name.renaming {
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.inline-rename-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--state-running);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  outline: none;
+  cursor: text;
 }
 
 .card-actions {
@@ -828,11 +865,9 @@ body.micro-mode .usage-reset-icon {
 
 /* ═══ Drag & Drop ═══ */
 
-.card[draggable="true"],
-.compact-card[draggable="true"] {
-  cursor: grab;
-}
-
+/* No grab cursor on hover — it suggests "reorder" and obscures that the
+   card is primarily click-to-focus. Show grabbing only while actively
+   dragging so the user gets feedback once they commit to the drag. */
 .card[draggable="true"]:active,
 .compact-card[draggable="true"]:active {
   cursor: grabbing;
@@ -851,11 +886,14 @@ body.micro-mode .usage-reset-icon {
   color: var(--text-muted);
 }
 
-/* ═══ Compact view — mini cards (denser than grid, richer than micro) ═══ */
+/* ═══ Compact view — 3-line mini cards
+   Line 1: name + actions inline
+   Line 2: state · tool
+   Line 3: branch                                                    ═══ */
 
 .compact-view {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 8px;
 }
 
@@ -867,6 +905,9 @@ body.micro-mode .usage-reset-icon {
   padding: 10px 12px;
   cursor: pointer;
   transition: border-color var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   overflow: hidden;
 }
 
@@ -887,42 +928,26 @@ body.micro-mode .usage-reset-icon {
 
 .compact-card-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 6px;
-}
-
-.compact-card-title {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
   min-width: 0;
-  flex: 1;
 }
 
-.compact-card .project-name {
+.compact-card-name {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   line-height: 1.3;
+  min-width: 0;
 }
 
-.compact-card .session-slug {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
+.compact-card-name .project-name-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
-}
-
-.compact-card .session-slug:hover {
-  color: var(--text-secondary);
+  display: inline-block;
+  max-width: 100%;
 }
 
 .compact-card-actions {
@@ -931,22 +956,32 @@ body.micro-mode .usage-reset-icon {
   flex-shrink: 0;
 }
 
-.compact-card-meta,
-.compact-card-meta-secondary {
+.compact-card-row {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-secondary);
-  line-height: 1.5;
+  min-width: 0;
 }
 
-.compact-card-meta-secondary {
-  margin-top: 2px;
+.compact-card-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.compact-card-state-label {
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
   font-size: 10px;
-  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.compact-card-tool {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  min-width: 0;
 }
 
 .compact-meta-sep {
@@ -954,31 +989,30 @@ body.micro-mode .usage-reset-icon {
   opacity: 0.5;
 }
 
-.compact-meta-state {
+.compact-card-muted {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.compact-card-branch {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  min-width: 0;
 }
 
-.compact-meta-state-label {
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  font-size: 10px;
-  font-weight: 600;
+.compact-card-branch-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
-.compact-card-meta .compact-meta-item.branch-value {
-  max-width: 110px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.compact-card-meta-secondary .branch-value {
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.compact-card-branch .branch-value {
+  min-width: 0;
+  word-break: break-word;
 }
 
 /* Indicator dot/spinner inherited shape — colour comes from data-state */
@@ -1312,11 +1346,15 @@ body.micro-mode .usage-reset-icon {
 .update-banner {
   position: fixed;
   bottom: 44px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 12px;
+  right: 12px;
+  margin: 0 auto;
+  width: fit-content;
+  max-width: calc(100vw - 24px);
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   padding: 12px 16px 12px 20px;
   background: var(--bg-secondary);
   border: 1px solid var(--state-running);
@@ -1329,13 +1367,14 @@ body.micro-mode .usage-reset-icon {
 }
 
 .update-banner-text {
-  min-width: 220px;
+  flex: 1 1 160px;
+  min-width: 0;
   line-height: 1.4;
 }
 
 @keyframes slideUp {
-  from { transform: translate(-50%, 20px); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 .update-banner-btn {
@@ -1501,29 +1540,6 @@ body.micro-mode .usage-reset-icon {
   background: var(--bg-tertiary);
   padding: 1px 5px;
   border-radius: 3px;
-}
-
-/* Sessions header — count of active sessions above the list */
-.sessions-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px 4px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.sessions-header-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--state-running);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
-}
-
-.sessions-header-count {
-  font-weight: 600;
-  color: var(--text-primary);
 }
 
 /* Divider between active and completed sessions */
@@ -2008,7 +2024,9 @@ body.micro-mode .usage-reset-icon {
 .position-indicator[data-pos="bottom-left"] { bottom: 6px; left: 6px; }
 .position-indicator[data-pos="bottom-right"] { bottom: 6px; right: 6px; }
 
-/* Status bar */
+/* Status bar — every label / number / icon shares one type style.
+   Single source of truth so a tweak (colour, size, spacing) propagates
+   to all atoms automatically. */
 .status-bar {
   display: flex;
   align-items: center;
@@ -2017,7 +2035,7 @@ body.micro-mode .usage-reset-icon {
   padding: 6px 16px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
-  font-size: 11px;
+  font-size: 10px;
   font-family: var(--font-mono);
   color: var(--text-muted);
   position: fixed;
@@ -2038,9 +2056,14 @@ body.micro-mode .usage-reset-icon {
   min-width: 0;
 }
 
-.usage-label {
-  font-size: 10px;
+.usage-label,
+.usage-pct,
+.usage-reset {
+  font-size: inherit;
   color: var(--text-muted);
+}
+
+.usage-label {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -2065,8 +2088,6 @@ body.micro-mode .usage-reset-icon {
 .usage-bar-fill.danger { background: var(--state-error); }
 
 .usage-pct {
-  font-size: 11px;
-  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   min-width: 32px;
 }
@@ -2075,12 +2096,10 @@ body.micro-mode .usage-reset-icon {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  color: var(--text-primary);
 }
 
 .usage-reset-icon {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 

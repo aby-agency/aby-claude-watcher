@@ -1383,17 +1383,19 @@ function renderUsage(data) {
   set('usageBar5h', 'usagePct5h', data.fiveHour);
   set('usageBar7d', 'usagePct7d', data.sevenDay);
 
-  const reset = document.getElementById('usageReset');
-  if (reset) {
-    const next = data.fiveHour && data.fiveHour.resetsAt;
-    const txt = reset.querySelector('.usage-reset-text');
+  const renderReset = (el, win) => {
+    if (!el) return;
+    const next = win && win.resetsAt;
+    const txt = el.querySelector('.usage-reset-text');
     if (next) {
-      reset.style.display = '';
+      el.style.display = '';
       if (txt) txt.textContent = formatResetTime(next);
     } else {
-      reset.style.display = 'none';
+      el.style.display = 'none';
     }
-  }
+  };
+  renderReset(document.getElementById('usageReset'), data.fiveHour);
+  renderReset(document.getElementById('usageReset7d'), data.sevenDay);
   group.title = formatUsageTooltip(data);
 }
 

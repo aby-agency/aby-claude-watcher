@@ -4,6 +4,13 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] — 2026-05-06
+
+### Added
+- **7-day window reset countdown** in the status bar — the 5-hour bar already
+  showed the time-until-reset; the 7-day bar now does too. Same visual
+  treatment (clock icon + relative time like `2h30` or `3 days`).
+
 ## [1.5.4] — 2026-05-06
 
 ### Fixed

@@ -164,7 +164,12 @@ class SessionWatcher extends EventEmitter {
           if (trackedId) {
             if (!this._isSidStale(trackedId, cwd)) {
               effectiveId = trackedId;
+            } else if (sessionId !== trackedId) {
+              // trackedId is stale and session.json reports a different sid —
+              // trust session.json (e.g., after /clear created a new JSONL).
+              effectiveId = sessionId;
             } else {
+              // session.json is lagged on the same stale sid: scan unclaimed JSONLs.
               const fresh = this._findFreshUnclaimedJsonl(cwd, liveSessionIds, claimedJsonls);
               effectiveId = fresh || trackedId;
             }

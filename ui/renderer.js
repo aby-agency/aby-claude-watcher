@@ -31,7 +31,6 @@ let autoLaunch = false;
 let searchQuery = '';
 let sessionOrder = []; // User-defined order of session IDs
 let draggedId = null;
-let activeFilters = new Set(); // empty = all visible, or: 'active', 'waiting', 'completed'
 
 // ═══ DOM refs ═══
 
@@ -138,37 +137,8 @@ async function init() {
   $btnBack.addEventListener('click', () => setView(previousViewMode || 'grid'));
   $btnPinMicro.addEventListener('click', togglePin);
 
-  // Status filter chips (multi-select)
-  document.querySelectorAll('.status-filter .filter-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const filter = chip.dataset.filter;
-      if (activeFilters.has(filter)) {
-        activeFilters.delete(filter);
-      } else {
-        activeFilters.add(filter);
-      }
-      updateFilterPills();
-      render();
-    });
-  });
-
-  // Clear filters button
-  document.getElementById('btnClearFilters').addEventListener('click', () => {
-    activeFilters.clear();
-    updateFilterPills();
-    render();
-  });
-
-  // Clear all (filters + search) from empty state
-  document.getElementById('btnClearAllFilters').addEventListener('click', () => {
-    activeFilters.clear();
-    searchQuery = '';
-    const search = document.getElementById('searchInput');
-    search.value = '';
-    search.style.display = 'none';
-    updateFilterPills();
-    render();
-  });
+  // Clear search from empty state
+  document.getElementById('btnClearAllFilters').addEventListener('click', closeSearch);
   $btnPin.addEventListener('click', togglePin);
   $btnAdd.addEventListener('click', () => $addModal.style.display = 'flex');
   $addCancel.addEventListener('click', closeAddModal);
@@ -320,10 +290,7 @@ async function init() {
         search.style.display = 'block';
         search.focus();
       } else {
-        search.style.display = 'none';
-        search.value = '';
-        searchQuery = '';
-        render();
+        closeSearch();
       }
     }
 
@@ -393,14 +360,14 @@ function updatePinButton() {
   $btnPin.classList.toggle('active', alwaysOnTop);
 }
 
-
-function updateFilterPills() {
-  document.querySelectorAll('.status-filter .filter-chip').forEach(p => {
-    p.classList.toggle('active', activeFilters.has(p.dataset.filter));
-  });
-  const clearBtn = document.getElementById('btnClearFilters');
-  clearBtn.style.display = activeFilters.size > 0 ? 'inline-flex' : 'none';
+function closeSearch() {
+  const search = document.getElementById('searchInput');
+  search.style.display = 'none';
+  search.value = '';
+  searchQuery = '';
+  render();
 }
+
 
 function updateNotifPosition() {
   $notificationOverlay.setAttribute('data-position', notifPosition);
@@ -576,7 +543,6 @@ function getRenderableSessions() {
 
 function render() {
   const count = sessions.size;
-  const filtersActive = activeFilters.size > 0 || searchQuery;
   const visibleCount = getRenderableSessions().length;
 
   const showNoSessions = count === 0;
@@ -671,18 +637,6 @@ function getSortedSessions() {
       (s.gitBranch || '').toLowerCase().includes(searchQuery)
     );
   }
-
-  // Filter by active filter pills (multi-select, OR logic)
-  if (activeFilters.size > 0) {
-    arr = arr.filter(s => {
-      const name = s.state.name;
-      if (activeFilters.has('active') && (name === 'running' || name === 'thinking')) return true;
-      if (activeFilters.has('waiting') && (name === 'waiting' || name === 'pending')) return true;
-      if (activeFilters.has('completed') && name === 'completed') return true;
-      return false;
-    });
-  }
-
 
   // Separate completed from active
   const active = arr.filter(s => s.state.name !== 'completed');
@@ -1305,11 +1259,8 @@ function updateStatusBar() {
   const totalInput = all.reduce((sum, s) => sum + (s.tokens?.input || 0), 0);
   const totalOutput = all.reduce((sum, s) => sum + (s.tokens?.output || 0), 0);
 
-  const filtersActive = activeFilters.size > 0 || searchQuery;
-  const visibleCount = filtersActive ? getSortedSessions().length : all.length;
-
-  const activeLabel = filtersActive
-    ? t('status_filtered', { visible: visibleCount, total: all.length })
+  const activeLabel = searchQuery
+    ? t('status_filtered', { visible: getSortedSessions().length, total: all.length })
     : t('status_active', { n: active.length });
 
   document.getElementById('statActive').textContent = activeLabel;

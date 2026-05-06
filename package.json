@@ -1,6 +1,6 @@
 {
   "name": "aby-claude-watcher",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Aby Claude Watcher — dashboard desktop pour monitorer en temps réel vos sessions Claude Code",
   "main": "main.js",
   "scripts": {

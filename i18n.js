@@ -12,11 +12,6 @@
       state_completed: 'Terminé',
 
       // Toolbar tooltips
-      filter_all: 'Tout',
-      filter_active: 'Actives',
-      filter_waiting: 'En attente',
-      filter_completed: 'Terminées',
-      filter_clear: 'Tout afficher',
       search_placeholder: 'Rechercher...',
       view_grid: 'Vue grille',
       view_compact: 'Vue compacte',
@@ -31,7 +26,7 @@
       empty_title: 'Aucune session Claude Code',
       empty_hint: 'Lancez <code>claude</code> dans un terminal ou utilisez le bouton +',
       empty_filtered_title: 'Aucun résultat',
-      empty_filtered_hint: 'Essayez de modifier vos filtres ou votre recherche',
+      empty_filtered_hint: 'Essayez une autre recherche',
       reset: 'Réinitialiser',
 
       // Card details
@@ -157,11 +152,6 @@
       state_completed: 'Completed',
 
       // Toolbar tooltips
-      filter_all: 'All',
-      filter_active: 'Active',
-      filter_waiting: 'Waiting',
-      filter_completed: 'Completed',
-      filter_clear: 'Show all',
       search_placeholder: 'Search...',
       view_grid: 'Grid view',
       view_compact: 'Compact view',
@@ -176,7 +166,7 @@
       empty_title: 'No Claude Code sessions',
       empty_hint: 'Run <code>claude</code> in a terminal or use the + button',
       empty_filtered_title: 'No results',
-      empty_filtered_hint: 'Try adjusting your filters or search',
+      empty_filtered_hint: 'Try a different search',
       reset: 'Reset',
 
       // Card details

@@ -337,6 +337,28 @@ test('scan: lagged session.json + fresh /clear jsonl → migrate tracked id once
   if (events.length !== 0) throw new Error(`expected sticky no-op, got ${JSON.stringify(events)}`);
 });
 
+test('scan: updated session.json + fresh /clear jsonl → migrate even when new sid in liveSessionIds', () => {
+  // Single Claude, post-/clear. session.json was updated to NEW-id. On disk:
+  // OLD.jsonl is stale, NEW.jsonl is fresh. Tracked: OLD-id (config-restored or
+  // pre-/clear state). Regression: previously, _findFreshUnclaimedJsonl excluded
+  // NEW-id because it appears in liveSessionIds, so migration silently failed
+  // and the card stayed stuck on OLD-id. Expected: migrate OLD → NEW.
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/proj-clear';
+  const now = Date.now();
+  writeSessionJson(tree.sessions, 9101, 'NEW-id', cwd);
+  writeJsonl(tree.projects, cwd, 'OLD-id', now - 60000);  // stale (tracked)
+  writeJsonl(tree.projects, cwd, 'NEW-id', now - 1000);   // fresh (Claude is here now)
+
+  const w = freshScanWatcher(tree.root);
+  w.sessions.set('OLD-id', makeSession('OLD-id', { pid: 9101, cwd, state: STATES.WAITING }));
+
+  w.scan();
+
+  if (w.sessions.has('OLD-id')) throw new Error('OLD-id must be migrated away');
+  if (!w.sessions.has('NEW-id')) throw new Error('NEW-id must be tracked');
+});
+
 test('scan: oscillation regression — two Claudes alternating writes, no flap after first attribution', () => {
   // Two Claudes in same cwd. Both /clear'd (both session.json sids stale).
   // Both wrote fresh post-/clear JSONLs. First scan attributes each pid to its

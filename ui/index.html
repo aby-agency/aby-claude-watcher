@@ -26,28 +26,6 @@
 
   <!-- Toolbar -->
   <div class="toolbar">
-    <div class="filter-chips status-filter">
-      <button class="filter-chip" data-filter="active" data-i18n-title="filter_active" title="Active">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-        </svg>
-      </button>
-      <button class="filter-chip" data-filter="waiting" data-i18n-title="filter_waiting" title="Waiting">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-      </button>
-      <button class="filter-chip" data-filter="completed" data-i18n-title="filter_completed" title="Completed">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 6 9 17l-5-5"/>
-        </svg>
-      </button>
-      <button class="filter-clear" id="btnClearFilters" data-i18n-title="filter_clear" title="Show all" style="display:none;">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
-        </svg>
-      </button>
-    </div>
     <input type="text" class="search-input" id="searchInput" data-i18n-placeholder="search_placeholder" placeholder="Search..." style="display:none;">
 
     <div class="toolbar-spacer"></div>
@@ -113,7 +91,7 @@
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
       <p data-i18n="empty_filtered_title">No results</p>
-      <p class="hint" data-i18n="empty_filtered_hint">Try adjusting your filters or search</p>
+      <p class="hint" data-i18n="empty_filtered_hint">Try a different search</p>
       <button class="empty-action" id="btnClearAllFilters" data-i18n="reset">Reset</button>
     </div>
     <div class="grid-view" id="gridView" style="display:none;"></div>

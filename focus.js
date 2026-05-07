@@ -136,7 +136,7 @@ function focusMac(terminalApp, terminalId, pid, cwd) {
   if (app === 'wezterm') return runAppleScript(`tell application "WezTerm" to activate`);
   if (app === 'alacritty') return runAppleScript(`tell application "Alacritty" to activate`);
   if (app === 'kitty') return runAppleScript(`tell application "kitty" to activate`);
-  if (app === 'ghostty') return runAppleScript(`tell application "Ghostty" to activate`);
+  if (app === 'ghostty') return focusGhosttyWindow(cwd);
   if (app === 'hyper') return runAppleScript(`tell application "Hyper" to activate`);
   if (app === 'terminal' || app.includes('apple_terminal')) return focusTerminalApp(pid, cwd);
 
@@ -274,6 +274,42 @@ function focusTerminalApp(pid, cwd) {
   }
 
   return runAppleScript(`tell application "Terminal" to activate`);
+}
+
+// Ghostty's AppleScript dictionary only exposes `activate` — no window/tab/
+// session objects. Splits within a window are not addressable via AX either.
+// Best we can do: bring Ghostty to front, then via System Events UI scripting
+// raise the window whose title contains the cwd basename (Ghostty inherits
+// the title from the shell's OSC sequences, which by default carry the cwd).
+//
+// Limitation: if multiple splits in the same window run different projects,
+// only the focused split's project shows up in the window title. We can only
+// target window-level here.
+function focusGhosttyWindow(cwd) {
+  const activate = () => runAppleScript(`tell application "Ghostty" to activate`);
+  if (!cwd) return activate();
+  const basename = path.basename(cwd);
+  if (!basename || /[;&|`$(){}!<>"\\\n\r]/.test(basename)) return activate();
+  const safe = escapeForAppleScript(basename);
+  const script = `
+    tell application "Ghostty" to activate
+    delay 0.05
+    tell application "System Events"
+      if not (exists process "ghostty") then return
+      tell process "ghostty"
+        repeat with w in windows
+          if name of w contains "${safe}" then
+            perform action "AXRaise" of w
+            return
+          end if
+        end repeat
+      end tell
+    end tell
+  `;
+  return runAppleScript(script).catch((err) => {
+    dlog('ghostty UI scripting failed:', err.message);
+    return activate();
+  });
 }
 
 function focusWindows(pid, cwd) {

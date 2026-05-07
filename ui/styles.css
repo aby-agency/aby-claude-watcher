@@ -186,16 +186,25 @@ body {
   color: var(--text-primary);
 }
 
-.micro-bell-flash {
+/* Notification bell flash — overlay used in grid, compact AND micro views
+   to mark a session that has just emitted a notification. Injected by
+   applyBellVisual() in renderer.js, lives 2 minutes or until state changes. */
+.bell-flash {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transform-origin: 50% 15%;
-  animation: micro-bell-in 0.4s ease-out, pending-wiggle 1.8s ease-in-out 0.4s infinite;
+  animation: bell-in 0.4s ease-out, pending-wiggle 1.8s ease-in-out 0.4s infinite;
 }
 
-@keyframes micro-bell-in {
+/* Grid badge has more room than compact/micro — bump the icon up a notch. */
+.state-badge .bell-flash svg {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes bell-in {
   0% { transform: scale(0); opacity: 0; }
   60% { transform: scale(1.3); opacity: 1; }
   100% { transform: scale(1); }
@@ -1015,7 +1024,19 @@ body.micro-mode .usage-reset-icon {
   word-break: break-word;
 }
 
-/* Indicator dot/spinner inherited shape — colour comes from data-state */
+/* Fixed-size slot for the leading indicator: dot, pending bell or bell-flash
+   all live inside this container, so swapping between them never shifts the
+   label sideways. */
+.compact-state-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Indicator dot — colour comes from data-state. */
 .compact-dot {
   width: 8px;
   height: 8px;
@@ -1109,92 +1130,99 @@ body.micro-mode .usage-reset-icon {
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* Banner-style toast — single clickable line. Color follows the kind:
+   waiting = blue, pending = orange. The whole toast is the click target. */
 .notification-toast {
+  --toast-color: var(--state-waiting);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   pointer-events: all;
+  cursor: pointer;
   animation: slideIn 0.3s ease-out;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   position: relative;
   min-width: 280px;
+  font-size: 12px;
+  transition: background var(--transition), transform var(--transition);
 }
 
-.notification-toast .toast-content {
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.notification-toast:hover {
+  background: var(--bg-tertiary);
+  transform: translateX(-2px);
 }
 
-.notification-toast .toast-header {
-  display: flex;
+.notification-toast[data-kind="pending"] {
+  --toast-color: var(--state-pending);
+}
+
+.notification-toast .toast-bell {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--toast-color);
+  transform-origin: 50% 15%;
+  animation: pending-wiggle 1.8s ease-in-out infinite;
 }
 
-.notification-toast .toast-header strong {
-  font-size: 13px;
+.notification-toast .toast-name {
+  font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }
 
+.notification-toast .toast-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.notification-toast .toast-state {
+  color: var(--toast-color);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+/* Discrete close button — pushed to the right via auto margin so it sits
+   away from the content. Hover reveals it more clearly. */
 .notification-toast .toast-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
   border-radius: var(--radius-sm);
+  opacity: 0.5;
   transition: all var(--transition);
-  flex-shrink: 0;
 }
 
 .notification-toast .toast-close:hover {
-  background: var(--bg-tertiary);
+  opacity: 1;
+  background: var(--bg-primary);
   color: var(--text-primary);
 }
 
-.notification-toast .toast-body {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.notification-toast .toast-slug {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-}
-
-.notification-toast .toast-actions {
-  display: flex;
-}
-
-.notification-toast .toast-focus-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 12px;
-  font-family: var(--font-sans);
-  transition: all var(--transition);
-  width: 100%;
-  justify-content: center;
-}
-
-.notification-toast .toast-focus-btn:hover {
-  background: var(--border);
+.notification-toast .toast-close svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* Timer bar — shrinks from right to left over TOAST_DURATION */
@@ -1203,7 +1231,8 @@ body.micro-mode .usage-reset-icon {
   bottom: 0;
   left: 0;
   height: 2px;
-  background: var(--state-waiting);
+  background: var(--toast-color);
+  opacity: 0.6;
   width: 100%;
   animation: timerShrink linear forwards;
 }
@@ -1976,6 +2005,43 @@ body.micro-mode .usage-reset-icon {
 .language-btn.active {
   background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+/* Sound theme picker */
+.sound-theme-picker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sound-theme-btn {
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.sound-theme-btn:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-light);
+}
+
+.sound-theme-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+/* Compact icon-only test button used inline in toggle rows */
+#btnTestSoundTheme {
+  padding: 6px 8px;
+  margin-top: 0;
+  align-self: center;
 }
 
 /* Notification position picker */

@@ -17,6 +17,7 @@ let config = {
   autoLaunch: false,
   language: null,       // 'fr' | 'en' | null (auto-detect)
   volume: 0.7,          // 0.0 - 1.0
+  soundTheme: 'default',     // 'default' | 'vibraphone' | 'wood' | 'soft'
   windowBounds: null,        // { x, y, width, height } — grid & compact share this
   microWindowBounds: null,   // separate bounds remembered for micro view
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
@@ -98,6 +99,12 @@ function setAutoLaunch(value) {
 
 function setLanguage(lang) {
   config.language = (lang === 'fr' || lang === 'en') ? lang : null;
+  save();
+}
+
+function setSoundTheme(theme) {
+  const allowed = ['default', 'vibraphone', 'wood', 'soft'];
+  config.soundTheme = allowed.includes(theme) ? theme : 'default';
   save();
 }
 
@@ -190,6 +197,7 @@ module.exports = {
   setNotifPosition,
   setAutoLaunch,
   setLanguage,
+  setSoundTheme,
   getNotificationPrefs,
   setNotificationPrefs,
   setCustomName,

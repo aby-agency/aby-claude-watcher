@@ -181,6 +181,26 @@
         <!-- Notifications tab -->
         <div class="settings-panel" data-panel="notifications" style="display:none;">
           <div class="settings-section">
+            <div class="settings-toggle-row">
+              <div>
+                <div class="settings-label" data-i18n="sound_theme_label">Sound theme</div>
+                <div class="settings-hint" data-i18n="sound_theme_hint">Notification sound style</div>
+              </div>
+              <button class="settings-test-btn" id="btnTestSoundTheme" data-i18n-title="test_sound" title="Test sound">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+              </button>
+            </div>
+            <div class="sound-theme-picker">
+              <button class="sound-theme-btn" data-theme="default" data-i18n="sound_theme_default">Default</button>
+              <button class="sound-theme-btn" data-theme="vibraphone" data-i18n="sound_theme_vibraphone">Vibraphone</button>
+              <button class="sound-theme-btn" data-theme="wood" data-i18n="sound_theme_wood">Wood</button>
+              <button class="sound-theme-btn" data-theme="soft" data-i18n="sound_theme_soft">Soft</button>
+            </div>
+          </div>
+
+          <div class="settings-section">
             <div class="settings-label" data-i18n="volume_label">Volume</div>
             <div class="settings-row">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -913,17 +913,23 @@ class SessionWatcher extends EventEmitter {
   // Defer the pending transition by ~1s. If Claude writes any JSONL event
   // in that window (auto-approved tool, immediate continuation, …), we cancel.
   // Real permission prompts idle for seconds, so they comfortably survive.
-  markPending(sessionId, hookEvent) {
+  markPending(sessionId, hookEvent, toolName) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     if (session.state.name === 'pending') return;
     if (this.pendingTimers.has(sessionId)) return; // already scheduled
 
-    // In bypassPermissions mode, hooks fire but never actually block on the
-    // user — Claude auto-approves and proceeds. The real interactive tools
-    // (AskUserQuestion, ExitPlanMode) are handled by the JSONL tool-sniff
-    // path instead, so we can safely ignore all hooks for bypass sessions.
-    if (session.permissionMode === 'bypassPermissions') return;
+    // bypassPermissions skips most hooks (Claude auto-approves and proceeds)
+    // — EXCEPT for hooks that signal a genuine user-blocking interaction:
+    //   - PreToolUse for AskUserQuestion / ExitPlanMode (always blocks the user)
+    //   - Notification in bypass mode (no permission_prompt would fire here, so
+    //     it's idle_prompt or an MCP elicitation_dialog — both block the user)
+    const INTERACTIVE_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
+    const isInteractiveTool = hookEvent === 'PreToolUse' && INTERACTIVE_TOOLS.has(toolName);
+    const isNotification = hookEvent === 'Notification';
+    if (session.permissionMode === 'bypassPermissions' && !isInteractiveTool && !isNotification) {
+      return;
+    }
 
     const lastEvent = session.lastEventTime || 0;
     if (Date.now() - lastEvent < 1000) return; // Claude is actively writing — ignore

@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('api', {
   removeSession: (sessionId) => ipcRenderer.invoke('remove-session', sessionId),
   clearCompletedSessions: () => ipcRenderer.invoke('clear-completed-sessions'),
   setVolume: (value) => ipcRenderer.invoke('set-volume', value),
+  setSoundTheme: (theme) => ipcRenderer.invoke('set-sound-theme', theme),
   setNotifPosition: (value) => ipcRenderer.invoke('set-notif-position', value),
   setAutoLaunch: (value) => ipcRenderer.invoke('set-auto-launch', value),
   checkUpdates: (force) => ipcRenderer.invoke('check-updates', force),

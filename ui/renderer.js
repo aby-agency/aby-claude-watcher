@@ -76,6 +76,9 @@ async function init() {
   notifPosition = config.notifPosition || 'top-right';
   autoLaunch = !!config.autoLaunch;
   sessionOrder = config.sessionOrder || [];
+  soundTheme = SOUND_THEMES[config.soundTheme] ? config.soundTheme : 'default';
+  regenerateSounds();
+  updateSoundThemePicker();
 
   // applyMicroMode needs alwaysOnTop set so the pin buttons render the right state.
   // It also calls updatePinButton + updateMicroPinButton internally, so we don't repeat them here.
@@ -116,10 +119,9 @@ async function init() {
   });
 
   window.api.onPlaySound((data) => {
-    const kind = (data && data.kind) || 'waiting';
+    playNotificationSound();
     const sid = data && data.sessionId;
-    playNotificationSound(kind);
-    if (sid) flashMicroBell(sid, kind);
+    if (sid) setBell(sid, (data && data.kind) || 'waiting');
   });
 
   const initialUsage = await window.api.getUsage();
@@ -183,6 +185,13 @@ async function init() {
     window.api.setVolume(volume);
   });
   $btnTestSound.addEventListener('click', () => playNotificationSound());
+
+  // Sound theme picker
+  document.querySelectorAll('.sound-theme-btn').forEach(btn => {
+    btn.addEventListener('click', () => setSoundTheme(btn.dataset.theme));
+  });
+  const $btnTestTheme = document.getElementById('btnTestSoundTheme');
+  if ($btnTestTheme) $btnTestTheme.addEventListener('click', testCurrentSoundTheme);
 
   // Notification position picker
   document.querySelectorAll('.position-btn').forEach(btn => {
@@ -292,6 +301,8 @@ async function init() {
     if (settingsModal) settingsModal.style.display = 'none';
     const aboutModal = document.getElementById('aboutModal');
     if (aboutModal) aboutModal.style.display = 'none';
+    // Dismiss any visible toasts
+    Array.from($notificationOverlay.children).forEach(el => el.remove());
   });
 
   // Update durations every second
@@ -362,6 +373,25 @@ function setNotifPosition(pos) {
   notifPosition = pos;
   window.api.setNotifPosition(pos);
   updateNotifPosition();
+}
+
+function updateSoundThemePicker() {
+  document.querySelectorAll('.sound-theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === soundTheme);
+  });
+}
+
+function setSoundTheme(theme) {
+  if (!SOUND_THEMES[theme]) return;
+  soundTheme = theme;
+  regenerateSounds();
+  updateSoundThemePicker();
+  window.api.setSoundTheme(theme);
+  playNotificationSound();
+}
+
+function testCurrentSoundTheme() {
+  playNotificationSound();
 }
 
 function t(key, params) { return window.i18n.t(key, params); }
@@ -620,6 +650,7 @@ function fullRender() {
   // Micro view filters completed already, no divider needed.
   if (viewMode === 'micro') {
     viewContainer().innerHTML = sorted.map(s => htmlFn(s)).join('');
+    reapplyAllBells();
     return;
   }
 
@@ -632,6 +663,7 @@ function fullRender() {
     for (const s of completed) fragments.push(htmlFn(s));
   }
   viewContainer().innerHTML = fragments.join('');
+  reapplyAllBells();
 }
 
 function dividerHTML(count) {
@@ -678,10 +710,22 @@ function updateSession(s) {
 
   existing.replaceWith(newEl);
 
+  // Bell + toast handoff: if a bell or toast was showing for this session
+  // and the user is interacting again (running/thinking), clear them. Bell
+  // otherwise re-attaches to the new DOM indicator.
+  const bell = activeBells.get(s.sessionId);
+  const isActiveAgain = stateName === 'running' || stateName === 'thinking';
+  if (bell) {
+    if (isActiveAgain) clearBell(s.sessionId, { skipRender: true });
+    else applyBellVisual(s.sessionId, bell.kind);
+  }
+  if (isActiveAgain) dismissToastForSession(s.sessionId);
+
   updateStatusBar();
 }
 
 function removeSessionFromDOM(sessionId) {
+  clearBell(sessionId);
   for (const container of [$gridView, $compactView]) {
     const el = container.querySelector(`[data-session="${sessionId}"]`);
     if (el) el.remove();
@@ -725,9 +769,18 @@ function getSortedSessions() {
   return [...active, ...completed];
 }
 
+// "Inactif" / "Sleeping" — shown when a waiting session has drifted past its
+// bell window (no bell active = user hasn't acknowledged within 2 min).
+function getStateLabel(s) {
+  if (s.state.name === 'waiting' && !activeBells.has(s.sessionId)) {
+    return t('state_waiting_idle');
+  }
+  return t('state_' + s.state.name);
+}
+
 function cardHTML(s) {
   const stateName = s.state.name;
-  const stateLabel = t('state_' + s.state.name);
+  const stateLabel = getStateLabel(s);
   const duration = formatDuration(s.startedAt);
   const tokens = formatTokens(s.tokens);
   const sid = escAttr(s.sessionId);
@@ -793,7 +846,7 @@ function microItemHTML(s) {
     : isPending
       ? `<span class="pending-indicator">${ICONS.bellRing}</span>`
       : '<span class="micro-item-dot"></span>';
-  const tooltip = `${name} — ${t('state_' + stateName)}`;
+  const tooltip = `${name} — ${getStateLabel(s)}`;
   const notifIcon = s.notifEnabled
     ? `<button class="micro-notif-btn notif-on" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">${ICONS.bell}</button>`
     : `<button class="micro-notif-btn" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">${ICONS.bellOff}</button>`;
@@ -814,13 +867,16 @@ function compactItemHTML(s) {
   const stateName = s.state.name;
   const sid = escAttr(s.sessionId);
   const isActive = stateName === 'running' || stateName === 'thinking';
-  const stateLabel = t('state_' + stateName);
+  const stateLabel = getStateLabel(s);
 
-  const stateIndicator = isActive
+  // Always wrap in a fixed-size slot so bell-flash (12×12) doesn't push the
+  // label sideways when it replaces the dot.
+  const inner = isActive
     ? '<span class="compact-spinner"></span>'
     : stateName === 'pending'
       ? `<span class="pending-indicator">${ICONS.bellRing}</span>`
       : '<span class="compact-dot"></span>';
+  const stateIndicator = `<span class="compact-state-slot">${inner}</span><span class="compact-meta-sep">·</span>`;
 
   const toolDisplay = isActive && s.lastTool
     ? toolPill(s.lastTool)
@@ -874,28 +930,74 @@ function handleFocus(sessionId) {
   window.api.focusTerminal(sessionId);
 }
 
-// ═══ Micro bell flash ═══
+// ═══ Notification bell ═══
+// State lives in JS, not the DOM, because session updates rebuild the DOM
+// nodes (replaceWith / fullRender) — the bell would be wiped within seconds
+// otherwise. We re-inject the visual on every render and clear it when the
+// session goes back to an active state (running/thinking) or on timeout.
 
-function flashMicroBell(sessionId, kind) {
-  const el = document.querySelector(`.micro-item[data-session="${sessionId}"]`);
-  if (!el) return;
-  const dot = el.querySelector('.micro-item-dot');
-  if (!dot) return;
+const BELL_DURATION = 120000; // 2 min — long enough to catch on next glance
+const activeBells = new Map(); // sessionId → { kind, timerId }
 
-  // Replace dot with a temporary bell icon
-  const color = kind === 'pending' ? 'var(--state-pending)' : 'var(--state-waiting)';
-  const bellSvg = ICONS.bellRing.replace('width="14"', 'width="12"').replace('height="14"', 'height="12"');
-  const flash = document.createElement('span');
-  flash.className = 'micro-bell-flash';
-  flash.style.color = color;
-  flash.innerHTML = bellSvg;
-  dot.style.display = 'none';
-  dot.parentElement.insertBefore(flash, dot);
+function setBell(sessionId, kind) {
+  const existing = activeBells.get(sessionId);
+  if (existing && existing.timerId) clearTimeout(existing.timerId);
+  const timerId = setTimeout(() => clearBell(sessionId), BELL_DURATION);
+  activeBells.set(sessionId, { kind, timerId });
+  // Re-render: the waiting label flips to its "fresh" form (no bell → with
+  // bell). updateSession's bell handoff re-applies the visual on the new DOM.
+  const s = sessions.get(sessionId);
+  if (s) updateSession(s);
+  else applyBellVisual(sessionId, kind);
+}
 
-  setTimeout(() => {
-    flash.remove();
-    dot.style.display = '';
-  }, 5000);
+// opts.skipRender = true when called from updateSession's own bell handoff
+// (the DOM was just rebuilt with the new state, no need to re-render).
+function clearBell(sessionId, opts) {
+  const entry = activeBells.get(sessionId);
+  if (!entry) return;
+  if (entry.timerId) clearTimeout(entry.timerId);
+  activeBells.delete(sessionId);
+  removeBellVisual(sessionId);
+  if (opts && opts.skipRender) return;
+  // Re-render: if state is still waiting, label flips to "Inactif".
+  const s = sessions.get(sessionId);
+  if (s && s.state.name === 'waiting') updateSession(s);
+}
+
+// Re-injects the bell on whatever indicator the current view has for this
+// session (dot or spinner). Idempotent — skips items that already have one.
+function applyBellVisual(sessionId, kind) {
+  document.querySelectorAll(`[data-session="${sessionId}"]`).forEach(item => {
+    if (item.querySelector('.bell-flash')) return;
+    const indicator = item.querySelector(
+      '.micro-item-dot, .micro-item-spinner, .compact-dot, .compact-spinner, .state-badge .dot, .state-badge .spinner'
+    );
+    if (!indicator) return;
+    const color = kind === 'pending' ? 'var(--state-pending)' : 'var(--state-waiting)';
+    const bellSvg = ICONS.bellRing.replace('width="14"', 'width="12"').replace('height="14"', 'height="12"');
+    const flash = document.createElement('span');
+    flash.className = 'bell-flash';
+    flash.style.color = color;
+    flash.innerHTML = bellSvg;
+    indicator.dataset.bellHidden = '1';
+    indicator.style.display = 'none';
+    indicator.parentElement.insertBefore(flash, indicator);
+  });
+}
+
+function removeBellVisual(sessionId) {
+  document.querySelectorAll(`[data-session="${sessionId}"]`).forEach(item => {
+    item.querySelectorAll('.bell-flash').forEach(f => f.remove());
+    item.querySelectorAll('[data-bell-hidden]').forEach(el => {
+      el.style.display = '';
+      delete el.dataset.bellHidden;
+    });
+  });
+}
+
+function reapplyAllBells() {
+  for (const [sid, bell] of activeBells) applyBellVisual(sid, bell.kind);
 }
 
 // ═══ Resume session ═══
@@ -1031,34 +1133,48 @@ async function toggleNotif(event, sessionId) {
 
 const TOAST_DURATION = 10000;
 
+// Banner-style toast: a single clickable line that focuses the terminal.
+// Color follows the notification kind (blue for waiting, orange for pending).
+// Auto-dismisses after TOAST_DURATION, on Escape, or when the session goes
+// back to an active state (handled in updateSession).
 function showToast(data) {
-  const sid = escAttr(data.sessionId);
+  const kind = data.kind === 'pending' ? 'pending' : 'waiting';
+  const stateLabel = kind === 'pending' ? t('state_pending') : t('state_waiting');
+
+  // Don't stack — replace any existing toast for the same session
+  const previous = $notificationOverlay.querySelector(
+    `.notification-toast[data-session="${escAttr(data.sessionId)}"]`
+  );
+  if (previous) previous.remove();
+
   const toast = document.createElement('div');
   toast.className = 'notification-toast';
+  toast.dataset.session = data.sessionId;
+  toast.dataset.kind = kind;
+  toast.setAttribute('role', 'button');
+  toast.setAttribute('tabindex', '0');
+  toast.title = t('action_focus_terminal');
+  const bell = ICONS.bellRing.replace('width="14"', 'width="13"').replace('height="14"', 'height="13"');
   toast.innerHTML = `
-    <div class="toast-content">
-      <div class="toast-header">
-        <strong>${esc(data.projectName)}</strong>
-        <button class="toast-close" onclick="this.closest('.notification-toast').remove();">${ICONS.x}</button>
-      </div>
-      <div class="toast-body">
-        <span class="state-badge waiting">
-          <span class="dot"></span>
-          ${t('state_waiting')}
-        </span>
-        <span class="toast-slug">${esc(data.slug || '')}</span>
-      </div>
-      <div class="toast-actions">
-        <button class="toast-focus-btn" onclick="handleFocus('${sid}'); this.closest('.notification-toast').remove();">
-          ${ICONS.terminal} ${t('action_focus_terminal')}
-        </button>
-      </div>
-    </div>
+    <span class="toast-bell">${bell}</span>
+    <span class="toast-name">${esc(data.projectName)}</span>
+    <span class="toast-arrow">→</span>
+    <span class="toast-state">${stateLabel}</span>
+    <button class="toast-close" title="${t('close')}" aria-label="${t('close')}">${ICONS.x}</button>
     <div class="toast-timer"></div>
   `;
+  toast.addEventListener('click', () => {
+    handleFocus(data.sessionId);
+    toast.remove();
+  });
+  // Close button dismisses without triggering focus
+  const closeBtn = toast.querySelector('.toast-close');
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toast.remove();
+  });
   $notificationOverlay.appendChild(toast);
 
-  // Start timer animation
   const timerEl = toast.querySelector('.toast-timer');
   timerEl.style.animationDuration = `${TOAST_DURATION}ms`;
 
@@ -1071,9 +1187,17 @@ function showToast(data) {
   }, TOAST_DURATION);
 }
 
+function dismissToastForSession(sessionId) {
+  const toast = $notificationOverlay.querySelector(
+    `.notification-toast[data-session="${escAttr(sessionId)}"]`
+  );
+  if (toast) toast.remove();
+}
+
 // ═══ Sound ═══
-// Generate chime WAV at startup — uses <audio> element so it follows
-// the system audio routing (headphones, bluetooth, etc.)
+// WAV is synthesized in JS and played via <audio> so it follows the system
+// audio routing (headphones, bluetooth, etc.). Regenerated when the theme
+// changes — see SOUND_THEMES + regenerateSounds below.
 
 function generateChimeWav(notes, duration) {
   const sampleRate = 44100;
@@ -1086,9 +1210,14 @@ function generateChimeWav(notes, duration) {
     const decay = note.decay || 12;
     const attack = note.attack || 50;
     const amp = note.amp || 1;
+    const tremRate = note.tremRate || 0;
+    const tremDepth = note.tremDepth || 0;
     for (let i = startSample; i < endSample; i++) {
       const t = (i - startSample) / sampleRate;
-      const envelope = Math.exp(-t * decay) * Math.min(t * attack, 1);
+      let envelope = Math.exp(-t * decay) * Math.min(t * attack, 1);
+      if (tremRate > 0) {
+        envelope *= 1 - tremDepth * 0.5 * (1 - Math.cos(2 * Math.PI * tremRate * t));
+      }
       buffer[i] += amp * Math.sin(2 * Math.PI * note.freq * t) * envelope;
     }
   }
@@ -1130,20 +1259,44 @@ function generateChimeWav(notes, duration) {
   return URL.createObjectURL(blob);
 }
 
-// Subtle two-note chime for "waiting" (end of turn)
-const chimeUrl = generateChimeWav([
-  { freq: 1047, start: 0,    dur: 0.15 },   // C6
-  { freq: 1319, start: 0.12, dur: 0.25 },   // E6
-], 0.4);
+// One sound per preset — same chime for end-of-turn and needs-action.
+// The visual layer (toast, micro bell flash) still distinguishes the two states.
+const SOUND_THEMES = {
+  default: { duration: 0.4, notes: [
+    { freq: 1047, start: 0,    dur: 0.15 },   // C6
+    { freq: 1319, start: 0.12, dur: 0.25 },   // E6
+  ]},
+  vibraphone: {
+    // Warm metallic ring with characteristic tremolo (~6 Hz).
+    // Fundamental + 4th partial (4× freq) — that's a vibraphone bar's voice.
+    duration: 0.8,
+    notes: [
+      { freq: 698,  start: 0,    dur: 0.6, decay: 5, attack: 80, tremRate: 6, tremDepth: 0.35 },              // F5
+      { freq: 2792, start: 0,    dur: 0.4, decay: 9, attack: 80, amp: 0.22, tremRate: 6, tremDepth: 0.35 },   // F7 partial
+      { freq: 880,  start: 0.20, dur: 0.6, decay: 5, attack: 80, tremRate: 6, tremDepth: 0.35 },              // A5
+      { freq: 3520, start: 0.20, dur: 0.4, decay: 9, attack: 80, amp: 0.22, tremRate: 6, tremDepth: 0.35 },   // A7 partial
+    ],
+  },
+  wood: { duration: 0.4, notes: [
+    { freq: 1047, start: 0,    dur: 0.18, decay: 25, attack: 200 },   // C6 dry
+    { freq: 1568, start: 0.12, dur: 0.18, decay: 25, attack: 200 },   // G6 dry
+  ]},
+  soft: { duration: 0.6, notes: [
+    { freq: 440, start: 0,    dur: 0.30, decay: 8, attack: 35, amp: 0.6 },   // A4
+    { freq: 523, start: 0.20, dur: 0.40, decay: 8, attack: 35, amp: 0.6 },   // C5
+  ]},
+};
 
-// More insistent double-strike bell for "pending" (needs user action).
-// Two quick hits with a bell-like ring (fundamental + octave overtone).
-const pendingUrl = generateChimeWav([
-  { freq: 1568, start: 0,    dur: 0.35, decay: 9,  attack: 80, amp: 0.9 },  // G6 strike
-  { freq: 3136, start: 0,    dur: 0.25, decay: 14, attack: 80, amp: 0.35 }, // G7 overtone
-  { freq: 1568, start: 0.22, dur: 0.35, decay: 9,  attack: 80, amp: 0.9 },  // G6 second strike
-  { freq: 3136, start: 0.22, dur: 0.25, decay: 14, attack: 80, amp: 0.35 }, // G7 overtone
-], 0.7);
+let soundUrl = null;
+let soundTheme = 'default';
+
+function regenerateSounds() {
+  if (soundUrl) URL.revokeObjectURL(soundUrl);
+  const theme = SOUND_THEMES[soundTheme] || SOUND_THEMES.default;
+  soundUrl = generateChimeWav(theme.notes, theme.duration);
+}
+
+regenerateSounds();
 
 async function getDefaultOutputDeviceId() {
   try {
@@ -1157,10 +1310,9 @@ async function getDefaultOutputDeviceId() {
   }
 }
 
-async function playNotificationSound(kind) {
+async function playNotificationSound() {
   try {
-    const src = kind === 'pending' ? pendingUrl : chimeUrl;
-    const audio = new Audio(src);
+    const audio = new Audio(soundUrl);
     audio.volume = volume;
     // Route to the current default output device (headphones, bluetooth, etc.)
     const deviceId = await getDefaultOutputDeviceId();

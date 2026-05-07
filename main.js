@@ -124,18 +124,17 @@ function setupWatcher() {
 
   watcher.on('session-waiting', (session) => {
     const prefs = config.getNotificationPrefs(session.sessionId);
+    const kind = session.state && session.state.name === 'pending' ? 'pending' : 'waiting';
     if (prefs.modal) {
       sendToRenderer('show-notification', {
         sessionId: session.sessionId,
         projectName: session.projectName,
         slug: session.slug,
+        kind,
       });
     }
     if (prefs.sound) {
-      sendToRenderer('play-sound', {
-        kind: session.state && session.state.name === 'pending' ? 'pending' : 'waiting',
-        sessionId: session.sessionId,
-      });
+      sendToRenderer('play-sound', { kind, sessionId: session.sessionId });
     }
   });
 
@@ -169,7 +168,7 @@ function setupSocket() {
   });
 
   socketServer.on('permission-pending', (data) => {
-    if (data.sessionId) watcher.markPending(data.sessionId, data.hookEvent);
+    if (data.sessionId) watcher.markPending(data.sessionId, data.hookEvent, data.toolName);
   });
 
   // Resolve pending registrations when sessions are discovered
@@ -314,6 +313,10 @@ ipcMain.handle('set-session-order', (_, order) => {
 
 ipcMain.handle('set-volume', (_, value) => {
     config.setVolume(value);
+  });
+
+  ipcMain.handle('set-sound-theme', (_, theme) => {
+    config.setSoundTheme(theme);
   });
 
   ipcMain.handle('set-notif-position', (_, value) => {

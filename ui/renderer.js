@@ -691,6 +691,7 @@ function updateSession(s) {
 
   // If completed status changed, re-render to reorder (completed goes to bottom)
   if ((oldState === 'completed') !== (stateName === 'completed')) {
+    if (stateName === 'completed') clearBell(s.sessionId, { skipRender: true });
     fullRender();
     return;
   }
@@ -710,16 +711,18 @@ function updateSession(s) {
 
   existing.replaceWith(newEl);
 
-  // Bell + toast handoff: if a bell or toast was showing for this session
-  // and the user is interacting again (running/thinking), clear them. Bell
-  // otherwise re-attaches to the new DOM indicator.
+  // Bell + toast handoff: a bell on a session that's now inactive (error —
+  // completed is handled above) or actively interacting again (running/
+  // thinking) is stale and gets cleared. Bell otherwise re-attaches to the
+  // new DOM indicator.
   const bell = activeBells.get(s.sessionId);
   const isActiveAgain = stateName === 'running' || stateName === 'thinking';
+  const isInactive = stateName === 'error';
   if (bell) {
-    if (isActiveAgain) clearBell(s.sessionId, { skipRender: true });
+    if (isActiveAgain || isInactive) clearBell(s.sessionId, { skipRender: true });
     else applyBellVisual(s.sessionId, bell.kind);
   }
-  if (isActiveAgain) dismissToastForSession(s.sessionId);
+  if (isActiveAgain || isInactive) dismissToastForSession(s.sessionId);
 
   updateStatusBar();
 }

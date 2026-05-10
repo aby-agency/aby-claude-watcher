@@ -79,7 +79,7 @@ test('saveSession + getSavedSessions', () => {
   assertEq(saved.sid1.stateName, 'running');
 });
 test('deleteSession removes session', () => {
-  config.saveSession('sid2', { stateName: 'completed' });
+  config.saveSession('sid2', { stateName: 'waiting' });
   config.setCustomName('sid2', 'Test');
   config.setSessionOrder(['sid1', 'sid2']);
   config.deleteSession('sid2');

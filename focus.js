@@ -10,13 +10,6 @@ function sanitizePid(pid) {
   return n;
 }
 
-function sanitizeSessionId(id) {
-  if (!id || typeof id !== 'string') return null;
-  // Session IDs are UUIDs — only allow alphanumeric + hyphens
-  if (!/^[a-zA-Z0-9-]+$/.test(id)) return null;
-  return id;
-}
-
 function sanitizePath(p) {
   if (!p || typeof p !== 'string') return null;
   // Block shell metacharacters and quote/backslash that could break quoted args
@@ -401,48 +394,4 @@ function runAppleScript(script) {
   });
 }
 
-function resumeSession(sessionId, cwd, opts) {
-  const safeId = sanitizeSessionId(sessionId);
-  if (!safeId) return Promise.reject(new Error('Invalid session ID'));
-  const skipPerms = !!(opts && opts.skipPermissions);
-  const flags = skipPerms ? ' --dangerously-skip-permissions' : '';
-  const cmd = `claude --resume ${safeId}${flags}`;
-  const dir = sanitizePath(cwd) || process.env.HOME;
-
-  if (process.platform === 'darwin') {
-    // Open new iTerm2 tab, cd to project dir, run claude --resume
-    return runAppleScript(`
-      tell application "iTerm2"
-        activate
-        tell current window
-          create tab with default profile
-          tell current session
-            write text "cd ${escapeForAppleScript(dir)} && ${cmd}"
-          end tell
-        end tell
-      end tell
-    `).catch(() => {
-      // Fallback to Terminal.app
-      return runAppleScript(`
-        tell application "Terminal"
-          activate
-          do script "cd ${escapeForAppleScript(dir)} && ${cmd}"
-        end tell
-      `);
-    });
-  } else if (process.platform === 'win32') {
-    return new Promise((resolve, reject) => {
-      exec(`start cmd /K "cd /d ${dir} && ${cmd}"`, (err) => {
-        if (err) reject(err); else resolve();
-      });
-    });
-  } else {
-    return new Promise((resolve, reject) => {
-      exec(`x-terminal-emulator -e "cd ${dir} && ${cmd}" 2>/dev/null &`, (err) => {
-        if (err) reject(err); else resolve();
-      });
-    });
-  }
-}
-
-module.exports = { focusTerminal, resumeSession };
+module.exports = { focusTerminal };

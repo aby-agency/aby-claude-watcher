@@ -21,9 +21,9 @@ const src = require('fs').readFileSync(require.resolve('../focus.js'), 'utf-8');
 // Extract and eval the sanitize functions in isolation
 const sanitizeSrc = src.match(/function sanitize[\s\S]+?^}/gm).join('\n');
 const testCtx = {};
-new Function('ctx', sanitizeSrc + '\nctx.sanitizePid = sanitizePid; ctx.sanitizeSessionId = sanitizeSessionId; ctx.sanitizePath = sanitizePath;')(testCtx);
+new Function('ctx', sanitizeSrc + '\nctx.sanitizePid = sanitizePid; ctx.sanitizePath = sanitizePath;')(testCtx);
 
-const { sanitizePid, sanitizeSessionId, sanitizePath } = testCtx;
+const { sanitizePid, sanitizePath } = testCtx;
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -40,15 +40,6 @@ test('rejects negative', () => assertEq(sanitizePid(-1), null));
 test('rejects string with injection', () => assertEq(sanitizePid('1; rm -rf /'), 1)); // parseInt stops at ;
 test('rejects non-numeric', () => assertEq(sanitizePid('abc'), null));
 test('rejects null/undefined', () => { assertEq(sanitizePid(null), null); assertEq(sanitizePid(undefined), null); });
-
-console.log('\nsanitizeSessionId:');
-test('accepts valid UUID', () => assertEq(sanitizeSessionId('afa7c9b7-8af1-4176-98d8-635520b61526'), 'afa7c9b7-8af1-4176-98d8-635520b61526'));
-test('accepts alphanumeric-only', () => assertEq(sanitizeSessionId('abc123XYZ-789'), 'abc123XYZ-789'));
-test('rejects semicolon', () => assertEq(sanitizeSessionId('abc;rm'), null));
-test('rejects space', () => assertEq(sanitizeSessionId('abc 123'), null));
-test('rejects backtick', () => assertEq(sanitizeSessionId('abc`cmd`'), null));
-test('rejects empty', () => assertEq(sanitizeSessionId(''), null));
-test('rejects non-string', () => assertEq(sanitizeSessionId(123), null));
 
 console.log('\nsanitizePath:');
 test('accepts normal path', () => assertEq(sanitizePath('/Users/me/project'), '/Users/me/project'));

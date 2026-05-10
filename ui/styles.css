@@ -20,13 +20,11 @@
   --state-pending-contrast: #ffffff;
   --state-neutral: #94a3b8;
   --state-error: #ef4444;
-  --state-completed: #4b5563;
 
   /* Glow variants */
   --glow-thinking: rgba(167, 139, 250, 0.15);
   --glow-running: rgba(34, 197, 94, 0.15);
   --glow-waiting: rgba(59, 130, 246, 0.15);
-  --glow-completed: rgba(75, 85, 99, 0.1);
 
   --radius: 8px;
   --radius-sm: 4px;
@@ -174,7 +172,6 @@ body {
 .micro-item[data-state="pending"] { color: var(--state-pending); }
 .micro-item[data-state="pending"] .micro-item-dot { background: var(--state-pending); }
 .micro-item[data-state="error"] .micro-item-dot { background: var(--state-error); animation: breathe 3s ease-in-out infinite; }
-.micro-item[data-state="completed"] .micro-item-dot { background: var(--state-completed); }
 
 .micro-item .micro-item-name {
   flex: 1;
@@ -233,10 +230,6 @@ body {
 .micro-item:hover .micro-notif-btn { opacity: 0.7; }
 .micro-notif-btn:hover { opacity: 1 !important; }
 .micro-notif-btn.notif-on { color: var(--state-running); opacity: 1;
-}
-
-.micro-item[data-state="completed"] .micro-item-name {
-  color: var(--text-muted);
 }
 
 /* ═══ Hide regular chrome in micro mode ═══ */
@@ -401,7 +394,6 @@ body.micro-mode .usage-reset-icon {
 
 .filter-seg[data-filter="active"].active { color: var(--state-running); }
 .filter-seg[data-filter="waiting"].active { color: var(--state-waiting); }
-.filter-seg[data-filter="completed"].active { color: var(--text-secondary); }
 
 .filter-seg,
 .toolbar-btn,
@@ -762,7 +754,6 @@ body.micro-mode .usage-reset-icon {
 .state-badge.running { --badge-bg: var(--glow-running); --badge-color: var(--state-running); }
 .state-badge.waiting { --badge-bg: var(--glow-waiting); --badge-color: var(--state-waiting); }
 .state-badge.pending { --badge-bg: rgba(249, 115, 22, 0.15); --badge-color: var(--state-pending); }
-.state-badge.completed { --badge-bg: var(--glow-completed); --badge-color: var(--state-completed); }
 .state-badge.error { --badge-bg: rgba(153, 27, 27, 0.15); --badge-color: var(--state-error); }
 
 .state-badge.running .dot,
@@ -1072,20 +1063,6 @@ body.micro-mode .usage-reset-icon {
 .compact-card[data-state="error"] { --card-accent: var(--state-error); }
 .compact-card[data-state="error"] .compact-meta-state { color: var(--state-error); }
 .compact-card[data-state="error"] .compact-dot { background: var(--state-error); }
-.compact-card[data-state="completed"] { --card-accent: var(--state-completed); }
-.compact-card[data-state="completed"] .compact-dot { background: var(--state-completed); }
-
-.compact-card[data-state="completed"] {
-  opacity: 0.55;
-}
-
-.compact-card[data-state="completed"]:hover {
-  opacity: 0.85;
-}
-
-.compact-card[data-state="completed"] .project-name {
-  color: var(--text-muted);
-}
 
 /* ═══ Notification modal ═══ */
 
@@ -1571,48 +1548,6 @@ body.micro-mode .usage-reset-icon {
   border-radius: 3px;
 }
 
-/* Divider between active and completed sessions */
-.sessions-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 4px 6px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-muted);
-  grid-column: 1 / -1; /* span all columns in grid view */
-}
-
-.sessions-divider-line {
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
-.sessions-divider-label {
-  white-space: nowrap;
-}
-
-.sessions-divider-action {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.sessions-divider-action:hover {
-  background: var(--state-error, #ef4444);
-  border-color: var(--state-error, #ef4444);
-  color: white;
-}
-
 /* About modal body */
 .about-body {
   font-size: 13px;
@@ -1663,98 +1598,13 @@ body.micro-mode .usage-reset-icon {
   color: var(--text-primary);
 }
 
-/* ═══ Resume modal ═══ */
-
-.modal-hint {
-  margin: -4px 0 16px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.resume-option {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-tertiary);
-  cursor: pointer;
-  transition: border-color var(--transition), background var(--transition);
-}
-
-.resume-option:hover {
-  border-color: var(--border-light);
-}
-
-.resume-option:has(input:checked) {
-  border-color: #f59e0b;
-  background: rgba(245, 158, 11, 0.08);
-}
-
-.resume-option input[type="checkbox"] {
-  flex-shrink: 0;
-  margin-top: 2px;
-  width: 16px;
-  height: 16px;
-  accent-color: #f59e0b;
-  cursor: pointer;
-}
-
-.resume-option-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.resume-warn {
-  color: #f59e0b;
-  font-size: 14px;
-}
-
-.resume-option-hint {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.resume-option-hint code {
-  padding: 1px 5px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: #f59e0b;
-}
-
 /* ═══ State-based card accents ═══ */
 
 .card[data-state="thinking"] { --card-accent: var(--state-thinking); }
 .card[data-state="running"] { --card-accent: var(--state-running); }
 .card[data-state="waiting"] { --card-accent: var(--state-waiting); }
 .card[data-state="pending"] { --card-accent: var(--state-pending); }
-.card[data-state="completed"] { --card-accent: var(--state-completed); }
 .card[data-state="error"] { --card-accent: var(--state-error); }
-
-/* Completed cards — greyed out */
-.card[data-state="completed"] {
-  opacity: 0.6;
-}
-
-.card[data-state="completed"]:hover {
-  opacity: 0.75;
-}
-
-.card[data-state="completed"] .project-name,
-.card[data-state="completed"] .session-slug,
-.card[data-state="completed"] .detail-value {
-  color: var(--text-muted);
-}
 
 /* ═══ List state dots ═══ */
 
@@ -1762,7 +1612,6 @@ body.micro-mode .usage-reset-icon {
 .compact-card[data-state="running"] .state-dot { background: var(--state-running); }
 .compact-card[data-state="waiting"] .state-dot { background: var(--state-waiting); }
 .compact-card[data-state="pending"] .state-dot { background: var(--state-pending); }
-.compact-card[data-state="completed"] .state-dot { background: var(--state-completed); }
 .compact-card[data-state="error"] .state-dot { background: var(--state-error); }
 
 .compact-card[data-state="pending"] .state-dot {
@@ -1783,19 +1632,6 @@ body.micro-mode .usage-reset-icon {
 @keyframes breathe {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
-}
-
-/* Completed list items — greyed out */
-.compact-card[data-state="completed"] {
-  opacity: 0.6;
-}
-
-.compact-card[data-state="completed"]:hover {
-  opacity: 0.75;
-}
-
-.compact-card[data-state="completed"] .project-name {
-  color: var(--text-muted);
 }
 
 /* ═══ Settings modal ═══ */

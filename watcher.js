@@ -19,7 +19,6 @@ const STATES = {
   WAITING: { name: 'waiting', color: '#3b82f6' },
   PENDING: { name: 'pending', color: '#f97316' },
   ERROR: { name: 'error', color: '#ef4444' },
-  COMPLETED: { name: 'completed', color: '#4b5563' },
 };
 
 class SessionWatcher extends EventEmitter {
@@ -40,10 +39,13 @@ class SessionWatcher extends EventEmitter {
     if (this.config) {
       const saved = this.config.getSavedSessions();
       for (const [id, data] of Object.entries(saved)) {
-        const savedState = Object.values(STATES).find(s => s.name === data.stateName) || STATES.COMPLETED;
-        // Keep the saved state as-is — the scan() will check PID liveness
-        // and mark as completed only if the session file is gone
-        const state = savedState;
+        // Drop legacy "completed" sessions persisted by older versions —
+        // we now purge sessions on completion instead of keeping them.
+        if (data.stateName === 'completed') {
+          this.config.deleteSession(id);
+          continue;
+        }
+        const savedState = Object.values(STATES).find(s => s.name === data.stateName) || STATES.WAITING;
 
         this.sessions.set(id, {
           sessionId: id,
@@ -51,18 +53,16 @@ class SessionWatcher extends EventEmitter {
           cwd: data.cwd || null,
           projectName: data.projectName || 'Unknown',
           slug: data.slug || '',
-          state,
+          state: savedState,
           lastTool: data.lastTool || null,
           model: data.model || null,
           gitBranch: data.gitBranch || null,
           startedAt: data.startedAt || new Date().toISOString(),
-          endedAt: data.endedAt || null,
           tokens: data.tokens || { input: 0, output: 0 },
           terminalApp: data.terminalApp || null,
           terminalId: data.terminalId || null,
           lastEventTime: Date.now(),
           hasActivity: savedState.name !== 'error',
-          wasResumed: false,
         });
         this.emit('session-added', this.sessions.get(id));
       }
@@ -203,14 +203,12 @@ class SessionWatcher extends EventEmitter {
               model: null,
                   gitBranch: null,
               startedAt: startedAtISO,
-              endedAt: null,
               tokens: { input: 0, output: 0 },
               terminalApp: null,
               terminalId: null,
               permissionMode: this.detectBypassFromPid(pid) ? 'bypassPermissions' : null,
               lastEventTime: Date.now(),
               hasActivity: false,
-              wasResumed: false,
             });
             this.watchJsonl(effectiveId);
             // Persist immediately so a fresh session that hasn't yet transitioned
@@ -229,11 +227,9 @@ class SessionWatcher extends EventEmitter {
               session.startedAt = startedAtISO;
             }
 
-            if (pidAlive && (session.state === STATES.COMPLETED || session.state === STATES.ERROR)) {
-              // Session was completed/errored but PID is alive — reactivate
-              session.endedAt = null;
+            if (pidAlive && session.state === STATES.ERROR) {
+              // Session errored but PID is alive again — reactivate
               session.hasActivity = false;
-              session.wasResumed = true;
               this.setState(effectiveId, STATES.WAITING, false);
             }
 
@@ -253,7 +249,6 @@ class SessionWatcher extends EventEmitter {
           session._missingTicks = 0;
           continue;
         }
-        if (session.state === STATES.COMPLETED) continue;
 
         session._missingTicks = (session._missingTicks || 0) + 1;
         // Wait 2 ticks (4s) before acting
@@ -498,12 +493,9 @@ class SessionWatcher extends EventEmitter {
 
       // Determine state from last events
       // Key insight: the LAST event type tells us the current state
-      // Only mark COMPLETED on last-prompt if the PID is actually dead
       let computedState = null;
       if (lastAssistant && lastAssistant.isApiErrorMessage) {
         computedState = STATES.ERROR;
-      } else if (hasLastPrompt && (!session.pid || !this.isPidAlive(session.pid))) {
-        computedState = STATES.COMPLETED;
       } else if (lastUser && lastAssistant &&
                  new Date(lastUser.timestamp) > new Date(lastAssistant.timestamp)) {
         // User event came AFTER last assistant — Claude is thinking/processing
@@ -768,12 +760,6 @@ class SessionWatcher extends EventEmitter {
 
     if (stateChanged) {
       session.state = newState;
-
-      // Freeze duration when completed
-      if (newState.name === 'completed' && !session.endedAt) {
-        session.endedAt = new Date().toISOString();
-      }
-
       this.emit('session-updated', session);
       this.persistSession(session);
     }
@@ -787,8 +773,11 @@ class SessionWatcher extends EventEmitter {
         this.emit('session-waiting', session);
       }
     }
-    // Reset cooldown when leaving waiting/pending
-    if (stateChanged && newState.name !== 'waiting' && newState.name !== 'pending') {
+    // Reset cooldown only when the user actually types — THINKING means a
+    // user prompt event landed. RUNNING just means Claude is mid-tool-loop
+    // (tool_result auto-replay), so re-notifying on every waiting cycle of
+    // the same loop is spam.
+    if (stateChanged && newState.name === 'thinking') {
       this.lastNotifTime.delete(sessionId);
     }
   }
@@ -805,31 +794,22 @@ class SessionWatcher extends EventEmitter {
       model: session.model,
       gitBranch: session.gitBranch,
       startedAt: session.startedAt,
-      endedAt: session.endedAt,
       tokens: session.tokens,
       terminalApp: session.terminalApp,
       terminalId: session.terminalId,
     });
   }
 
+  // Session file gone + PID dead: drop it. We only surface live sessions.
+  // (Errored sessions whose PID just died stay visible — they kept the ERROR
+  // state from a prior assistant event, so they don't reach this path until
+  // the user dismisses them via the X button → removeSession().)
   markCompleted(sessionId) {
     if (!sessionId) return;
     const session = this.sessions.get(sessionId);
     if (!session) return;
-    if (!session.hasActivity) {
-      // User resumed the session but it died before writing anything — silent crash.
-      if (session.wasResumed) {
-        if (session.state !== STATES.ERROR) this.setState(sessionId, STATES.ERROR, false);
-        return;
-      }
-      // Otherwise it's a phantom (wrapper spawn that died, stale scan entry, …) —
-      // drop it entirely instead of surfacing a meaningless card.
-      this.removeSession(sessionId);
-      return;
-    }
-    if (session.state !== STATES.COMPLETED) {
-      this.setState(sessionId, STATES.COMPLETED, false);
-    }
+    if (session.state === STATES.ERROR) return;
+    this.removeSession(sessionId);
   }
 
   // Swap a session's ID in place (e.g., after /clear). Preserves custom name,
@@ -852,7 +832,6 @@ class SessionWatcher extends EventEmitter {
     session.tokens = { input: 0, output: 0 };
     session.lastTool = null;
     session.hasActivity = false;
-    session.endedAt = null;
     this.sessions.set(newId, session);
 
     // Migrate config (name, notif prefs, order, saved session data)

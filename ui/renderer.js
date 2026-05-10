@@ -140,36 +140,6 @@ async function init() {
   document.getElementById('btnClearAllFilters').addEventListener('click', closeSearch);
   $btnPin.addEventListener('click', togglePin);
 
-  // Resume modal
-  document.getElementById('resumeConfirm').addEventListener('click', confirmResume);
-  document.getElementById('resumeCancel').addEventListener('click', closeResumeModal);
-  document.getElementById('resumeModal').addEventListener('click', (e) => {
-    if (e.target.id === 'resumeModal') closeResumeModal();
-  });
-
-  // Clear-completed modal — the trigger button (#clearCompletedBtn) lives
-  // inside fullRender() output and gets re-created on every render, so we
-  // delegate from document. The modal's own buttons are static.
-  document.addEventListener('click', (e) => {
-    if (e.target && e.target.id === 'clearCompletedBtn') {
-      const completed = Array.from(sessions.values()).filter(s => s.state.name === 'completed');
-      document.getElementById('clearCompletedCount').textContent = completed.length;
-      document.getElementById('clearCompletedModal').style.display = 'flex';
-    }
-  });
-  document.getElementById('clearCompletedCancel').addEventListener('click', () => {
-    document.getElementById('clearCompletedModal').style.display = 'none';
-  });
-  document.getElementById('clearCompletedConfirm').addEventListener('click', async () => {
-    document.getElementById('clearCompletedModal').style.display = 'none';
-    await window.api.clearCompletedSessions();
-  });
-  document.getElementById('clearCompletedModal').addEventListener('click', (e) => {
-    if (e.target.id === 'clearCompletedModal') {
-      document.getElementById('clearCompletedModal').style.display = 'none';
-    }
-  });
-
   // Settings
   $btnSettings.addEventListener('click', () => $settingsModal.style.display = 'flex');
   $settingsClose.addEventListener('click', () => $settingsModal.style.display = 'none');
@@ -296,7 +266,6 @@ async function init() {
   // were removed in 1.5.7 — see CHANGELOG.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    closeResumeModal();
     const settingsModal = document.getElementById('settingsModal');
     if (settingsModal) settingsModal.style.display = 'none';
     const aboutModal = document.getElementById('aboutModal');
@@ -606,10 +575,7 @@ function startUpdateDownload(info) {
 // ═══ Rendering ═══
 
 function getRenderableSessions() {
-  const arr = getSortedSessions();
-  // Micro view hides completed sessions to keep the ambient signal clean
-  if (viewMode === 'micro') return arr.filter(s => s.state.name !== 'completed');
-  return arr;
+  return getSortedSessions();
 }
 
 function render() {
@@ -646,32 +612,8 @@ function viewItemHTML() {
 function fullRender() {
   const sorted = getRenderableSessions();
   const htmlFn = viewItemHTML();
-
-  // Micro view filters completed already, no divider needed.
-  if (viewMode === 'micro') {
-    viewContainer().innerHTML = sorted.map(s => htmlFn(s)).join('');
-    reapplyAllBells();
-    return;
-  }
-
-  const active = sorted.filter(s => s.state.name !== 'completed');
-  const completed = sorted.filter(s => s.state.name === 'completed');
-
-  const fragments = active.map(s => htmlFn(s));
-  if (completed.length > 0) {
-    fragments.push(dividerHTML(completed.length));
-    for (const s of completed) fragments.push(htmlFn(s));
-  }
-  viewContainer().innerHTML = fragments.join('');
+  viewContainer().innerHTML = sorted.map(s => htmlFn(s)).join('');
   reapplyAllBells();
-}
-
-function dividerHTML(count) {
-  return `<div class="sessions-divider" data-skip-render="1">
-    <span class="sessions-divider-line"></span>
-    <span class="sessions-divider-label">${t('sessions_old_label', { n: count })}</span>
-    <button class="sessions-divider-action" id="clearCompletedBtn">${t('clear_completed_action')}</button>
-  </div>`;
 }
 
 function updateSession(s) {
@@ -689,14 +631,6 @@ function updateSession(s) {
   const stateName = s.state.name;
   const oldState = existing.dataset.state;
 
-  // If completed status changed, re-render to reorder (completed goes to bottom)
-  if ((oldState === 'completed') !== (stateName === 'completed')) {
-    if (stateName === 'completed') clearBell(s.sessionId, { skipRender: true });
-    fullRender();
-    return;
-  }
-
-
   // Patch in place — replace the element's HTML
   const htmlFn = viewItemHTML();
   const temp = document.createElement('div');
@@ -711,10 +645,9 @@ function updateSession(s) {
 
   existing.replaceWith(newEl);
 
-  // Bell + toast handoff: a bell on a session that's now inactive (error —
-  // completed is handled above) or actively interacting again (running/
-  // thinking) is stale and gets cleared. Bell otherwise re-attaches to the
-  // new DOM indicator.
+  // Bell + toast handoff: a bell on a session that's now inactive (error)
+  // or actively interacting again (running/thinking) is stale and gets
+  // cleared. Bell otherwise re-attaches to the new DOM indicator.
   const bell = activeBells.get(s.sessionId);
   const isActiveAgain = stateName === 'running' || stateName === 'thinking';
   const isInactive = stateName === 'error';
@@ -749,27 +682,17 @@ function getSortedSessions() {
     );
   }
 
-  // Separate completed from active
-  const active = arr.filter(s => s.state.name !== 'completed');
-  const completed = arr.filter(s => s.state.name === 'completed');
-
-  // Sort active sessions by user-defined order, then by start time for new ones
-  active.sort((a, b) => {
+  // Sort by user-defined order, falling back to newest first
+  arr.sort((a, b) => {
     const ai = sessionOrder.indexOf(a.sessionId);
     const bi = sessionOrder.indexOf(b.sessionId);
-    // Both in order list — use that order
     if (ai !== -1 && bi !== -1) return ai - bi;
-    // Only one in list — the one in the list comes first
     if (ai !== -1) return -1;
     if (bi !== -1) return 1;
-    // Neither in list — newest first
     return new Date(b.startedAt) - new Date(a.startedAt);
   });
 
-  // Completed always at bottom, newest first
-  completed.sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
-
-  return [...active, ...completed];
+  return arr;
 }
 
 // "Inactif" / "Sleeping" — shown when a waiting session has drifted past its
@@ -790,7 +713,7 @@ function cardHTML(s) {
 
   return `
     <div class="card" data-state="${stateName}" data-session="${sid}"
-         draggable="${stateName !== 'completed' && !searchQuery}"
+         draggable="${!searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
 onclick="handleCardClick(event, '${sid}')">
       <div class="card-header">
@@ -801,8 +724,7 @@ onclick="handleCardClick(event, '${sid}')">
           </div>
         </div>
         <div class="card-actions">
-          ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
-          ${(stateName === 'completed' || stateName === 'error') ? `<button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
+          ${stateName === 'error' ? `<button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
           <button class="card-btn notif-btn ${s.notifEnabled ? 'notif-on' : ''}" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">
             ${s.notifEnabled ? ICONS.bell : ICONS.bellOff}
           </button>
@@ -819,7 +741,7 @@ onclick="handleCardClick(event, '${sid}')">
         </div>
         <div class="detail">
           <span class="detail-label">${t('duration')}</span>
-          <span class="detail-value ${stateName !== 'completed' ? 'duration-value' : ''}" ${stateName !== 'completed' ? `data-started="${s.startedAt}"` : ''}>${stateName === 'completed' && s.endedAt ? formatDuration(s.startedAt, s.endedAt) : duration}</span>
+          <span class="detail-value duration-value" data-started="${s.startedAt}">${duration}</span>
         </div>
         <div class="detail">
           <span class="detail-label">${t('tokens')}</span>
@@ -856,7 +778,7 @@ function microItemHTML(s) {
   return `
     <div class="micro-item" data-state="${stateName}" data-session="${sid}"
          title="${escAttr(tooltip)}"
-         draggable="${stateName !== 'completed' && !searchQuery}"
+         draggable="${!searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
          onclick="handleFocus('${sid}')">
       ${indicator}
@@ -887,7 +809,7 @@ function compactItemHTML(s) {
 
   return `
     <div class="compact-card" data-state="${stateName}" data-session="${sid}"
-         draggable="${stateName !== 'completed' && !searchQuery}"
+         draggable="${!searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
 onclick="handleCardClick(event, '${sid}')">
       <div class="compact-card-header">
@@ -896,8 +818,7 @@ onclick="handleCardClick(event, '${sid}')">
           <span class="edit-hint">${ICONS.edit}</span>
         </div>
         <div class="compact-card-actions">
-          ${stateName === 'completed' ? `<button class="card-btn" onclick="event.stopPropagation(); handleResume('${sid}')" title="${t('action_resume')}">${ICONS.play}</button>` : ''}
-          ${(stateName === 'completed' || stateName === 'error') ? `<button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
+          ${stateName === 'error' ? `<button class="card-btn" onclick="event.stopPropagation(); handleRemove('${sid}')" title="${t('action_delete')}">${ICONS.x}</button>` : ''}
           <button class="card-btn notif-btn ${s.notifEnabled ? 'notif-on' : ''}" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">
             ${s.notifEnabled ? ICONS.bell : ICONS.bellOff}
           </button>
@@ -1001,29 +922,6 @@ function removeBellVisual(sessionId) {
 
 function reapplyAllBells() {
   for (const [sid, bell] of activeBells) applyBellVisual(sid, bell.kind);
-}
-
-// ═══ Resume session ═══
-
-let resumePendingSessionId = null;
-
-function handleResume(sessionId) {
-  resumePendingSessionId = sessionId;
-  const $skip = document.getElementById('resumeSkipPerms');
-  if ($skip) $skip.checked = false;
-  document.getElementById('resumeModal').style.display = 'flex';
-}
-
-function closeResumeModal() {
-  resumePendingSessionId = null;
-  document.getElementById('resumeModal').style.display = 'none';
-}
-
-function confirmResume() {
-  if (!resumePendingSessionId) { closeResumeModal(); return; }
-  const skipPermissions = !!document.getElementById('resumeSkipPerms').checked;
-  window.api.resumeSession(resumePendingSessionId, { skipPermissions });
-  closeResumeModal();
 }
 
 // ═══ Card click — focus terminal (suppressed if user is dragging) ═══
@@ -1330,10 +1228,9 @@ async function playNotificationSound() {
 
 // ═══ Helpers ═══
 
-function formatDuration(startedAt, endedAt) {
+function formatDuration(startedAt) {
   if (!startedAt) return '—';
-  const end = endedAt ? new Date(endedAt).getTime() : Date.now();
-  const ms = end - new Date(startedAt).getTime();
+  const ms = Date.now() - new Date(startedAt).getTime();
   if (ms < 0) return '0s';
   const s = Math.floor(ms / 1000);
   const m = Math.floor(s / 60);
@@ -1410,7 +1307,7 @@ function toolPill(toolName) {
 
 function onDragStart(e) {
   const el = e.target.closest('[data-session]');
-  if (!el || el.dataset.state === 'completed') { e.preventDefault(); return; }
+  if (!el) { e.preventDefault(); return; }
   draggedId = el.dataset.session;
   el.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
@@ -1421,7 +1318,7 @@ function onDragOver(e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   const target = e.target.closest('[data-session]');
-  if (!target || target.dataset.session === draggedId || target.dataset.state === 'completed') return;
+  if (!target || target.dataset.session === draggedId) return;
 
   const container = target.parentElement;
   const dragged = container.querySelector(`[data-session="${draggedId}"]`);
@@ -1458,10 +1355,7 @@ function saveCurrentOrder() {
   const items = container.querySelectorAll('[data-session]');
   sessionOrder = Array.from(items)
     .map(el => el.dataset.session)
-    .filter(id => {
-      const s = sessions.get(id);
-      return s && s.state.name !== 'completed';
-    });
+    .filter(id => sessions.has(id));
   window.api.setSessionOrder(sessionOrder);
 }
 
@@ -1473,14 +1367,13 @@ function updateStatusBar() {
   if (!fallback || fallback.style.display === 'none') return;
 
   const all = Array.from(sessions.values());
-  const active = all.filter(s => s.state.name !== 'completed');
   const waiting = all.filter(s => s.state.name === 'waiting');
   const totalInput = all.reduce((sum, s) => sum + (s.tokens?.input || 0), 0);
   const totalOutput = all.reduce((sum, s) => sum + (s.tokens?.output || 0), 0);
 
   const activeLabel = searchQuery
     ? t('status_filtered', { visible: getSortedSessions().length, total: all.length })
-    : t('status_active', { n: active.length });
+    : t('status_active', { n: all.length });
 
   document.getElementById('statActive').textContent = activeLabel;
   document.getElementById('statWaiting').textContent = t('status_waiting', { n: waiting.length });

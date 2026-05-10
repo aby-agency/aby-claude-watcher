@@ -5,7 +5,6 @@ const STATE_COLORS = {
   running: '#22c55e',
   waiting: '#3b82f6',
   error: '#ef4444',
-  completed: '#4b5563',
 };
 
 function esc(str) {
@@ -22,17 +21,15 @@ function renderPopover(sessions, config) {
   const customNames = (config && config.customNames) || {};
   const sessionOrder = (config && config.sessionOrder) || [];
 
-  const active = sessions.filter(s => s.state.name !== 'completed');
+  $header.textContent = window.i18n.t('popover_header', { n: sessions.length });
 
-  $header.textContent = window.i18n.t('popover_header', { n: active.length });
-
-  if (active.length === 0) {
+  if (sessions.length === 0) {
     $list.innerHTML = `<div class="popover-empty">${window.i18n.t('popover_empty')}</div>`;
     return;
   }
 
   // Use same order as main window (user-defined sessionOrder, newest first for new ones)
-  active.sort((a, b) => {
+  sessions.sort((a, b) => {
     const ai = sessionOrder.indexOf(a.sessionId);
     const bi = sessionOrder.indexOf(b.sessionId);
     if (ai !== -1 && bi !== -1) return ai - bi;
@@ -41,7 +38,7 @@ function renderPopover(sessions, config) {
     return new Date(b.startedAt) - new Date(a.startedAt);
   });
 
-  $list.innerHTML = active.map(s => {
+  $list.innerHTML = sessions.map(s => {
     const stateName = s.state.name;
     const color = STATE_COLORS[stateName] || '#6b7280';
     const isActive = stateName === 'running' || stateName === 'thinking';

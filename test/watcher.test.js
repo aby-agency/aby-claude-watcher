@@ -41,13 +41,11 @@ function makeSession(id, overrides = {}) {
     model: null,
     gitBranch: null,
     startedAt: new Date().toISOString(),
-    endedAt: null,
     tokens: { input: 0, output: 0 },
     terminalApp: null,
     terminalId: null,
     lastEventTime: Date.now(),
     hasActivity: true,
-    wasResumed: false,
     ...overrides,
   };
 }
@@ -515,7 +513,7 @@ section('orphan purge:');
 test('start() prunes notifications/customNames for ids without saved session', () => {
   const config = makeMockConfig();
   // Pretend a saved session A exists, but stale notif/customName for B and C
-  config._data.sessions['A'] = { stateName: 'completed' };
+  config._data.sessions['A'] = { stateName: 'waiting' };
   config._data.notifications['A'] = { modal: true, sound: false };
   config._data.notifications['B-orphan'] = { modal: true, sound: true };
   config._data.notifications['C-orphan'] = { modal: false, sound: true };

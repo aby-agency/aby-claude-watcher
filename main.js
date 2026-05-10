@@ -3,9 +3,8 @@ const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
 const { UsageMonitor } = require('./usage');
-const { focusTerminal, resumeSession } = require('./focus');
+const { focusTerminal } = require('./focus');
 const { checkForUpdates, downloadAndInstall, abortActiveDownload, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
-const { installHooks, getDefaultHookPath } = require('./install-hooks');
 const config = require('./config');
 const i18n = require('./i18n');
 
@@ -292,26 +291,7 @@ ipcMain.handle('set-session-order', (_, order) => {
     watcher.removeSession(sessionId);
   });
 
-  ipcMain.handle('clear-completed-sessions', () => {
-    const ids = watcher.getSessions()
-      .filter(s => s.state && s.state.name === 'completed')
-      .map(s => s.sessionId);
-    for (const id of ids) watcher.removeSession(id);
-    return { count: ids.length };
-  });
-
-  ipcMain.handle('resume-session', (_, sessionId, opts) => {
-    const s = watcher.getSessions().find(s => s.sessionId === sessionId);
-    const cwd = s ? s.cwd : null;
-    // Best-effort: ensure the permission-detection hook is installed in the
-    // project so the resumed Claude session can emit PENDING signals.
-    if (cwd) {
-      try { installHooks(cwd, getDefaultHookPath()); } catch {}
-    }
-    return resumeSession(sessionId, cwd, opts);
-  });
-
-ipcMain.handle('set-volume', (_, value) => {
+  ipcMain.handle('set-volume', (_, value) => {
     config.setVolume(value);
   });
 
@@ -423,7 +403,6 @@ function serializeSession(session) {
     model: session.model,
     gitBranch: session.gitBranch || null,
     startedAt: session.startedAt,
-    endedAt: session.endedAt,
     tokens: session.tokens,
     cwd: session.cwd,
     notifEnabled: (() => { const p = config.getNotificationPrefs(session.sessionId); return !!(p.modal || p.sound); })(),
@@ -627,7 +606,7 @@ function updateTrayMenu() {
   if (!tray) return;
 
   const sessions = watcher.getSessions();
-  const activeCount = sessions.filter(s => s.state.name !== 'completed').length;
+  const activeCount = sessions.length;
   const waitingCount = sessions.filter(s => s.state.name === 'waiting' || s.state.name === 'pending').length;
   let tooltip = i18n.t('tray_tooltip', { app: 'Aby Claude Watcher', n: activeCount });
   if (waitingCount > 0) tooltip += i18n.t('tray_tooltip_waiting', { n: waitingCount });

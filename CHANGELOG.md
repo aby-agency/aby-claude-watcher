@@ -4,6 +4,45 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-05-10
+
+Product pivot: the app now monitors only **live** Claude Code sessions.
+Completed sessions vanish the moment Claude exits, the resume / clear
+flows are gone, and the codebase is ~250 lines lighter. The value prop
+becomes "ambient awareness of what's running right now" — anything else
+(history, resume) belongs to the `claude` CLI itself.
+
+### Removed
+- **Completed state** — `STATES.COMPLETED`, the dark-grey badge, the
+  "Anciennes sessions" / "Old sessions" divider, and every code path
+  that transitioned a session into completion. When a session ends
+  (file gone + PID dead), it's purged instantly from the UI and the
+  config store. Legacy completed sessions persisted by older versions
+  are migrated out on first launch.
+- **Resume flow** — the play button on completed cards, the resume
+  modal with its `--dangerously-skip-permissions` toggle, the
+  `resume-session` IPC handler, `focus.resumeSession()`, and the
+  best-effort hook installation that ran before resuming.
+- **Clear-completed action** — the "Tout effacer" / "Clear all" button,
+  its confirmation modal, and the `clear-completed-sessions` IPC. With
+  no completed sessions left to accumulate, the bulk-clear has no job.
+- **Cleanup** — `endedAt` field, `wasResumed` flag, micro-view's
+  completed filter, drag-drop completed restrictions, the
+  `--state-completed` / `--glow-completed` CSS variables, all
+  `state_completed` / `action_resume` / `resume_*` /
+  `clear_completed_*` / `sessions_old_label` i18n strings,
+  `sanitizeSessionId` from focus.js (only used by resume).
+
+### Changed
+- **Notification cooldown reset** — previously cleared on any state
+  transition out of waiting/pending, so a Claude tool-loop
+  (`waiting → running → waiting`) re-rang the bell every cycle. Now
+  cooldown only resets when state goes to `thinking` (= a real user
+  prompt landed). One ding per "Claude is waiting for you" episode.
+- **Error sessions** stay visible with a manual X button. They're the
+  only non-active state surfaced in the UI now — everything else is
+  thinking / running / waiting / pending.
+
 ## [1.5.9] — 2026-05-06
 
 This is a UX-driven cleanup release. The cards lost about half their

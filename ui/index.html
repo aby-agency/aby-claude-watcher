@@ -94,46 +94,8 @@
     <div class="micro-view" id="microView" style="display:none;"></div>
   </div>
 
-  <!-- Confirm clear-completed modal -->
-  <div class="modal-backdrop" id="clearCompletedModal" style="display:none;">
-    <div class="modal">
-      <h3 data-i18n="clear_completed_title">Clear old sessions?</h3>
-      <p class="modal-body" data-i18n-html="clear_completed_body">Completed sessions will be removed from this view…</p>
-      <div class="modal-actions">
-        <button id="clearCompletedCancel" data-i18n="cancel">Cancel</button>
-        <button class="danger" id="clearCompletedConfirm"><span data-i18n="clear_completed_confirm">Clear</span> (<span id="clearCompletedCount">0</span>)</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Notification overlay -->
   <div class="notification-overlay" id="notificationOverlay"></div>
-
-<!-- Resume session modal (hidden) -->
-  <div class="modal-backdrop" id="resumeModal" style="display:none;">
-    <div class="modal">
-      <h3 data-i18n="resume_title">Resume session</h3>
-      <p class="modal-hint" data-i18n="resume_hint">Open this session in a new terminal.</p>
-
-      <label class="resume-option">
-        <input type="checkbox" id="resumeSkipPerms">
-        <div>
-          <div class="resume-option-label">
-            <span class="resume-warn">⚠︎</span>
-            <span data-i18n="resume_skip_perms_label">Skip permission prompts</span>
-          </div>
-          <div class="resume-option-hint" data-i18n-html="resume_skip_perms_hint">
-            Runs Claude Code with <code>--dangerously-skip-permissions</code>. Use only in a worktree, container or sandbox.
-          </div>
-        </div>
-      </label>
-
-      <div class="modal-actions">
-        <button id="resumeCancel" data-i18n="cancel">Cancel</button>
-        <button class="primary" id="resumeConfirm" data-i18n="resume_confirm">Resume</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Settings modal (hidden) -->
   <div class="modal-backdrop" id="settingsModal" style="display:none;">
@@ -325,7 +287,7 @@
         <p class="about-tagline" data-i18n="about_tagline">Real-time dashboard for your Claude Code sessions.</p>
         <ul class="about-features">
           <li data-i18n="about_feature_detect">Auto-detects every Claude Code session as it spawns</li>
-          <li data-i18n="about_feature_state">Live state per session: thinking, running, waiting, completed</li>
+          <li data-i18n="about_feature_state">Live state per session: thinking, running, waiting</li>
           <li data-i18n="about_feature_notify">Notifies you when Claude is waiting for your input</li>
           <li data-i18n="about_feature_focus">One click to focus the originating terminal, or to resume</li>
           <li data-i18n="about_feature_usage">Tracks 5h and 7-day usage windows with countdown to reset</li>

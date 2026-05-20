@@ -4,6 +4,20 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] — 2026-05-20
+
+### Fixed
+- **Popover height stuck regardless of session count** — the tray popover
+  measured `.popover-body.scrollHeight` to auto-resize, but that element
+  has `height: 100vh` + `overflow: hidden` and its scrollable child
+  (`.popover-list`) scrolls internally without pushing the parent.
+  `scrollHeight` therefore always returned the current window height,
+  so opening the popover with 1 session or 15 sessions produced the
+  exact same ~360px window. Height is now computed from
+  `header.offsetHeight + popList.scrollHeight + footer.offsetHeight + 2px`
+  (body borders) so the window grows up to the existing 600px clamp
+  before the inner list takes over scrolling.
+
 ## [1.6.0] — 2026-05-10
 
 Product pivot: the app now monitors only **live** Claude Code sessions.

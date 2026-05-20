@@ -84,7 +84,11 @@ async function refresh() {
   renderPopover(sessions, config);
   // Auto-resize to fit content
   requestAnimationFrame(() => {
-    const height = document.querySelector('.popover-body').scrollHeight;
+    const header = document.querySelector('.popover-header');
+    const list = document.getElementById('popList');
+    const footer = document.querySelector('.popover-footer');
+    // .popover-body has 1px borders top + bottom = 2px
+    const height = header.offsetHeight + list.scrollHeight + footer.offsetHeight + 2;
     window.popoverApi.resize(height);
   });
 }

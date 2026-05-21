@@ -2147,3 +2147,51 @@ body.micro-mode .usage-reset-icon {
   color: var(--text-primary);
   min-width: 0;
 }
+
+/* Compact view: tighter spacing, no top border (the parent card has enough separators) */
+.compact-card .subagents-block {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  gap: 3px;
+}
+.compact-card .subagents-header {
+  font-size: 9px;
+  margin-bottom: 1px;
+}
+.compact-card .subagent-row {
+  padding: 3px 6px;
+  font-size: 10px;
+  gap: 6px;
+}
+
+/* Micro group: stack parent row + subagent rows vertically */
+.micro-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.micro-group .subagents-block {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  margin-left: 18px;  /* align under the dot */
+  gap: 2px;
+}
+.micro-group .subagents-header {
+  display: none;  /* too cramped in micro — rely on the spinner+text alone */
+}
+.micro-group .subagent-row {
+  padding: 2px 6px;
+  font-size: 10px;
+  gap: 5px;
+  border-left-width: 1.5px;
+}
+.micro-group .subagent-type {
+  display: none;  /* drop the type pill in micro to keep the row narrow */
+}
+.micro-group .subagent-spinner {
+  width: 6px;
+  height: 6px;
+  border-width: 1px;
+}

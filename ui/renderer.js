@@ -801,15 +801,21 @@ function microItemHTML(s) {
   const notifIcon = s.notifEnabled
     ? `<button class="micro-notif-btn notif-on" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">${ICONS.bell}</button>`
     : `<button class="micro-notif-btn" onclick="event.stopPropagation(); toggleNotif(event, '${sid}')" title="${t('action_notifications')}">${ICONS.bellOff}</button>`;
+  // Wrap parent row + subagent rows in a group so data-session targets the
+  // whole stack (drag-drop, bell, updateSession). The .micro-item itself loses
+  // data-session to avoid double-matches in selectors.
   return `
-    <div class="micro-item" data-state="${stateName}" data-session="${sid}"
-         title="${escAttr(tooltip)}"
+    <div class="micro-group" data-state="${stateName}" data-session="${sid}"
          draggable="${!searchQuery}"
-         ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
-         onclick="handleFocus('${sid}')">
-      ${indicator}
-      <span class="micro-item-name">${esc(name)}</span>
-      ${notifIcon}
+         ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">
+      <div class="micro-item" data-state="${stateName}"
+           title="${escAttr(tooltip)}"
+           onclick="handleFocus('${sid}')">
+        ${indicator}
+        <span class="micro-item-name">${esc(name)}</span>
+        ${notifIcon}
+      </div>
+      ${subagentsBlockHTML(s)}
     </div>
   `;
 }
@@ -861,6 +867,7 @@ onclick="handleCardClick(event, '${sid}')">
         <span class="compact-card-branch-icon">${ICONS.branch || '⎇'}</span>
         <span class="branch-value">${esc(s.gitBranch || '—')}</span>
       </div>
+      ${subagentsBlockHTML(s)}
     </div>
   `;
 }

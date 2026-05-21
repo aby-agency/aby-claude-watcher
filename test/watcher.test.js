@@ -46,6 +46,7 @@ function makeSession(id, overrides = {}) {
     terminalId: null,
     lastEventTime: Date.now(),
     hasActivity: true,
+    agentDispatches: new Map(),
     ...overrides,
   };
 }
@@ -533,6 +534,41 @@ test('start() prunes notifications/customNames for ids without saved session', (
   if (!config._data.sessionOrder.includes('A')) throw new Error('A must remain in order');
 
   w.stop();
+});
+
+section('Agent dispatch capture:');
+
+test('Agent tool_use populates session.agentDispatches via fastInitialLoad', () => {
+  const tmp = tmpJsonl('agent-dispatch');
+  const userEv = { type: 'user', message: { role: 'user', content: 'go' },
+                   timestamp: '2026-05-21T10:00:00.000Z' };
+  const assistEv = {
+    type: 'assistant',
+    message: { role: 'assistant',
+      content: [
+        { type: 'text', text: 'launching' },
+        { type: 'tool_use', id: 'toolu_bg1', name: 'Agent',
+          input: { description: 'D1', subagent_type: 'general-purpose', run_in_background: true } },
+        { type: 'tool_use', id: 'toolu_fg1', name: 'Agent',
+          input: { description: 'D2', subagent_type: 'general-purpose' } },
+      ],
+      stop_reason: 'tool_use' },
+    timestamp: '2026-05-21T10:00:30.000Z',
+  };
+  fs.writeFileSync(tmp, [JSON.stringify(userEv), JSON.stringify(assistEv), ''].join('\n'));
+
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('S', makeSession('S', { state: STATES.RUNNING }));
+  w.fastInitialLoad('S', tmp);
+
+  const s = w.sessions.get('S');
+  if (!s.agentDispatches) throw new Error('agentDispatches not initialized');
+  const bg = s.agentDispatches.get('toolu_bg1');
+  const fg = s.agentDispatches.get('toolu_fg1');
+  if (!bg || bg.runInBackground !== true) throw new Error(`bg=${JSON.stringify(bg)}`);
+  if (!fg || fg.runInBackground !== false) throw new Error(`fg=${JSON.stringify(fg)}`);
+  if (typeof bg.dispatchTs !== 'number') throw new Error(`bg.dispatchTs not a number: ${bg.dispatchTs}`);
 });
 
 runAll().then(() => {

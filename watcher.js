@@ -63,6 +63,7 @@ class SessionWatcher extends EventEmitter {
           terminalId: data.terminalId || null,
           lastEventTime: Date.now(),
           hasActivity: savedState.name !== 'error',
+          agentDispatches: new Map(),
         });
         this.emit('session-added', this.sessions.get(id));
       }
@@ -209,6 +210,7 @@ class SessionWatcher extends EventEmitter {
               permissionMode: this.detectBypassFromPid(pid) ? 'bypassPermissions' : null,
               lastEventTime: Date.now(),
               hasActivity: false,
+              agentDispatches: new Map(),
             });
             this.watchJsonl(effectiveId);
             // Persist immediately so a fresh session that hasn't yet transitioned
@@ -365,6 +367,24 @@ class SessionWatcher extends EventEmitter {
     return path.basename(cwd);
   }
 
+  // Record every Agent tool_use we see, with its run_in_background flag and the
+  // event timestamp. subagents.js joins these by toolUseId (via the agent
+  // .meta.json) to filter background-vs-foreground dispatches.
+  captureAgentDispatches(session, event) {
+    if (!session || !session.agentDispatches) return;
+    const content = event && event.message && event.message.content;
+    if (!Array.isArray(content)) return;
+    const tsMs = event.timestamp ? Date.parse(event.timestamp) : Date.now();
+    for (const c of content) {
+      if (c && c.type === 'tool_use' && c.name === 'Agent' && c.id) {
+        session.agentDispatches.set(c.id, {
+          runInBackground: !!(c.input && c.input.run_in_background),
+          dispatchTs: Number.isFinite(tsMs) ? tsMs : Date.now(),
+        });
+      }
+    }
+  }
+
   findJsonlPath(sessionId) {
     try {
       const dirs = fs.readdirSync(PROJECTS_DIR);
@@ -472,6 +492,7 @@ class SessionWatcher extends EventEmitter {
                 session.tokens.input += event.message.usage.input_tokens || 0;
                 session.tokens.output += event.message.usage.output_tokens || 0;
               }
+              this.captureAgentDispatches(session, event);
             } else if (event.type === 'user') {
               lastUser = event;
             } else if (event.type === 'permission-mode' && event.permissionMode) {
@@ -694,6 +715,8 @@ class SessionWatcher extends EventEmitter {
       this.setState(sessionId, STATES.ERROR, isInitial);
       return;
     }
+
+    this.captureAgentDispatches(session, event);
 
     // Determine state from content
     const content = message.content || [];

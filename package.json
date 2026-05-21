@@ -1,13 +1,13 @@
 {
   "name": "aby-claude-watcher",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "Aby Claude Watcher — dashboard desktop pour monitorer en temps réel vos sessions Claude Code",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder --mac",
-    "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js && node test/updater.test.js && node test/watcher.test.js"
+    "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js && node test/updater.test.js && node test/watcher.test.js && node test/subagents.test.js"
   },
   "build": {
     "appId": "fr.aby-agency.aby-claude-watcher",
@@ -37,6 +37,7 @@
       "preload.js",
       "preload-popover.js",
       "watcher.js",
+      "subagents.js",
       "socket.js",
       "focus.js",
       "config.js",

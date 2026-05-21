@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readMeta, readLastEvent, deriveState } = require('../subagents');
+const { readMeta, readLastEvent, deriveState, scanSession } = require('../subagents');
 
 let passed = 0, failed = 0;
 const queue = [];
@@ -159,6 +159,87 @@ test('user event last (mid-tool-cycle) + recent mtime ⇒ running', () => {
     Date.now() - 500
   );
   if (state !== 'running') throw new Error(`expected running, got ${state}`);
+});
+
+section('scanSession:');
+
+function setupSessionDir(opts = {}) {
+  const root = tmpDir();
+  const sessionDir = path.join(root, 'sess1');
+  const subDir = path.join(sessionDir, 'subagents');
+  fs.mkdirSync(subDir, { recursive: true });
+
+  for (const a of opts.agents || []) {
+    fs.writeFileSync(path.join(subDir, `agent-${a.id}.meta.json`),
+      JSON.stringify({ agentType: a.type || 'general-purpose',
+                       description: a.desc || 'x',
+                       toolUseId: a.tuid || `toolu_${a.id}` }));
+    fs.writeFileSync(path.join(subDir, `agent-${a.id}.jsonl`),
+      (a.events || []).map(e => JSON.stringify(e)).join('\n') + '\n');
+    if (a.mtimeAgoMs != null) {
+      const mtime = (Date.now() - a.mtimeAgoMs) / 1000;
+      fs.utimesSync(path.join(subDir, `agent-${a.id}.jsonl`), mtime, mtime);
+    }
+  }
+  return sessionDir;
+}
+
+test('returns [] for non-existent session dir', () => {
+  const r = scanSession('/nope', new Map());
+  if (!Array.isArray(r) || r.length !== 0) throw new Error(`expected []`);
+});
+
+test('discovers all agents (no filter applied yet)', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 'a1', desc: 'one', events: [{ type: 'assistant', message: { stop_reason: 'end_turn' } }] },
+    { id: 'a2', desc: 'two', events: [{ type: 'assistant', message: { stop_reason: null } }],
+      mtimeAgoMs: 1000 },
+  ]});
+  const dispatches = new Map([
+    ['toolu_a1', { runInBackground: true, dispatchTs: 1000 }],
+    ['toolu_a2', { runInBackground: true, dispatchTs: 2000 }],
+  ]);
+  const r = scanSession(sessionDir, dispatches);
+  if (r.length !== 2) throw new Error(`expected 2, got ${r.length}`);
+  const a1 = r.find(s => s.agentId === 'a1');
+  if (a1.state !== 'completed') throw new Error(`a1.state=${a1.state}`);
+  if (a1.description !== 'one') throw new Error(`a1.description=${a1.description}`);
+  const a2 = r.find(s => s.agentId === 'a2');
+  if (a2.state !== 'running') throw new Error(`a2.state=${a2.state}`);
+});
+
+test('skips orphan jsonl with no meta.json', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 'good', events: [{ type: 'assistant', message: { stop_reason: 'end_turn' } }] },
+  ]});
+  fs.unlinkSync(path.join(sessionDir, 'subagents', 'agent-good.meta.json'));
+  const r = scanSession(sessionDir, new Map());
+  if (r.length !== 0) throw new Error(`expected 0, got ${r.length}`);
+});
+
+test('attaches dispatch metadata (runInBackground, dispatchTs) when matched', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 'bg', tuid: 'toolu_bg', events: [{ type: 'assistant', message: { stop_reason: null } }] },
+    { id: 'fg', tuid: 'toolu_fg', events: [{ type: 'assistant', message: { stop_reason: null } }] },
+  ]});
+  const dispatches = new Map([
+    ['toolu_bg', { runInBackground: true, dispatchTs: 1000 }],
+    ['toolu_fg', { runInBackground: false, dispatchTs: 2000 }],
+  ]);
+  const r = scanSession(sessionDir, dispatches);
+  const bg = r.find(s => s.agentId === 'bg');
+  const fg = r.find(s => s.agentId === 'fg');
+  if (bg.runInBackground !== true) throw new Error(`bg.runInBackground=${bg.runInBackground}`);
+  if (fg.runInBackground !== false) throw new Error(`fg.runInBackground=${fg.runInBackground}`);
+  if (bg.dispatchTs !== 1000) throw new Error(`bg.dispatchTs=${bg.dispatchTs}`);
+});
+
+test('runInBackground defaults to undefined when no dispatch entry exists', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 'orphan', tuid: 'toolu_orphan', events: [{ type: 'assistant', message: { stop_reason: null } }] },
+  ]});
+  const r = scanSession(sessionDir, new Map());
+  if (r[0].runInBackground !== undefined) throw new Error(`expected undefined`);
 });
 
 runAll().then(() => process.exit(failed > 0 ? 1 : 0));

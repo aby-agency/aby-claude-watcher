@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 
 const TAIL_BYTES = 64 * 1024;
 const STALE_THRESHOLD_MS = 5000;
@@ -53,10 +54,49 @@ function deriveState(lastEvent, mtimeMs, nowMs = Date.now()) {
   return 'running';
 }
 
+function scanSession(sessionDir, dispatches) {
+  const out = [];
+  const subDir = path.join(sessionDir, 'subagents');
+  let entries;
+  try { entries = fs.readdirSync(subDir); }
+  catch { return out; }
+
+  for (const entry of entries) {
+    if (!entry.startsWith('agent-') || !entry.endsWith('.jsonl')) continue;
+    const agentId = entry.slice('agent-'.length, -'.jsonl'.length);
+    const jsonlPath = path.join(subDir, entry);
+    const metaPath = path.join(subDir, `agent-${agentId}.meta.json`);
+
+    const meta = readMeta(metaPath);
+    if (!meta) continue;
+
+    let stat;
+    try { stat = fs.statSync(jsonlPath); } catch { continue; }
+
+    const lastEvent = readLastEvent(jsonlPath);
+    const state = deriveState(lastEvent, stat.mtimeMs);
+
+    const dispatch = dispatches.get(meta.toolUseId);
+
+    out.push({
+      agentId,
+      description: meta.description,
+      agentType: meta.agentType,
+      toolUseId: meta.toolUseId,
+      runInBackground: dispatch ? dispatch.runInBackground : undefined,
+      dispatchTs: dispatch ? dispatch.dispatchTs : null,
+      lastEventTs: stat.mtimeMs,
+      state,
+    });
+  }
+  return out;
+}
+
 module.exports = {
   readMeta,
   readLastEvent,
   deriveState,
+  scanSession,
   STALE_THRESHOLD_MS,
   ERROR_TIMEOUT_MS,
   TAIL_BYTES,

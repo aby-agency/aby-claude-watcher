@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 
 const TAIL_BYTES = 64 * 1024;
-const STALE_THRESHOLD_MS = 5000;
 const ERROR_TIMEOUT_MS = 30000;
 
 function readMeta(metaPath) {
@@ -92,6 +91,8 @@ function scanSession(sessionDir, dispatches) {
   return out;
 }
 
+// Stateless today; kept as a class so we can cache scanSession results
+// (keyed by sessionDir, short TTL) if disk-scan cost becomes visible.
 class SubagentTracker {
   snapshotForSession(sessionDir, dispatches) {
     return scanSession(sessionDir, dispatches)
@@ -105,7 +106,6 @@ module.exports = {
   deriveState,
   scanSession,
   SubagentTracker,
-  STALE_THRESHOLD_MS,
   ERROR_TIMEOUT_MS,
   TAIL_BYTES,
 };

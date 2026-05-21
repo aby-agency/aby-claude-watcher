@@ -705,13 +705,12 @@ function getStateLabel(s) {
 }
 
 function subagentRowHTML(sa) {
-  const desc = esc(sa.description || sa.agentType || 'subagent');
-  const type = esc(sa.agentType || '');
+  const raw = sa.description || sa.agentType || 'subagent';
   return `
     <div class="subagent-row" data-agent="${escAttr(sa.agentId)}">
       <span class="subagent-spinner"></span>
-      <span class="subagent-type">${type}</span>
-      <span class="subagent-desc" title="${desc}">${desc}</span>
+      <span class="subagent-type">${esc(sa.agentType || '')}</span>
+      <span class="subagent-desc" title="${escAttr(raw)}">${esc(raw)}</span>
     </div>
   `;
 }
@@ -805,7 +804,7 @@ function microItemHTML(s) {
   // whole stack (drag-drop, bell, updateSession). The .micro-item itself loses
   // data-session to avoid double-matches in selectors.
   return `
-    <div class="micro-group" data-state="${stateName}" data-session="${sid}"
+    <div class="micro-group" data-session="${sid}"
          draggable="${!searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">
       <div class="micro-item" data-state="${stateName}"

@@ -412,6 +412,13 @@ class SessionWatcher extends EventEmitter {
   }
 
   startFileWatch(sessionId, jsonlPath) {
+    // Remember the resolved path on the session so consumers (e.g. subagent
+    // tracker in main.js) can derive the project dir without re-slugifying
+    // cwd — that slug rule is owned by Claude Code and isn't a simple
+    // '/' → '-' (non-ASCII chars get mangled).
+    const session = this.sessions.get(sessionId);
+    if (session) session.jsonlPath = jsonlPath;
+
     // Fast initial load: read tail for state + quick scan for tokens
     this.fastInitialLoad(sessionId, jsonlPath);
 

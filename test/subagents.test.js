@@ -269,4 +269,7 @@ test('snapshot returns only background+running subagents for a session', () => {
   if (result[0].agentId !== 'bgRun') throw new Error(`got ${result[0].agentId}`);
 });
 
-runAll().then(() => process.exit(failed > 0 ? 1 : 0));
+runAll().then(() => {
+  console.log(`\n${passed} passed, ${failed} failed`);
+  process.exit(failed > 0 ? 1 : 0);
+});

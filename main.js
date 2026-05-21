@@ -1,6 +1,5 @@
 const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeImage, shell, screen, clipboard } = require('electron');
 const path = require('path');
-const os = require('os');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
 const { UsageMonitor } = require('./usage');
@@ -10,17 +9,16 @@ const config = require('./config');
 const i18n = require('./i18n');
 const { SubagentTracker } = require('./subagents');
 
-const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const subagentTracker = new SubagentTracker();
 
-// Claude Code stores per-session JSONLs at:
-//   ~/.claude/projects/<projectSlug>/<sessionId>/subagents/agent-*.jsonl
-// where <projectSlug> mirrors cwd with every '/' replaced by '-'. So
-// /Users/x/Project/Fafa becomes -Users-x-Project-Fafa.
+// Per-session subagents live at <projectDir>/<sessionId>/subagents/agent-*.jsonl.
+// We don't re-derive <projectDir> from cwd because the Claude Code slug rule
+// is more involved than a simple '/' → '-' (it mangles non-ASCII chars and
+// merges sub-paths). Instead we lean on the watcher, which has already
+// resolved the real JSONL path at watch time and stashed it on the session.
 function sessionDirFor(session) {
-  if (!session || !session.cwd || !session.sessionId) return null;
-  const slug = session.cwd.replace(/\//g, '-');
-  return path.join(PROJECTS_DIR, slug, session.sessionId);
+  if (!session || !session.sessionId || !session.jsonlPath) return null;
+  return path.join(path.dirname(session.jsonlPath), session.sessionId);
 }
 
 let mainWindow;

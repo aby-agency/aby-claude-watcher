@@ -571,6 +571,22 @@ test('Agent tool_use populates session.agentDispatches via fastInitialLoad', () 
   if (typeof bg.dispatchTs !== 'number') throw new Error(`bg.dispatchTs not a number: ${bg.dispatchTs}`);
 });
 
+test('startFileWatch stores jsonlPath on session (for sessionDirFor downstream)', () => {
+  const tmp = tmpJsonl('jsonl-path-store');
+  fs.writeFileSync(tmp, JSON.stringify({ type: 'assistant', message: { stop_reason: 'end_turn' } }) + '\n');
+
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('JP', makeSession('JP', { state: STATES.RUNNING }));
+  w.startFileWatch('JP', tmp);
+
+  const s = w.sessions.get('JP');
+  if (s.jsonlPath !== tmp) throw new Error(`expected ${tmp}, got ${s.jsonlPath}`);
+
+  // Clean up the watcher to release file handles
+  w.stop();
+});
+
 runAll().then(() => {
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readMeta, readLastEvent } = require('../subagents');
+const { readMeta, readLastEvent, deriveState } = require('../subagents');
 
 let passed = 0, failed = 0;
 const queue = [];
@@ -104,6 +104,61 @@ test('skips trailing blank lines', () => {
   fs.writeFileSync(p, JSON.stringify({ type: 'assistant', message: { stop_reason: 'end_turn' } }) + '\n\n\n');
   const ev = readLastEvent(p);
   if (!ev || ev.type !== 'assistant') throw new Error('failed to skip blanks');
+});
+
+section('deriveState:');
+
+test('end_turn + recent mtime ⇒ completed', () => {
+  const state = deriveState(
+    { type: 'assistant', message: { stop_reason: 'end_turn' } },
+    Date.now()
+  );
+  if (state !== 'completed') throw new Error(`expected completed, got ${state}`);
+});
+
+test('end_turn + old mtime ⇒ completed', () => {
+  const state = deriveState(
+    { type: 'assistant', message: { stop_reason: 'end_turn' } },
+    Date.now() - 60_000
+  );
+  if (state !== 'completed') throw new Error(`expected completed, got ${state}`);
+});
+
+test('tool_use stop_reason + recent mtime ⇒ running', () => {
+  const state = deriveState(
+    { type: 'assistant', message: { stop_reason: 'tool_use' } },
+    Date.now() - 1000
+  );
+  if (state !== 'running') throw new Error(`expected running, got ${state}`);
+});
+
+test('null stop_reason + recent mtime ⇒ running', () => {
+  const state = deriveState(
+    { type: 'assistant', message: { stop_reason: null } },
+    Date.now() - 1000
+  );
+  if (state !== 'running') throw new Error(`expected running, got ${state}`);
+});
+
+test('null stop_reason + mtime > 30s ⇒ error', () => {
+  const state = deriveState(
+    { type: 'assistant', message: { stop_reason: null } },
+    Date.now() - 60_000
+  );
+  if (state !== 'error') throw new Error(`expected error, got ${state}`);
+});
+
+test('null lastEvent ⇒ error', () => {
+  const state = deriveState(null, Date.now());
+  if (state !== 'error') throw new Error(`expected error, got ${state}`);
+});
+
+test('user event last (mid-tool-cycle) + recent mtime ⇒ running', () => {
+  const state = deriveState(
+    { type: 'user', message: { role: 'user', content: [{ type: 'tool_result' }] } },
+    Date.now() - 500
+  );
+  if (state !== 'running') throw new Error(`expected running, got ${state}`);
 });
 
 runAll().then(() => process.exit(failed > 0 ? 1 : 0));

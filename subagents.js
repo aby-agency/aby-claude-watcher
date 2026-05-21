@@ -1,6 +1,8 @@
 const fs = require('fs');
 
 const TAIL_BYTES = 64 * 1024;
+const STALE_THRESHOLD_MS = 5000;
+const ERROR_TIMEOUT_MS = 30000;
 
 function readMeta(metaPath) {
   try {
@@ -39,4 +41,23 @@ function readLastEvent(jsonlPath) {
   }
 }
 
-module.exports = { readMeta, readLastEvent, TAIL_BYTES };
+function deriveState(lastEvent, mtimeMs, nowMs = Date.now()) {
+  if (!lastEvent) return 'error';
+
+  const msg = lastEvent.message || {};
+  const stopReason = msg.stop_reason;
+  const ageMs = nowMs - mtimeMs;
+
+  if (stopReason === 'end_turn') return 'completed';
+  if (stopReason == null && ageMs > ERROR_TIMEOUT_MS) return 'error';
+  return 'running';
+}
+
+module.exports = {
+  readMeta,
+  readLastEvent,
+  deriveState,
+  STALE_THRESHOLD_MS,
+  ERROR_TIMEOUT_MS,
+  TAIL_BYTES,
+};

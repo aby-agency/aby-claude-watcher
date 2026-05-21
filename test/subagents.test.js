@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readMeta, readLastEvent, deriveState, scanSession } = require('../subagents');
+const { readMeta, readLastEvent, deriveState, scanSession, SubagentTracker } = require('../subagents');
 
 let passed = 0, failed = 0;
 const queue = [];
@@ -240,6 +240,33 @@ test('runInBackground defaults to undefined when no dispatch entry exists', () =
   ]});
   const r = scanSession(sessionDir, new Map());
   if (r[0].runInBackground !== undefined) throw new Error(`expected undefined`);
+});
+
+section('SubagentTracker:');
+
+test('snapshot returns only background+running subagents for a session', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    // Background, running
+    { id: 'bgRun', tuid: 'tu_bgRun',
+      events: [{ type: 'assistant', message: { stop_reason: null } }] },
+    // Background, completed (filtered out)
+    { id: 'bgDone', tuid: 'tu_bgDone',
+      events: [{ type: 'assistant', message: { stop_reason: 'end_turn' } }] },
+    // Foreground, running (filtered out)
+    { id: 'fgRun', tuid: 'tu_fgRun',
+      events: [{ type: 'assistant', message: { stop_reason: null } }] },
+  ]});
+  const dispatches = new Map([
+    ['tu_bgRun',  { runInBackground: true,  dispatchTs: 1 }],
+    ['tu_bgDone', { runInBackground: true,  dispatchTs: 2 }],
+    ['tu_fgRun',  { runInBackground: false, dispatchTs: 3 }],
+  ]);
+
+  const tracker = new SubagentTracker();
+  const result = tracker.snapshotForSession(sessionDir, dispatches);
+
+  if (result.length !== 1) throw new Error(`expected 1, got ${result.length}: ${JSON.stringify(result.map(r => r.agentId))}`);
+  if (result[0].agentId !== 'bgRun') throw new Error(`got ${result[0].agentId}`);
 });
 
 runAll().then(() => process.exit(failed > 0 ? 1 : 0));

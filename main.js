@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeImage, shell, screen, clipboard } = require('electron');
 const path = require('path');
+const os = require('os');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
 const { UsageMonitor } = require('./usage');
@@ -7,6 +8,20 @@ const { focusTerminal } = require('./focus');
 const { checkForUpdates, downloadAndInstall, abortActiveDownload, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
 const config = require('./config');
 const i18n = require('./i18n');
+const { SubagentTracker } = require('./subagents');
+
+const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
+const subagentTracker = new SubagentTracker();
+
+// Claude Code stores per-session JSONLs at:
+//   ~/.claude/projects/<projectSlug>/<sessionId>/subagents/agent-*.jsonl
+// where <projectSlug> mirrors cwd with every '/' replaced by '-'. So
+// /Users/x/Project/Fafa becomes -Users-x-Project-Fafa.
+function sessionDirFor(session) {
+  if (!session || !session.cwd || !session.sessionId) return null;
+  const slug = session.cwd.replace(/\//g, '-');
+  return path.join(PROJECTS_DIR, slug, session.sessionId);
+}
 
 let mainWindow;
 let popoverWindow;
@@ -393,6 +408,12 @@ ipcMain.handle('set-session-order', (_, order) => {
 }
 
 function serializeSession(session) {
+  const sessionDir = sessionDirFor(session);
+  const dispatches = session.agentDispatches || new Map();
+  const subagents = sessionDir
+    ? subagentTracker.snapshotForSession(sessionDir, dispatches)
+    : [];
+
   return {
     sessionId: session.sessionId,
     projectName: session.projectName,
@@ -406,6 +427,7 @@ function serializeSession(session) {
     tokens: session.tokens,
     cwd: session.cwd,
     notifEnabled: (() => { const p = config.getNotificationPrefs(session.sessionId); return !!(p.modal || p.sound); })(),
+    subagents,
   };
 }
 

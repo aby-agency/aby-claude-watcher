@@ -92,11 +92,19 @@ function scanSession(sessionDir, dispatches) {
   return out;
 }
 
+class SubagentTracker {
+  snapshotForSession(sessionDir, dispatches) {
+    return scanSession(sessionDir, dispatches)
+      .filter(sa => sa.runInBackground === true && sa.state === 'running');
+  }
+}
+
 module.exports = {
   readMeta,
   readLastEvent,
   deriveState,
   scanSession,
+  SubagentTracker,
   STALE_THRESHOLD_MS,
   ERROR_TIMEOUT_MS,
   TAIL_BYTES,

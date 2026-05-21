@@ -704,6 +704,31 @@ function getStateLabel(s) {
   return t('state_' + s.state.name);
 }
 
+function subagentRowHTML(sa) {
+  const desc = esc(sa.description || sa.agentType || 'subagent');
+  const type = esc(sa.agentType || '');
+  return `
+    <div class="subagent-row" data-agent="${escAttr(sa.agentId)}">
+      <span class="subagent-spinner"></span>
+      <span class="subagent-type">${type}</span>
+      <span class="subagent-desc" title="${desc}">${desc}</span>
+    </div>
+  `;
+}
+
+function subagentsBlockHTML(s) {
+  if (!s.subagents || s.subagents.length === 0) return '';
+  const rows = s.subagents.map(subagentRowHTML).join('');
+  const count = s.subagents.length;
+  const label = count === 1 ? 'sous-agent' : 'sous-agents';
+  return `
+    <div class="subagents-block" data-count="${count}">
+      <div class="subagents-header">${count} ${label} en cours</div>
+      ${rows}
+    </div>
+  `;
+}
+
 function cardHTML(s) {
   const stateName = s.state.name;
   const stateLabel = getStateLabel(s);
@@ -756,6 +781,7 @@ onclick="handleCardClick(event, '${sid}')">
           <span class="detail-value">${(stateName === 'running' || stateName === 'thinking') ? toolPill(s.lastTool) : toolPill(null)}</span>
         </div>
       </div>
+      ${subagentsBlockHTML(s)}
     </div>
   `;
 }

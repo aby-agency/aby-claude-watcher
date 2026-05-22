@@ -2,8 +2,8 @@
 
 const STATE_COLORS = {
   thinking: '#a78bfa',
-  running: '#22c55e',
-  waiting: '#3b82f6',
+  running: '#3b82f6',
+  waiting: '#22c55e',
   error: '#ef4444',
 };
 

@@ -25,10 +25,11 @@ npm run dev      # with devtools
 | State | Color | Trigger |
 |-------|-------|---------|
 | thinking | purple `#a78bfa` | Last event = `user` text (Claude processing) |
-| running | green `#22c55e` | Last event = `assistant` with `stop_reason: "tool_use"` |
-| waiting | blue `#3b82f6` | `end_turn` + 2s no activity |
+| running | blue `#3b82f6` | Last event = `assistant` with `stop_reason: "tool_use"` |
+| waiting | green `#22c55e` | `end_turn` + 2s no activity (idle, turn finished) |
+| pending | amber `#f59e0b` | Permission prompt deferred from hook ping (action required) |
 | error | red `#ef4444` | `isApiErrorMessage` event OR silent crash after explicit resume |
-| completed | dark grey `#4b5563` | Session file gone + PID dead (with past activity) |
+| completed | (purged) | Session file gone + PID dead → removed from UI |
 
 ## Key decisions
 

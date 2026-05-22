@@ -15,9 +15,9 @@ const DEBUG = process.argv.includes('--dev') || !!process.env.ABY_DEBUG;
 
 const STATES = {
   THINKING: { name: 'thinking', color: '#a78bfa' },
-  RUNNING: { name: 'running', color: '#22c55e' },
-  WAITING: { name: 'waiting', color: '#3b82f6' },
-  PENDING: { name: 'pending', color: '#f97316' },
+  RUNNING: { name: 'running', color: '#3b82f6' },
+  WAITING: { name: 'waiting', color: '#22c55e' },
+  PENDING: { name: 'pending', color: '#f59e0b' },
   ERROR: { name: 'error', color: '#ef4444' },
 };
 

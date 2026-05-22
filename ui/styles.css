@@ -14,17 +14,17 @@
 
   /* State colors */
   --state-thinking: #a78bfa;
-  --state-running: #22c55e;
-  --state-waiting: #3b82f6;
-  --state-pending: #f97316;
+  --state-running: #3b82f6;
+  --state-waiting: #22c55e;
+  --state-pending: #f59e0b;
   --state-pending-contrast: #ffffff;
   --state-neutral: #94a3b8;
   --state-error: #ef4444;
 
   /* Glow variants */
   --glow-thinking: rgba(167, 139, 250, 0.15);
-  --glow-running: rgba(34, 197, 94, 0.15);
-  --glow-waiting: rgba(59, 130, 246, 0.15);
+  --glow-running: rgba(59, 130, 246, 0.15);
+  --glow-waiting: rgba(34, 197, 94, 0.15);
 
   --radius: 8px;
   --radius-sm: 4px;
@@ -753,7 +753,7 @@ body.micro-mode .usage-reset-icon {
 .state-badge.thinking { --badge-bg: var(--glow-thinking); --badge-color: var(--state-thinking); }
 .state-badge.running { --badge-bg: var(--glow-running); --badge-color: var(--state-running); }
 .state-badge.waiting { --badge-bg: var(--glow-waiting); --badge-color: var(--state-waiting); }
-.state-badge.pending { --badge-bg: rgba(249, 115, 22, 0.15); --badge-color: var(--state-pending); }
+.state-badge.pending { --badge-bg: rgba(245, 158, 11, 0.15); --badge-color: var(--state-pending); }
 .state-badge.error { --badge-bg: rgba(153, 27, 27, 0.15); --badge-color: var(--state-error); }
 
 .state-badge.running .dot,
@@ -995,7 +995,7 @@ body.micro-mode .usage-reset-icon {
 }
 
 .compact-card-branch {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 5px;
   font-size: 11px;
@@ -1011,8 +1011,12 @@ body.micro-mode .usage-reset-icon {
 }
 
 .compact-card-branch .branch-value {
+  max-width: none;
   min-width: 0;
-  word-break: break-word;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Fixed-size slot for the leading indicator: dot, pending bell or bell-flash
@@ -1049,19 +1053,19 @@ body.micro-mode .usage-reset-icon {
 
 /* State-driven colours */
 .compact-card[data-state="thinking"] { --card-accent: var(--state-thinking); }
-.compact-card[data-state="thinking"] .compact-meta-state { color: var(--state-thinking); }
+.compact-card[data-state="thinking"] .compact-card-state { color: var(--state-thinking); }
 .compact-card[data-state="thinking"] .compact-dot { background: var(--state-thinking); }
 .compact-card[data-state="running"] { --card-accent: var(--state-running); }
-.compact-card[data-state="running"] .compact-meta-state { color: var(--state-running); }
+.compact-card[data-state="running"] .compact-card-state { color: var(--state-running); }
 .compact-card[data-state="running"] .compact-dot { background: var(--state-running); }
 .compact-card[data-state="waiting"] { --card-accent: var(--state-waiting); }
-.compact-card[data-state="waiting"] .compact-meta-state { color: var(--state-waiting); }
+.compact-card[data-state="waiting"] .compact-card-state { color: var(--state-waiting); }
 .compact-card[data-state="waiting"] .compact-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
 .compact-card[data-state="pending"] { --card-accent: var(--state-pending); }
-.compact-card[data-state="pending"] .compact-meta-state { color: var(--state-pending); }
+.compact-card[data-state="pending"] .compact-card-state { color: var(--state-pending); }
 .compact-card[data-state="pending"] .compact-dot { background: var(--state-pending); }
 .compact-card[data-state="error"] { --card-accent: var(--state-error); }
-.compact-card[data-state="error"] .compact-meta-state { color: var(--state-error); }
+.compact-card[data-state="error"] .compact-card-state { color: var(--state-error); }
 .compact-card[data-state="error"] .compact-dot { background: var(--state-error); }
 
 /* ═══ Notification modal ═══ */
@@ -2119,8 +2123,8 @@ body.micro-mode .usage-reset-icon {
   align-items: center;
   gap: 8px;
   padding: 5px 8px;
-  background: rgba(34, 197, 94, 0.08);
-  border-left: 2px solid #22c55e;
+  background: color-mix(in srgb, var(--state-running) 8%, transparent);
+  border-left: 2px solid var(--state-running);
   border-radius: 3px;
   font-size: 11px;
   overflow: hidden;
@@ -2128,8 +2132,8 @@ body.micro-mode .usage-reset-icon {
 .subagent-spinner {
   width: 8px;
   height: 8px;
-  border: 1.5px solid rgba(34, 197, 94, 0.35);
-  border-top-color: #22c55e;
+  border: 1.5px solid color-mix(in srgb, var(--state-running) 35%, transparent);
+  border-top-color: var(--state-running);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   flex-shrink: 0;

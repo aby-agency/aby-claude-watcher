@@ -137,14 +137,14 @@ function setupWatcher() {
   watcher.on('session-waiting', (session) => {
     const prefs = config.getNotificationPrefs(session.sessionId);
     const kind = session.state && session.state.name === 'pending' ? 'pending' : 'waiting';
-    if (prefs.modal) {
-      sendToRenderer('show-notification', {
-        sessionId: session.sessionId,
-        projectName: session.projectName,
-        slug: session.slug,
-        kind,
-      });
-    }
+    // Always fire the visual event — the renderer gates by view mode.
+    // Compact view shows the toast regardless of the bell; grid still requires it.
+    sendToRenderer('show-notification', {
+      sessionId: session.sessionId,
+      projectName: session.projectName,
+      slug: session.slug,
+      kind,
+    });
     if (prefs.sound) {
       sendToRenderer('play-sound', { kind, sessionId: session.sessionId });
     }

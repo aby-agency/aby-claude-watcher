@@ -115,6 +115,12 @@ async function init() {
     // Skip the in-app toast in micro mode — the whole window is too small
     // for a modal overlay. The pulsing waiting dot is enough signal.
     if (viewMode === 'micro') return;
+    // Grid view keeps the bell-gated semantics. Compact always shows the
+    // toast — the bell there only controls sound + OS notif.
+    if (viewMode === 'grid') {
+      const s = sessions.get(data.sessionId);
+      if (!s || !s.notifEnabled) return;
+    }
     showToast(data);
   });
 

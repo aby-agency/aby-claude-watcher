@@ -4,6 +4,52 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] — 2026-05-22
+
+### Fixed
+- **No toast in compact view when bell was off** — toasts were gated on
+  the per-session bell pref (`prefs.modal`) at the main-process level,
+  so users in compact view who had never enabled the bell got no visual
+  signal at all on `waiting` / `pending` transitions. The `show-notification`
+  IPC now fires unconditionally; the renderer gates by view mode instead.
+  Compact view always shows the toast — the bell there only controls
+  sound + native OS notifications. Grid view behaviour is unchanged
+  (bell still controls the toast). Micro view still skips the toast
+  entirely (window is too small for an overlay).
+
+## [1.7.1] — 2026-05-22
+
+### Changed
+- **State color rework** — adjusted the palette across all view modes for
+  better contrast between `running`, `thinking`, `waiting`, `pending` and
+  `error`.
+
+### Fixed
+- **Compact branch truncation** — long git branch names overflowed their
+  slot in compact cards; now truncated with ellipsis.
+- **Subagent session-dir resolution** — `SubagentTracker` was deriving the
+  agent session directory from a path that didn't always match what the
+  watcher actually resolved, causing some subagents to be missed. The
+  tracker now reuses the watcher's resolved JSONL path.
+
+### Added
+- **Nested sub-rows in compact and micro views** — the subagent sub-cards
+  introduced in 1.7.0 now also render under their parent session in
+  compact and micro layouts (not just grid).
+
+## [1.7.0] — 2026-05-21
+
+### Added
+- **Live background subagents** — the watcher now scans
+  `~/.claude/projects/<session>/agent-*.jsonl` + `agent-*.meta.json`,
+  captures `Agent` tool_use dispatches per session, derives state
+  (running / completed / error) from the agent's last event plus mtime,
+  and renders nested sub-cards under each parent session showing what
+  background work is in flight. Includes a `SubagentTracker` wired
+  into the main process and serialized over IPC.
+- **`subagents.js` shipped in the packaged build** and added to the
+  test suite (`test/subagents.test.js`).
+
 ## [1.6.1] — 2026-05-20
 
 ### Fixed

@@ -138,6 +138,25 @@
               </button>
             </div>
           </div>
+          <div class="settings-section">
+            <div class="settings-toggle-row">
+              <div>
+                <div class="settings-label" data-i18n="transparency_label">Window transparency</div>
+                <div class="settings-hint" data-i18n="transparency_hint">Make the window translucent when idle, opaque on focus or hover</div>
+              </div>
+              <button class="settings-toggle" id="transparencyToggle" role="switch" aria-checked="false" data-i18n-title="transparency_label" title="Window transparency">
+                <span class="settings-toggle-knob"></span>
+              </button>
+            </div>
+            <div class="settings-row" id="opacityRow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>
+              </svg>
+              <input type="range" id="opacitySlider" min="30" max="100" value="85" class="slider">
+              <span class="volume-value" id="opacityValue">85%</span>
+            </div>
+          </div>
         </div>
 
         <!-- Notifications tab -->

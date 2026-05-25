@@ -4,6 +4,25 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] — 2026-05-25
+
+### Added
+- **Window transparency** — opt-in setting (off by default) under
+  Settings → General. When enabled, the window turns translucent while idle
+  and returns to full opacity on focus or hover. An opacity slider (30–100 %)
+  sets the idle level; the 30 % floor keeps the window from becoming
+  invisible/unclickable. Implemented with `BrowserWindow.setOpacity()`, so it
+  applies uniformly across grid, compact and micro views. While dragging the
+  slider the value previews live (the focus rule is bypassed so the effect is
+  visible even though the settings modal holds focus).
+
+### Fixed
+- **Notification showed the project name, not the custom one** — after
+  renaming a session card, the toast still displayed the original
+  project/slug name (e.g. "Invictorius" instead of "Recherche"). The
+  `show-notification` payload now carries the custom name and the toast
+  renders `customName || projectName`, matching the cards and the popover.
+
 ## [1.7.2] — 2026-05-22
 
 ### Fixed

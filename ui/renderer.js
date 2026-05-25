@@ -30,6 +30,8 @@ let alwaysOnTop = false;
 let volume = 0.7;
 let notifPosition = 'top-right';
 let autoLaunch = false;
+let windowTransparencyEnabled = false;
+let windowOpacity = 0.85;
 let searchQuery = '';
 let sessionOrder = []; // User-defined order of session IDs
 let draggedId = null;
@@ -56,6 +58,10 @@ const $settingsClose = document.getElementById('settingsClose');
 const $volumeSlider = document.getElementById('volumeSlider');
 const $volumeValue = document.getElementById('volumeValue');
 const $btnTestSound = document.getElementById('btnTestSound');
+const $transparencyToggle = document.getElementById('transparencyToggle');
+const $opacitySlider = document.getElementById('opacitySlider');
+const $opacityValue = document.getElementById('opacityValue');
+const $opacityRow = document.getElementById('opacityRow');
 
 // ═══ Init ═══
 
@@ -75,6 +81,8 @@ async function init() {
   volume = config.volume ?? 0.7;
   notifPosition = config.notifPosition || 'top-right';
   autoLaunch = !!config.autoLaunch;
+  windowTransparencyEnabled = !!config.windowTransparencyEnabled;
+  windowOpacity = config.windowOpacity ?? 0.85;
   sessionOrder = config.sessionOrder || [];
   soundTheme = SOUND_THEMES[config.soundTheme] ? config.soundTheme : 'default';
   regenerateSounds();
@@ -88,6 +96,7 @@ async function init() {
   updateAutoLaunchToggle();
   $volumeSlider.value = Math.round(volume * 100);
   $volumeValue.textContent = `${Math.round(volume * 100)}%`;
+  updateTransparencyControls();
 
   const existingSessions = await window.api.getSessions();
   for (const s of existingSessions) {
@@ -161,6 +170,20 @@ async function init() {
     window.api.setVolume(volume);
   });
   $btnTestSound.addEventListener('click', () => playNotificationSound());
+
+  // Window transparency
+  if ($transparencyToggle) $transparencyToggle.addEventListener('click', toggleTransparency);
+  if ($opacitySlider) {
+    $opacitySlider.addEventListener('input', (e) => {
+      windowOpacity = parseInt(e.target.value) / 100;
+      $opacityValue.textContent = `${e.target.value}%`;
+      window.api.setWindowOpacity(windowOpacity); // live preview
+    });
+  }
+  // Hover → opaque. A non-focused alwaysOnTop window still receives DOM
+  // mouse events, so this drives the "opaque on hover" behaviour.
+  document.documentElement.addEventListener('mouseenter', () => window.api.notifyHover(true));
+  document.documentElement.addEventListener('mouseleave', () => window.api.notifyHover(false));
 
   // Sound theme picker
   document.querySelectorAll('.sound-theme-btn').forEach(btn => {
@@ -407,6 +430,25 @@ function toggleAutoLaunch() {
   autoLaunch = !autoLaunch;
   window.api.setAutoLaunch(autoLaunch);
   updateAutoLaunchToggle();
+}
+
+function updateTransparencyControls() {
+  if ($transparencyToggle) {
+    $transparencyToggle.classList.toggle('on', windowTransparencyEnabled);
+    $transparencyToggle.setAttribute('aria-checked', String(windowTransparencyEnabled));
+  }
+  if ($opacitySlider) {
+    $opacitySlider.value = Math.round(windowOpacity * 100);
+    $opacitySlider.disabled = !windowTransparencyEnabled;
+  }
+  if ($opacityValue) $opacityValue.textContent = `${Math.round(windowOpacity * 100)}%`;
+  if ($opacityRow) $opacityRow.classList.toggle('disabled', !windowTransparencyEnabled);
+}
+
+function toggleTransparency() {
+  windowTransparencyEnabled = !windowTransparencyEnabled;
+  window.api.setWindowTransparencyEnabled(windowTransparencyEnabled);
+  updateTransparencyControls();
 }
 
 // ═══ About + updates ═══

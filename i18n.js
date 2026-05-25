@@ -59,6 +59,8 @@ settings_title: 'Paramètres',
       auto_launch_hint_html: 'Ouvrir <strong>Aby Claude Watcher</strong> automatiquement à la connexion',
       language_label: 'Langue',
       language_hint: "Langue de l'interface",
+      transparency_label: 'Transparence de la fenêtre',
+      transparency_hint: 'Rendre la fenêtre translucide au repos, opaque au survol ou au focus',
 
       // Settings — notifications
       volume_label: 'Volume',
@@ -200,6 +202,8 @@ settings_title: 'Settings',
       auto_launch_hint_html: 'Open <strong>Aby Claude Watcher</strong> automatically at login',
       language_label: 'Language',
       language_hint: 'Interface language',
+      transparency_label: 'Window transparency',
+      transparency_hint: 'Make the window translucent when idle, opaque on hover or focus',
 
       // Settings — notifications
       volume_label: 'Volume',

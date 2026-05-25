@@ -1714,6 +1714,20 @@ body.micro-mode .usage-reset-icon {
   transition: background var(--transition);
 }
 
+.slider:disabled {
+  cursor: not-allowed;
+}
+
+.slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+/* Dim the opacity row while the transparency toggle is off */
+.settings-row.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;

@@ -30,6 +30,23 @@ let tray;
 let currentViewMode = 'grid';
 const MICRO_DEFAULT_BOUNDS = { width: 260, height: 200 };
 
+// Window transparency state. The window is fully opaque while focused or
+// hovered, and drops to config.windowOpacity when idle — but only when the
+// feature is enabled. See applyWindowOpacity().
+let windowFocused = true;
+let windowHovered = false;
+
+function applyWindowOpacity() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const conf = config.get();
+  if (!conf.windowTransparencyEnabled) {
+    mainWindow.setOpacity(1);
+    return;
+  }
+  const active = windowFocused || windowHovered;
+  mainWindow.setOpacity(active ? 1 : (conf.windowOpacity ?? 0.85));
+}
+
 function createWindow() {
   const conf = config.get();
   const initialMicro = (conf.viewMode === 'micro');
@@ -97,6 +114,19 @@ function createWindow() {
 
   mainWindow.on('focus', () => {
     if (process.platform === 'darwin') app.dock.setBadge('');
+    windowFocused = true;
+    applyWindowOpacity();
+  });
+
+  mainWindow.on('blur', () => {
+    windowFocused = false;
+    applyWindowOpacity();
+  });
+
+  // Apply the saved opacity once the window is ready to paint
+  mainWindow.once('ready-to-show', () => {
+    windowFocused = mainWindow.isFocused();
+    applyWindowOpacity();
   });
 
   // On macOS, clicking the red close button should HIDE the window (stay in tray)
@@ -259,6 +289,27 @@ function setupIPC() {
   ipcMain.handle('set-always-on-top', (_, value) => {
     config.setAlwaysOnTop(value);
     if (mainWindow) mainWindow.setAlwaysOnTop(value);
+  });
+
+  ipcMain.handle('set-window-transparency-enabled', (_, value) => {
+    config.setWindowTransparencyEnabled(value);
+    applyWindowOpacity();
+  });
+
+  ipcMain.handle('set-window-opacity', (_, value) => {
+    config.setWindowOpacity(value);
+    // Live preview: apply the raw value directly, bypassing the focus/hover
+    // rule. The settings modal holds focus while dragging, so applyWindowOpacity()
+    // would otherwise force 1.0 and hide the effect. Normal logic resumes on the
+    // next focus/blur/hover event (e.g. closing the modal).
+    if (mainWindow && !mainWindow.isDestroyed() && config.get().windowTransparencyEnabled) {
+      mainWindow.setOpacity(config.get().windowOpacity);
+    }
+  });
+
+  ipcMain.handle('window-hover', (_, hovering) => {
+    windowHovered = !!hovering;
+    applyWindowOpacity();
   });
 
   ipcMain.handle('set-notification-prefs', (_, sessionId, prefs) => {

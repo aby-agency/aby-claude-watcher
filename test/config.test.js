@@ -99,6 +99,26 @@ test('volume clamped to 0', () => {
   assertEq(config.get().volume, 0);
 });
 
+console.log('\nwindow opacity:');
+test('opacity clamped to 1', () => {
+  config.setWindowOpacity(2);
+  assertEq(config.get().windowOpacity, 1);
+});
+test('opacity floored at 0.3', () => {
+  config.setWindowOpacity(0);
+  assertEq(config.get().windowOpacity, 0.3);
+});
+test('opacity keeps in-range value', () => {
+  config.setWindowOpacity(0.7);
+  assertEq(config.get().windowOpacity, 0.7);
+});
+test('transparency toggle coerces to boolean', () => {
+  config.setWindowTransparencyEnabled(1);
+  assertEq(config.get().windowTransparencyEnabled, true);
+  config.setWindowTransparencyEnabled(0);
+  assertEq(config.get().windowTransparencyEnabled, false);
+});
+
 // Cleanup
 try { fs.rmSync(testDir, { recursive: true, force: true }); } catch {}
 

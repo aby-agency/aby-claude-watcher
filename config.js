@@ -20,6 +20,8 @@ let config = {
   soundTheme: 'default',     // 'default' | 'vibraphone' | 'wood' | 'soft'
   windowBounds: null,        // { x, y, width, height } — grid & compact share this
   microWindowBounds: null,   // separate bounds remembered for micro view
+  windowTransparencyEnabled: false, // master toggle for window opacity feature
+  windowOpacity: 0.85,       // 0.3 - 1.0 — opacity when idle (translucent), full on focus/hover
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
   customNames: {},      // { [sessionId]: "Custom name" }
 };
@@ -84,6 +86,17 @@ function setAlwaysOnTop(value) {
 
 function setVolume(value) {
   config.volume = Math.max(0, Math.min(1, value));
+  save();
+}
+
+function setWindowTransparencyEnabled(value) {
+  config.windowTransparencyEnabled = !!value;
+  save();
+}
+
+function setWindowOpacity(value) {
+  // Floor at 0.3 so the window can never become invisible / unclickable
+  config.windowOpacity = Math.max(0.3, Math.min(1, value));
   save();
 }
 
@@ -194,6 +207,8 @@ module.exports = {
   setCompactMode,
   setAlwaysOnTop,
   setVolume,
+  setWindowTransparencyEnabled,
+  setWindowOpacity,
   setNotifPosition,
   setAutoLaunch,
   setLanguage,

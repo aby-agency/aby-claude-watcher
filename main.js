@@ -172,6 +172,7 @@ function setupWatcher() {
     sendToRenderer('show-notification', {
       sessionId: session.sessionId,
       projectName: session.projectName,
+      customName: config.getCustomName(session.sessionId),
       slug: session.slug,
       kind,
     });

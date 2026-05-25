@@ -1138,7 +1138,7 @@ function showToast(data) {
   const bell = ICONS.bellRing.replace('width="14"', 'width="13"').replace('height="14"', 'height="13"');
   toast.innerHTML = `
     <span class="toast-bell">${bell}</span>
-    <span class="toast-name">${esc(data.projectName)}</span>
+    <span class="toast-name">${esc(data.customName || data.projectName)}</span>
     <span class="toast-arrow">→</span>
     <span class="toast-state">${stateLabel}</span>
     <button class="toast-close" title="${t('close')}" aria-label="${t('close')}">${ICONS.x}</button>

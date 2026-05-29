@@ -95,9 +95,23 @@ function scanSession(sessionDir, dispatches) {
 // (keyed by sessionDir, short TTL) if disk-scan cost becomes visible.
 class SubagentTracker {
   snapshotForSession(sessionDir, dispatches) {
+    // Show every running agent — foreground and background alike (the "fleet"
+    // view). Background agents run detached (easy to forget); foreground ones
+    // are the active team. Completed/errored agents are still excluded.
     return scanSession(sessionDir, dispatches)
-      .filter(sa => sa.runInBackground === true && sa.state === 'running');
+      .filter(sa => sa.state === 'running');
   }
+}
+
+// True when the session is blocked on a synchronous (foreground) subagent: the
+// parent is delegating and busy, NOT waiting on the user — so its pending/orange
+// state and "needs you" notification are false positives. Background agents
+// (runInBackground === true) run detached, so the parent can still legitimately
+// be pending; they do not count. `snapshot` is the running-only list from
+// snapshotForSession. Unknown dispatch mode (undefined) is treated as non-blocking.
+function hasBlockingForegroundAgent(snapshot) {
+  return Array.isArray(snapshot)
+    && snapshot.some(sa => sa.state === 'running' && sa.runInBackground === false);
 }
 
 module.exports = {
@@ -106,6 +120,7 @@ module.exports = {
   deriveState,
   scanSession,
   SubagentTracker,
+  hasBlockingForegroundAgent,
   ERROR_TIMEOUT_MS,
   TAIL_BYTES,
 };

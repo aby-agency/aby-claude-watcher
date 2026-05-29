@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
+const { log } = require('./logger');
 
 const CONFIG_PATH = path.join(
   app ? app.getPath('userData') : path.join(require('os').homedir(), '.aby-claude-watcher'),
@@ -48,7 +49,7 @@ function save() {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
     } catch (e) {
-      console.error('Failed to save config:', e.message);
+      log.error('Failed to save config:', e.message);
     }
   }, 500);
 }
@@ -61,7 +62,7 @@ function saveSync() {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
   } catch (e) {
-    console.error('Failed to save config:', e.message);
+    log.error('Failed to save config:', e.message);
   }
 }
 

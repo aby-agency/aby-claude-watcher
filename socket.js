@@ -2,6 +2,7 @@ const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
+const { log } = require('./logger');
 
 const SOCKET_PATH = process.platform === 'win32'
   ? '\\\\.\\pipe\\aby-claude-watcher'
@@ -49,7 +50,7 @@ class SocketServer extends EventEmitter {
     });
 
     this.server.on('error', (err) => {
-      console.error('Socket server error:', err.message);
+      log.error('Socket server error:', err.message);
     });
   }
 

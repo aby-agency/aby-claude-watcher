@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readMeta, readLastEvent, deriveState, scanSession, SubagentTracker } = require('../subagents');
+const { readMeta, readLastEvent, deriveState, scanSession, SubagentTracker, hasBlockingForegroundAgent } = require('../subagents');
 
 let passed = 0, failed = 0;
 const queue = [];
@@ -244,15 +244,15 @@ test('runInBackground defaults to undefined when no dispatch entry exists', () =
 
 section('SubagentTracker:');
 
-test('snapshot returns only background+running subagents for a session', () => {
+test('snapshot returns all running subagents (foreground + background)', () => {
   const sessionDir = setupSessionDir({ agents: [
-    // Background, running
+    // Background, running → included
     { id: 'bgRun', tuid: 'tu_bgRun',
       events: [{ type: 'assistant', message: { stop_reason: null } }] },
-    // Background, completed (filtered out)
+    // Background, completed → excluded (not running)
     { id: 'bgDone', tuid: 'tu_bgDone',
       events: [{ type: 'assistant', message: { stop_reason: 'end_turn' } }] },
-    // Foreground, running (filtered out)
+    // Foreground, running → included (the fleet view; was filtered out before)
     { id: 'fgRun', tuid: 'tu_fgRun',
       events: [{ type: 'assistant', message: { stop_reason: null } }] },
   ]});
@@ -263,10 +263,38 @@ test('snapshot returns only background+running subagents for a session', () => {
   ]);
 
   const tracker = new SubagentTracker();
-  const result = tracker.snapshotForSession(sessionDir, dispatches);
+  const ids = tracker.snapshotForSession(sessionDir, dispatches).map(r => r.agentId).sort();
 
-  if (result.length !== 1) throw new Error(`expected 1, got ${result.length}: ${JSON.stringify(result.map(r => r.agentId))}`);
-  if (result[0].agentId !== 'bgRun') throw new Error(`got ${result[0].agentId}`);
+  if (JSON.stringify(ids) !== JSON.stringify(['bgRun', 'fgRun'])) {
+    throw new Error(`expected [bgRun, fgRun], got ${JSON.stringify(ids)}`);
+  }
+});
+
+section('hasBlockingForegroundAgent:');
+
+test('true when a running foreground agent is present (parent is blocked)', () => {
+  const snap = [
+    { agentId: 'a', state: 'running', runInBackground: true },   // background, parallel
+    { agentId: 'b', state: 'running', runInBackground: false },  // foreground, blocks parent
+  ];
+  if (hasBlockingForegroundAgent(snap) !== true) throw new Error('expected true');
+});
+
+test('false when only background agents run (parent can legitimately wait on you)', () => {
+  const snap = [
+    { agentId: 'a', state: 'running', runInBackground: true },
+    { agentId: 'b', state: 'running', runInBackground: true },
+  ];
+  if (hasBlockingForegroundAgent(snap) !== false) throw new Error('expected false');
+});
+
+test('false on empty snapshot', () => {
+  if (hasBlockingForegroundAgent([]) !== false) throw new Error('expected false');
+});
+
+test('false when runInBackground is undefined (unknown dispatch — conservative)', () => {
+  const snap = [{ agentId: 'a', state: 'running', runInBackground: undefined }];
+  if (hasBlockingForegroundAgent(snap) !== false) throw new Error('expected false');
 });
 
 runAll().then(() => {

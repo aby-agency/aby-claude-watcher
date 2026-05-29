@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeImage, shell, screen, clipboard } = require('electron');
+const { log } = require('./logger'); // first: initializes file logging + crash catching
 const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
 const { SocketServer } = require('./socket');
@@ -7,7 +8,7 @@ const { focusTerminal } = require('./focus');
 const { checkForUpdates, downloadAndInstall, abortActiveDownload, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
 const config = require('./config');
 const i18n = require('./i18n');
-const { SubagentTracker } = require('./subagents');
+const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
 
 const subagentTracker = new SubagentTracker();
 
@@ -19,6 +20,24 @@ const subagentTracker = new SubagentTracker();
 function sessionDirFor(session) {
   if (!session || !session.sessionId || !session.jsonlPath) return null;
   return path.join(path.dirname(session.jsonlPath), session.sessionId);
+}
+
+// A session blocked on a foreground subagent is busy (delegating), not waiting
+// on the user — so its pending/orange state and notification are false positives.
+function blockingForegroundAgent(session) {
+  const dir = sessionDirFor(session);
+  if (!dir) return false;
+  return hasBlockingForegroundAgent(
+    subagentTracker.snapshotForSession(dir, session.agentDispatches || new Map())
+  );
+}
+
+// Effective display state. Only scans subagents when the raw state is pending
+// (the only state the override can change), keeping the badge/tray cheap.
+function effectiveStateName(session) {
+  const name = session && session.state ? session.state.name : 'waiting';
+  if (name === 'pending' && blockingForegroundAgent(session)) return 'running';
+  return name;
 }
 
 let mainWindow;
@@ -96,7 +115,7 @@ function createWindow() {
   }
 
   mainWindow.webContents.on('did-fail-load', (_, code, desc) => {
-    console.error('Failed to load:', code, desc);
+    log.error('Failed to load:', code, desc);
   });
 
   // Save window bounds on move/resize — into the slot matching the current view
@@ -165,6 +184,11 @@ function setupWatcher() {
   });
 
   watcher.on('session-waiting', (session) => {
+    // Busy on a foreground subagent → no bell, no sound (it's not waiting on you).
+    if (blockingForegroundAgent(session)) {
+      log.info(`[notif] suppressed for ${session.sessionId.slice(0, 8)} — blocked on foreground agent`);
+      return;
+    }
     const prefs = config.getNotificationPrefs(session.sessionId);
     const kind = session.state && session.state.name === 'pending' ? 'pending' : 'waiting';
     // Always fire the visual event — the renderer gates by view mode.
@@ -463,13 +487,17 @@ function serializeSession(session) {
   const subagents = sessionDir
     ? subagentTracker.snapshotForSession(sessionDir, dispatches)
     : [];
+  // Blocked on a foreground subagent → show running, not pending/orange.
+  const state = (session.state.name === 'pending' && hasBlockingForegroundAgent(subagents))
+    ? STATES.RUNNING
+    : session.state;
 
   return {
     sessionId: session.sessionId,
     projectName: session.projectName,
     customName: config.getCustomName(session.sessionId),
     slug: session.slug,
-    state: session.state,
+    state,
     lastTool: session.lastTool,
     model: session.model,
     gitBranch: session.gitBranch || null,
@@ -501,7 +529,7 @@ function applyAutoLaunch() {
       openAsHidden: true, // Start minimized to tray
     });
   } catch (e) {
-    console.error('Failed to set login item:', e.message);
+    log.error('Failed to set login item:', e.message);
   }
 }
 
@@ -670,7 +698,10 @@ function setupTray() {
 
 function updateDockBadge() {
   if (process.platform !== 'darwin') return;
-  const waiting = watcher.getSessions().filter(s => s.state.name === 'waiting' || s.state.name === 'pending').length;
+  const waiting = watcher.getSessions().filter(s => {
+    const n = effectiveStateName(s);
+    return n === 'waiting' || n === 'pending';
+  }).length;
   app.dock.setBadge(waiting > 0 ? String(waiting) : '');
 }
 
@@ -679,7 +710,10 @@ function updateTrayMenu() {
 
   const sessions = watcher.getSessions();
   const activeCount = sessions.length;
-  const waitingCount = sessions.filter(s => s.state.name === 'waiting' || s.state.name === 'pending').length;
+  const waitingCount = sessions.filter(s => {
+    const n = effectiveStateName(s);
+    return n === 'waiting' || n === 'pending';
+  }).length;
   let tooltip = i18n.t('tray_tooltip', { app: 'Aby Claude Watcher', n: activeCount });
   if (waitingCount > 0) tooltip += i18n.t('tray_tooltip_waiting', { n: waitingCount });
   tray.setToolTip(tooltip);

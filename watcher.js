@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { EventEmitter } = require('events');
+const { log, DEBUG } = require('./logger');
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const SESSIONS_DIR = path.join(CLAUDE_DIR, 'sessions');
@@ -10,8 +11,7 @@ const PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
 const SCAN_INTERVAL = 2000;
 const POLL_INTERVAL = 250;
 const WAITING_DELAY = 2000;
-
-const DEBUG = process.argv.includes('--dev') || !!process.env.ABY_DEBUG;
+const PENDING_DELAY = 1000; // defer interactive-tool PENDING so a same-batch tool_result can cancel it
 
 const STATES = {
   THINKING: { name: 'thinking', color: '#a78bfa' },
@@ -181,7 +181,7 @@ class SessionWatcher extends EventEmitter {
           activeSessionIds.add(effectiveId);
 
           if (trackedId && trackedId !== effectiveId && !this._isSidStale(effectiveId, cwd)) {
-            if (DEBUG) console.log(`[watcher] /clear migrate ${trackedId.slice(0, 8)} → ${effectiveId.slice(0, 8)} (pid=${pid}, cwd=${cwd})`);
+            if (DEBUG) log.debug(`[watcher] /clear migrate ${trackedId.slice(0, 8)} → ${effectiveId.slice(0, 8)} (pid=${pid}, cwd=${cwd})`);
             this.migrateSession(trackedId, effectiveId);
           }
 
@@ -232,7 +232,7 @@ class SessionWatcher extends EventEmitter {
             if (pidAlive && session.state === STATES.ERROR) {
               // Session errored but PID is alive again — reactivate
               session.hasActivity = false;
-              this.setState(effectiveId, STATES.WAITING, false);
+              this.setState(effectiveId, STATES.WAITING, false, 'pid-revived');
             }
 
             if (!this.fileWatchers.has(effectiveId)) {
@@ -273,7 +273,7 @@ class SessionWatcher extends EventEmitter {
     } catch (e) {
       // ENOENT is expected when Claude Code is not yet running
       if (e.code !== 'ENOENT') {
-        console.error('SessionWatcher scan error:', e.message);
+        log.error('SessionWatcher scan error:', e.message);
       }
     }
   }
@@ -560,7 +560,7 @@ class SessionWatcher extends EventEmitter {
       // (otherwise the stale restored state survives across restarts and the
       // session looks "stuck running"). isInitial=true skips the notification.
       if (computedState) {
-        this.setState(sessionId, computedState, true);
+        this.setState(sessionId, computedState, true, 'initial-scan');
       } else {
         // No determinable state — still emit so token/model/slug updates land
         this.emit('session-updated', session);
@@ -667,20 +667,20 @@ class SessionWatcher extends EventEmitter {
         const content = event.message && event.message.content;
         const isToolResult = Array.isArray(content) && content.some(c => c.type === 'tool_result');
         if (isToolResult) {
-          this.setState(sessionId, STATES.RUNNING, isInitial);
+          this.setState(sessionId, STATES.RUNNING, isInitial, 'tool_result');
         } else {
-          this.setState(sessionId, STATES.THINKING, isInitial);
+          this.setState(sessionId, STATES.THINKING, isInitial, 'user-prompt');
         }
         break;
       case 'progress':
         // Any progress event means something is actively happening
         this.clearWaitingTimer(sessionId);
-        this.setState(sessionId, STATES.RUNNING, isInitial);
+        this.setState(sessionId, STATES.RUNNING, isInitial, 'progress');
         break;
       case 'queue-operation':
         // Tool queue activity — session is actively executing
         this.clearWaitingTimer(sessionId);
-        this.setState(sessionId, STATES.RUNNING, isInitial);
+        this.setState(sessionId, STATES.RUNNING, isInitial, 'queue-op');
         break;
       case 'attachment':
         // Attachments are message metadata (file refs, hook payloads) Claude
@@ -719,7 +719,7 @@ class SessionWatcher extends EventEmitter {
     // API error (stream timeout, connection refused, quota exhausted, …)
     if (event.isApiErrorMessage) {
       this.clearWaitingTimer(sessionId);
-      this.setState(sessionId, STATES.ERROR, isInitial);
+      this.setState(sessionId, STATES.ERROR, isInitial, 'api-error');
       return;
     }
 
@@ -745,15 +745,26 @@ class SessionWatcher extends EventEmitter {
       // user to approve a plan before continuing.
       const INTERACTIVE_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
       if (lastToolUse && INTERACTIVE_TOOLS.has(lastToolUse.name)) {
-        this.setState(sessionId, STATES.PENDING, isInitial);
+        if (isInitial) {
+          // Restoring a session that genuinely ended on an unanswered question.
+          this.setState(sessionId, STATES.PENDING, isInitial, `interactive:${lastToolUse.name}`);
+        } else {
+          // Defer: if this tool_use is being replayed in a batch that already
+          // contains its tool_result (user answered), the next event clears the
+          // timer (processEvent) — no PENDING flicker. A genuinely-unanswered
+          // question survives the delay and surfaces as pending.
+          this.scheduleInteractivePending(sessionId, lastToolUse.name);
+        }
         return;
       }
-      this.setState(sessionId, STATES.RUNNING, isInitial);
+      // lastToolUse is absent on streaming text/thinking messages that still
+      // carry stop_reason:tool_use — fall back to the last known tool, or '?'.
+      this.setState(sessionId, STATES.RUNNING, isInitial, `tool_use:${session.lastTool || '?'}`);
     } else if (message.stop_reason === 'end_turn') {
       this.startWaitingTimer(sessionId, isInitial);
     } else if (hasThinking && !hasToolUse) {
       this.clearWaitingTimer(sessionId);
-      this.setState(sessionId, STATES.THINKING, isInitial);
+      this.setState(sessionId, STATES.THINKING, isInitial, 'thinking-block');
     }
   }
 
@@ -763,12 +774,12 @@ class SessionWatcher extends EventEmitter {
       // For initial load, check if enough time has passed
       const session = this.sessions.get(sessionId);
       if (session && Date.now() - new Date(session.startedAt).getTime() > WAITING_DELAY) {
-        this.setState(sessionId, STATES.WAITING, isInitial);
+        this.setState(sessionId, STATES.WAITING, isInitial, 'end_turn-initial');
       }
       return;
     }
     const timer = setTimeout(() => {
-      this.setState(sessionId, STATES.WAITING, false);
+      this.setState(sessionId, STATES.WAITING, false, 'end_turn-idle');
     }, WAITING_DELAY);
     this.waitingTimers.set(sessionId, timer);
   }
@@ -781,7 +792,7 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
-  setState(sessionId, newState, isInitial) {
+  setState(sessionId, newState, isInitial, trigger) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
@@ -789,6 +800,9 @@ class SessionWatcher extends EventEmitter {
     const stateChanged = oldState.name !== newState.name;
 
     if (stateChanged) {
+      // Forensic trail for transient state bugs (token loss, swap flicker,
+      // stuck-running) — relive the sequence from main.log instead of repro.
+      log.info(`[state] ${sessionId.slice(0, 8)} ${oldState.name}→${newState.name} (${trigger || '?'}${isInitial ? ', initial' : ''})`);
       session.state = newState;
       this.emit('session-updated', session);
       this.persistSession(session);
@@ -951,7 +965,7 @@ class SessionWatcher extends EventEmitter {
       // Final check: did an event arrive since we scheduled?
       if (Date.now() - (s.lastEventTime || 0) < 1000) return;
       this.clearWaitingTimer(sessionId);
-      this.setState(sessionId, STATES.PENDING, false);
+      this.setState(sessionId, STATES.PENDING, false, `hook:${hookEvent}`);
     }, 1000);
     this.pendingTimers.set(sessionId, timer);
   }
@@ -962,6 +976,21 @@ class SessionWatcher extends EventEmitter {
       clearTimeout(timer);
       this.pendingTimers.delete(sessionId);
     }
+  }
+
+  // Schedule a deferred, cancelable PENDING for an interactive tool_use
+  // (AskUserQuestion / ExitPlanMode). Mirrors the hook-driven markPending path:
+  // any subsequent real event clears it via clearPendingTimer (processEvent), so
+  // a tool_result replayed in the same read batch cancels the spurious pending.
+  scheduleInteractivePending(sessionId, toolName) {
+    this.clearPendingTimer(sessionId);
+    const timer = setTimeout(() => {
+      this.pendingTimers.delete(sessionId);
+      const s = this.sessions.get(sessionId);
+      if (!s || s.state.name === 'pending') return;
+      this.setState(sessionId, STATES.PENDING, false, `interactive:${toolName}`);
+    }, PENDING_DELAY);
+    this.pendingTimers.set(sessionId, timer);
   }
 
 getSessions() {

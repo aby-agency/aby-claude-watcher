@@ -1,8 +1,8 @@
 const { exec, execSync } = require('child_process');
 const path = require('path');
 
-const DEBUG = process.argv.includes('--dev') || !!process.env.ABY_DEBUG;
-const dlog = (...args) => { if (DEBUG) console.log('[focus]', ...args); };
+const { log, DEBUG } = require('./logger');
+const dlog = (...args) => { if (DEBUG) log.debug('[focus]', ...args); };
 
 function sanitizePid(pid) {
   const n = parseInt(pid, 10);

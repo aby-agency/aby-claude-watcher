@@ -4,6 +4,37 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] — 2026-05-29
+
+### Added
+- **File logging** — the app now writes a persistent log to
+  `~/Library/Logs/aby-claude-watcher/main.log` (5 MB rotation) via
+  `electron-log`. Production builds launched from the Finder no longer lose
+  their output: errors and every session state transition are recorded with
+  their trigger (e.g. `running→pending (hook:PreToolUse)`), making transient
+  state bugs diagnosable from the log instead of requiring live reproduction.
+  Verbose `debug`-level lines (focus detection, `/clear` migration) are
+  written only in dev (`--dev` / `ABY_DEBUG`); production logs at `info`.
+- **Crash handler** — uncaught exceptions and unhandled promise rejections in
+  the main process are now captured to the log with a full stack trace instead
+  of killing the tray app silently.
+- **Agent fleet view** — the nested sub-rows now show *all* running agents under
+  a session, foreground and background alike (previously only detached background
+  agents appeared). A session blocked on a foreground agent is displayed as
+  *running* (not pending/orange) with its bell and sound suppressed — it is busy
+  delegating, not waiting on you. Background agents are unaffected: the parent can
+  still legitimately be pending while they run in parallel.
+
+### Fixed
+- **AskUserQuestion pending flicker** — catching up on a batch of JSONL lines
+  that already contained an answered `AskUserQuestion` / `ExitPlanMode` no longer
+  flashes a spurious `pending` state (and false "needs you" notification). The
+  interactive-tool pending is now deferred and cancelled if its `tool_result`
+  lands in the same read batch, mirroring the hook-driven pending path.
+- **`tool_use:null` log label** — streaming assistant messages that carry
+  `stop_reason:tool_use` without a tool_use block now log `tool_use:?` instead
+  of `tool_use:null`.
+
 ## [1.8.0] — 2026-05-25
 
 ### Added

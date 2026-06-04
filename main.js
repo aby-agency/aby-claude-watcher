@@ -43,12 +43,14 @@ function effectiveStateName(session) {
 // ─── Workflows multi-agents (tool Workflow) ───
 // workflowActive : sessionId → Set(runId) vus "running" au dernier scan. Sert
 // d'amorçage au tick ET de mémoire de transition : un run découvert déjà
-// completed (watcher démarré après la fin) n'y entre jamais → pas de notif
-// rétroactive. notifiedWorkflowRuns : garde one-shot par runId (un run ne se
-// termine qu'une fois, pas besoin du cooldown 30 s).
+// completed (watcher démarré après la fin) n'y entre jamais dans workflowActive
+// → pas de notif rétroactive (gate activeRuns.has(runId) dans le tick).
+// notifiedWorkflowRuns : garde one-shot par session+runId (belt-and-suspenders ;
+// un run ne se termine qu'une fois), keyé par sessionId pour que session-removed
+// puisse purger toute l'entrée d'un coup.
 const WORKFLOW_TICK_MS = 2000;
 const workflowActive = new Map();
-const notifiedWorkflowRuns = new Set();
+const notifiedWorkflowRuns = new Map(); // sessionId → Set(runId) déjà notifiés
 
 function notifyWorkflowDone(session, wf) {
   log.info(`[workflow] ${wf.runId} (${wf.name}) completed — ${wf.stats ? wf.stats.agentCount : wf.started} agents`);
@@ -77,21 +79,28 @@ function workflowTick() {
   // Copie : serializeSession ré-insère les clés pendant l'itération, et une clé
   // delete+set serait revisitée par l'itérateur du Map (boucle infinie).
   for (const [sessionId, activeRuns] of [...workflowActive]) {
-    const session = sessions.find(s => s.sessionId === sessionId);
-    const dir = session ? sessionDirFor(session) : null;
-    if (!dir) { workflowActive.delete(sessionId); continue; }
+    try {
+      const session = sessions.find(s => s.sessionId === sessionId);
+      const dir = session ? sessionDirFor(session) : null;
+      if (!dir) { workflowActive.delete(sessionId); continue; }
 
-    const all = subagentTracker.workflowsForSession(dir);
-    for (const wf of all) {
-      if (wf.status === 'completed' && activeRuns.has(wf.runId) && !notifiedWorkflowRuns.has(wf.runId)) {
-        notifiedWorkflowRuns.add(wf.runId);
-        notifyWorkflowDone(session, wf);
+      const all = subagentTracker.workflowsForSession(dir);
+      const notified = notifiedWorkflowRuns.get(sessionId) || new Set();
+      for (const wf of all) {
+        if (wf.status === 'completed' && activeRuns.has(wf.runId) && !notified.has(wf.runId)) {
+          notified.add(wf.runId);
+          notifiedWorkflowRuns.set(sessionId, notified);
+          notifyWorkflowDone(session, wf);
+        }
       }
+      // serializeSession remet à jour workflowActive (ou la session en sort si
+      // plus aucun run actif) et pousse le badge frais au renderer.
+      workflowActive.delete(sessionId);
+      sendToRenderer('session-updated', serializeSession(session));
+    } catch (e) {
+      log.error('[workflow] tick failed for ' + sessionId.slice(0, 8) + ':', e.message);
+      continue;
     }
-    // serializeSession remet à jour workflowActive (ou la session en sort si
-    // plus aucun run actif) et pousse le badge frais au renderer.
-    workflowActive.delete(sessionId);
-    sendToRenderer('session-updated', serializeSession(session));
   }
 }
 
@@ -261,6 +270,9 @@ function setupWatcher() {
   });
 
   watcher.on('session-removed', (sessionId) => {
+    // Session partie → ses runs de workflow sont morts, on purge le suivi
+    workflowActive.delete(sessionId);
+    notifiedWorkflowRuns.delete(sessionId);
     sendToRenderer('session-removed', sessionId);
   });
 

@@ -109,7 +109,8 @@ fait entrer la session dans le suivi.
   silencieusement (pas de notif « terminé » — on n'a pas de preuve de succès).
 - Watcher démarré en cours de run → le `session-added` initial sérialise la session, donc le
   run est découvert et entre dans le suivi du tick ; s'il est déjà terminé au démarrage, pas
-  de notif rétroactive (le Set one-shot est peuplé des runs déjà completed au premier scan).
+  de notif rétroactive (un run découvert déjà completed n'est jamais entré dans le suivi des
+  runs actifs, donc la transition running→completed n'est jamais observée).
 
 ## Tests
 

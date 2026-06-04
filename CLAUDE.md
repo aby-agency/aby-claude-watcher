@@ -47,3 +47,4 @@ npm run dev      # with devtools
 - All data (model, slug, branch) uses latest value (resume-safe)
 - Input sanitization on all shell/AppleScript interpolation
 - Headless sessions (`session.json entrypoint !== "cli"`) → `isBackground`: dedicated collapsible UI section below interactive ones, no click-focus, notifications muted unless the per-session bell is on (deliberate exception to the v1.7.2 compact-toast rule)
+- Workflows multi-agents (`subagents/workflows/wf_*/journal.jsonl`) → aggregated violet badge per run, NOT individual agent rows; live via 2s tick (parent JSONL silent during run); name from `workflows/scripts/<name>-<runId>.js` filename; completion = `workflows/<runId>.json` state file (terminal states cached, `running` states re-read); one-shot `workflow-done` toast, no needs-you bell, no retroactive notif; stale > 30 min without state file → badge silently dropped; workflow agents never count in `hasBlockingForegroundAgent`

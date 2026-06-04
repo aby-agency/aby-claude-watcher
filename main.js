@@ -311,6 +311,11 @@ function setupIPC() {
     config.setCompactMode(value);
   });
 
+  ipcMain.handle('set-background-collapsed', (_, value) => {
+    config.setBackgroundSectionCollapsed(value);
+    return true;
+  });
+
   ipcMain.handle('set-always-on-top', (_, value) => {
     config.setAlwaysOnTop(value);
     if (mainWindow) mainWindow.setAlwaysOnTop(value);

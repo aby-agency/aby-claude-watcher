@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   focusTerminal: (sessionId) => ipcRenderer.invoke('focus-terminal', sessionId),
   setViewMode: (mode) => ipcRenderer.invoke('set-view-mode', mode),
+  setBackgroundCollapsed: (value) => ipcRenderer.invoke('set-background-collapsed', value),
   setCompactMode: (value) => ipcRenderer.invoke('set-compact-mode', value),
   setAlwaysOnTop: (value) => ipcRenderer.invoke('set-always-on-top', value),
   setWindowTransparencyEnabled: (value) => ipcRenderer.invoke('set-window-transparency-enabled', value),

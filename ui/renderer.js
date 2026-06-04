@@ -713,6 +713,18 @@ function updateSession(s) {
     return;
   }
 
+  // isBackground flipped (headless session resumed interactively, …) — the
+  // card must move across the section divider, which an in-place patch
+  // can't do. Note: in micro view the [data-session] node is the .micro-group
+  // wrapper; the bg-session class sits on its .micro-item child.
+  const wasBg = existing.classList.contains('bg-session') ||
+                !!existing.querySelector(':scope > .micro-item.bg-session');
+  if (!!s.isBackground !== wasBg) {
+    fullRender();
+    updateStatusBar();
+    return;
+  }
+
   const stateName = s.state.name;
   const oldState = existing.dataset.state;
 

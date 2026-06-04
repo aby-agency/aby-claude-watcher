@@ -25,6 +25,7 @@ let config = {
   windowOpacity: 0.85,       // 0.3 - 1.0 — opacity when idle (translucent), full on focus/hover
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
   customNames: {},      // { [sessionId]: "Custom name" }
+  backgroundSectionCollapsed: false, // "Background" section folded in the session list
 };
 
 function load() {
@@ -77,6 +78,11 @@ function setViewMode(mode) {
 
 function setCompactMode(value) {
   config.compactMode = value;
+  save();
+}
+
+function setBackgroundSectionCollapsed(value) {
+  config.backgroundSectionCollapsed = !!value;
   save();
 }
 
@@ -206,6 +212,7 @@ module.exports = {
   get,
   setViewMode,
   setCompactMode,
+  setBackgroundSectionCollapsed,
   setAlwaysOnTop,
   setVolume,
   setWindowTransparencyEnabled,

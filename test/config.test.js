@@ -119,6 +119,17 @@ test('transparency toggle coerces to boolean', () => {
   assertEq(config.get().windowTransparencyEnabled, false);
 });
 
+console.log('\nbackgroundSectionCollapsed:');
+test('defaults to false', () => {
+  assertEq(!!config.get().backgroundSectionCollapsed, false);
+});
+test('setter coerces to bool', () => {
+  config.setBackgroundSectionCollapsed(1);
+  assertEq(config.get().backgroundSectionCollapsed, true);
+  config.setBackgroundSectionCollapsed(false);
+  assertEq(config.get().backgroundSectionCollapsed, false);
+});
+
 // Cleanup
 try { fs.rmSync(testDir, { recursive: true, force: true }); } catch {}
 

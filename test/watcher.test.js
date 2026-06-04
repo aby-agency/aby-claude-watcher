@@ -233,8 +233,8 @@ function makeFakeClaudeTree() {
   return { root, sessions, projects };
 }
 
-function writeSessionJson(sessionsDir, pid, sessionId, cwd, updatedAt = Date.now()) {
-  const data = { pid, sessionId, cwd, startedAt: Date.now(), status: 'busy', updatedAt };
+function writeSessionJson(sessionsDir, pid, sessionId, cwd, updatedAt = Date.now(), entrypoint = 'cli') {
+  const data = { pid, sessionId, cwd, startedAt: Date.now(), status: 'busy', updatedAt, entrypoint };
   fs.writeFileSync(path.join(sessionsDir, `${pid}.json`), JSON.stringify(data));
 }
 
@@ -585,6 +585,76 @@ test('startFileWatch stores jsonlPath on session (for sessionDirFor downstream)'
 
   // Clean up the watcher to release file handles
   w.stop();
+});
+
+section('isBackground detection:');
+
+test('scan: entrypoint sdk-cli → isBackground true', () => {
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/proj-bg';
+  writeSessionJson(tree.sessions, 4001, 'BG-id', cwd, Date.now(), 'sdk-cli');
+  writeJsonl(tree.projects, cwd, 'BG-id', Date.now() - 1000);
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  const s = w.sessions.get('BG-id');
+  if (!s) throw new Error('BG-id must be tracked');
+  if (s.isBackground !== true) throw new Error(`expected isBackground=true, got ${s.isBackground}`);
+});
+
+test('scan: entrypoint cli → isBackground false', () => {
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/proj-fg';
+  writeSessionJson(tree.sessions, 4002, 'FG-id', cwd, Date.now(), 'cli');
+  writeJsonl(tree.projects, cwd, 'FG-id', Date.now() - 1000);
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  if (w.sessions.get('FG-id').isBackground !== false) throw new Error('expected isBackground=false');
+});
+
+test('scan: entrypoint absent (vieux Claude Code) → isBackground false', () => {
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/proj-old';
+  // Write a session.json WITHOUT the entrypoint field
+  const data = { pid: 4003, sessionId: 'OLD-cc-id', cwd, startedAt: Date.now(), updatedAt: Date.now() };
+  fs.writeFileSync(path.join(tree.sessions, '4003.json'), JSON.stringify(data));
+  writeJsonl(tree.projects, cwd, 'OLD-cc-id', Date.now() - 1000);
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  if (w.sessions.get('OLD-cc-id').isBackground !== false) throw new Error('expected isBackground=false');
+});
+
+test('scan: isBackground persisté dans config', () => {
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/proj-persist-bg';
+  writeSessionJson(tree.sessions, 4004, 'PBG-id', cwd, Date.now(), 'sdk-cli');
+  writeJsonl(tree.projects, cwd, 'PBG-id', Date.now() - 1000);
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  // scan() creates the session then persistSession() — verify the mock config
+  const saved = w.config.getSavedSessions()['PBG-id'];
+  if (!saved) throw new Error('session not persisted');
+  if (saved.isBackground !== true) throw new Error(`expected persisted isBackground=true, got ${saved.isBackground}`);
+});
+
+test('start(): restaure isBackground depuis config', () => {
+  const config = makeMockConfig();
+  config._data.sessions['RESTORED-bg'] = { stateName: 'waiting', isBackground: true, cwd: '/tmp/x', projectName: 'x' };
+  const w = new SessionWatcher(config);
+  w.scan = () => {}; // no filesystem scan
+  w.start();
+  const s = w.sessions.get('RESTORED-bg');
+  if (!s) throw new Error('session not restored');
+  if (s.isBackground !== true) throw new Error('expected restored isBackground=true');
+  w.stop();
+});
+
+test('migrateSession conserve isBackground', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.watchJsonl = () => {};
+  w.sessions.set('MIG-old', makeSession('MIG-old', { isBackground: true }));
+  w.migrateSession('MIG-old', 'MIG-new');
+  const s = w.sessions.get('MIG-new');
+  if (!s || s.isBackground !== true) throw new Error('isBackground lost in migration');
 });
 
 runAll().then(() => {

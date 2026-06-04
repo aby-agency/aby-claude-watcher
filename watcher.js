@@ -61,6 +61,7 @@ class SessionWatcher extends EventEmitter {
           tokens: data.tokens || { input: 0, output: 0 },
           terminalApp: data.terminalApp || null,
           terminalId: data.terminalId || null,
+          isBackground: !!data.isBackground,
           lastEventTime: Date.now(),
           hasActivity: savedState.name !== 'error',
           agentDispatches: new Map(),
@@ -138,9 +139,15 @@ class SessionWatcher extends EventEmitter {
 
       for (const data of liveSessions) {
         try {
-          const { pid, sessionId, cwd, startedAt } = data;
+          const { pid, sessionId, cwd, startedAt, entrypoint } = data;
 
           if (!sessionId) continue;
+
+          // Headless (`claude -p`, SDK, …) write entrypoint "sdk-cli"; interactive
+          // terminals write "cli". Unknown future entrypoints default to background
+          // (read-only + silent is the safe degradation). Absent field = old Claude
+          // Code version → keep the historical interactive behavior.
+          const isBackground = !!entrypoint && entrypoint !== 'cli';
 
           // Find any existing tracked session for this (pid, cwd) BEFORE
           // picking a target — once we've attributed a JSONL to a Claude
@@ -208,6 +215,7 @@ class SessionWatcher extends EventEmitter {
               terminalApp: null,
               terminalId: null,
               permissionMode: this.detectBypassFromPid(pid) ? 'bypassPermissions' : null,
+              isBackground,
               lastEventTime: Date.now(),
               hasActivity: false,
               agentDispatches: new Map(),
@@ -223,6 +231,7 @@ class SessionWatcher extends EventEmitter {
             // Always update from live session data (PID/cwd can change on resume)
             session.pid = pid;
             session.cwd = cwd;
+            session.isBackground = isBackground;
             if (startedAt) {
               const startedAtISO = typeof startedAt === 'number'
                 ? new Date(startedAt).toISOString() : startedAt;
@@ -841,6 +850,7 @@ class SessionWatcher extends EventEmitter {
       tokens: session.tokens,
       terminalApp: session.terminalApp,
       terminalId: session.terminalId,
+      isBackground: !!session.isBackground,
     });
   }
 

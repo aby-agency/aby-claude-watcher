@@ -138,7 +138,9 @@ async function init() {
   window.api.onPlaySound((data) => {
     playNotificationSound();
     const sid = data && data.sessionId;
-    if (sid) setBell(sid, (data && data.kind) || 'waiting');
+    const kind = (data && data.kind) || 'waiting';
+    // workflow-done = info ponctuelle, pas un "needs you" → pas de cloche persistante
+    if (sid && kind !== 'workflow-done') setBell(sid, kind);
   });
 
   const initialUsage = await window.api.getUsage();

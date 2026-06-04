@@ -66,7 +66,7 @@ function notifyWorkflowDone(session, wf) {
     durationMs: (wf.stats && wf.stats.durationMs) || null,
   });
   if (prefs.sound) {
-    sendToRenderer('play-sound', { kind: 'waiting', sessionId: session.sessionId });
+    sendToRenderer('play-sound', { kind: 'workflow-done', sessionId: session.sessionId });
   }
 }
 

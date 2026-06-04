@@ -4,6 +4,29 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] — 2026-06-04
+
+### Added
+- **Background sessions section** — headless sessions (`entrypoint !== "cli"`
+  in `session.json`: SDK runs, scheduled agents, remote workers) are now
+  detected as background and grouped in a dedicated collapsible *Background*
+  section below the interactive ones. They don't respond to click-to-focus
+  (there is no terminal to focus) and their waiting/pending notifications are
+  muted unless the per-session bell is explicitly enabled. The collapsed state
+  persists across restarts, and hidden background sessions keep their saved
+  order.
+- **Multi-agent workflow badges** — a session running a multi-agent workflow
+  (e.g. a deep-research harness spawning 100+ subagents) now shows one
+  aggregated violet badge per run — `⚡ deep-research — 12 agents actifs
+  (27/39)` — instead of an unreadable flood of agent rows. Counters update
+  live every 2 s from the run journal, even while the parent session is idle
+  waiting for the workflow to finish. When the run completes, a one-shot toast
+  fires (`⚡ deep-research terminé — 103 agents, 6 min`, sound per session
+  prefs, deliberately no "needs you" bell — it is information, not an action
+  request) and the badge disappears. Killed runs go stale after 30 min of
+  journal silence and drop without a completion toast. Workflow agents never
+  affect the parent session's displayed state or its blocking-agent logic.
+
 ## [1.9.0] — 2026-05-29
 
 ### Added

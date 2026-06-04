@@ -2166,6 +2166,45 @@ body.micro-mode .usage-reset-icon {
   min-width: 0;
 }
 
+/* Workflow badge — une ligne agrégée par run multi-agents, accent violet
+   (thinking) pour le distinguer des subagents directs (bleu running) */
+.workflow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: color-mix(in srgb, var(--state-thinking) 8%, transparent);
+  border-left: 2px solid var(--state-thinking);
+  border-radius: 3px;
+  font-size: 11px;
+  overflow: hidden;
+}
+.workflow-spinner {
+  border-color: color-mix(in srgb, var(--state-thinking) 35%, transparent);
+  border-top-color: var(--state-thinking);
+}
+.workflow-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+  min-width: 0;
+}
+.workflow-progress {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.compact-card .workflow-row {
+  padding: 3px 6px;
+  font-size: 10px;
+  gap: 6px;
+}
+.notification-toast[data-kind="workflow-done"] {
+  --toast-color: var(--state-thinking);
+}
+
 /* Compact view: tighter spacing, no top border (the parent card has enough separators) */
 .compact-card .subagents-block {
   margin-top: 6px;

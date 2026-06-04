@@ -11,6 +11,9 @@
       state_pending: 'Action requise',
       state_error: 'Erreur',
       background_section: 'Background ({n})',
+      workflow_progress: '{running} agent{s} actif{s} ({done}/{started})',
+      workflow_done: 'terminé',
+      workflow_agents: '{n} agent{s}',
 
       // Toolbar tooltips
       search_placeholder: 'Rechercher...',
@@ -155,6 +158,9 @@ settings_title: 'Paramètres',
       state_pending: 'Needs you',
       state_error: 'Error',
       background_section: 'Background ({n})',
+      workflow_progress: '{running} agent{s} active ({done}/{started})',
+      workflow_done: 'done',
+      workflow_agents: '{n} agent{s}',
 
       // Toolbar tooltips
       search_placeholder: 'Search...',

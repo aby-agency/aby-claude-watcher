@@ -812,14 +812,35 @@ function subagentRowHTML(sa) {
   `;
 }
 
+function workflowRowHTML(wf) {
+  const progress = t('workflow_progress', {
+    running: wf.running, done: wf.done, started: wf.started, n: wf.running,
+  });
+  return `
+    <div class="workflow-row" data-run="${escAttr(wf.runId)}">
+      <span class="subagent-spinner workflow-spinner"></span>
+      <span class="workflow-name" title="${escAttr(wf.name)}">⚡ ${esc(wf.name)}</span>
+      <span class="workflow-progress">${esc(progress)}</span>
+    </div>
+  `;
+}
+
+// Bloc commun aux 3 vues : badges workflows (agrégés) au-dessus des rows
+// subagents. Le header ne compte que les subagents directs — les agents d'un
+// workflow sont résumés par leur badge.
 function subagentsBlockHTML(s) {
-  if (!s.subagents || s.subagents.length === 0) return '';
-  const rows = s.subagents.map(subagentRowHTML).join('');
-  const count = s.subagents.length;
+  const workflows = s.workflows || [];
+  const subs = s.subagents || [];
+  if (workflows.length === 0 && subs.length === 0) return '';
+  const wfRows = workflows.map(workflowRowHTML).join('');
+  const count = subs.length;
   const label = count === 1 ? 'sous-agent' : 'sous-agents';
+  const header = count ? `<div class="subagents-header">${count} ${label} en cours</div>` : '';
+  const rows = subs.map(subagentRowHTML).join('');
   return `
     <div class="subagents-block" data-count="${count}">
-      <div class="subagents-header">${count} ${label} en cours</div>
+      ${wfRows}
+      ${header}
       ${rows}
     </div>
   `;
@@ -1167,13 +1188,27 @@ async function toggleNotif(event, sessionId) {
 
 const TOAST_DURATION = 10000;
 
+// « ⚡ deep-research terminé — 103 agents, 6 min ». Retour pré-échappé : il est
+// injecté tel quel dans le innerHTML du toast.
+function workflowDoneLabel(data) {
+  const parts = [];
+  if (data.agentCount) parts.push(t('workflow_agents', { n: data.agentCount }));
+  if (data.durationMs) parts.push(`${Math.max(1, Math.round(data.durationMs / 60000))} min`);
+  const suffix = parts.length ? ` — ${parts.join(', ')}` : '';
+  return `⚡ ${esc(data.workflowName || '')} ${t('workflow_done')}${esc(suffix)}`;
+}
+
 // Banner-style toast: a single clickable line that focuses the terminal.
 // Color follows the notification kind (blue for waiting, orange for pending).
 // Auto-dismisses after TOAST_DURATION, on Escape, or when the session goes
 // back to an active state (handled in updateSession).
 function showToast(data) {
-  const kind = data.kind === 'pending' ? 'pending' : 'waiting';
-  const stateLabel = kind === 'pending' ? t('state_pending') : t('state_waiting');
+  const kind = data.kind === 'pending' ? 'pending'
+    : data.kind === 'workflow-done' ? 'workflow-done'
+    : 'waiting';
+  const stateLabel = kind === 'pending' ? t('state_pending')
+    : kind === 'workflow-done' ? workflowDoneLabel(data)
+    : t('state_waiting');
 
   // Don't stack — replace any existing toast for the same session
   const previous = $notificationOverlay.querySelector(

@@ -671,6 +671,37 @@ test('scan: flip isBackground when entrypoint changes between scans (resume-safe
   if (w.sessions.get('FLIP-id').isBackground !== false) throw new Error('expected false after entrypoint flip to cli');
 });
 
+section('background notification gating:');
+
+test('background + cloche off → pas de session-waiting', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('BGN', makeSession('BGN', { isBackground: true, state: STATES.RUNNING }));
+  let fired = false;
+  w.on('session-waiting', () => { fired = true; });
+  w.setState('BGN', STATES.WAITING, false, 'test');
+  if (fired) throw new Error('session-waiting must NOT fire for silent background session');
+});
+
+test('background + cloche on → session-waiting émis', () => {
+  const config = makeMockConfig();
+  config._data.notifications['BGY'] = { modal: true, sound: true };
+  const w = new SessionWatcher(config);
+  w.sessions.set('BGY', makeSession('BGY', { isBackground: true, state: STATES.RUNNING }));
+  let fired = false;
+  w.on('session-waiting', () => { fired = true; });
+  w.setState('BGY', STATES.WAITING, false, 'test');
+  if (!fired) throw new Error('session-waiting must fire when bell is on');
+});
+
+test('interactive + cloche off → session-waiting émis (comportement inchangé)', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('FGN', makeSession('FGN', { isBackground: false, state: STATES.RUNNING }));
+  let fired = false;
+  w.on('session-waiting', () => { fired = true; });
+  w.setState('FGN', STATES.WAITING, false, 'test');
+  if (!fired) throw new Error('session-waiting must fire for interactive sessions');
+});
+
 runAll().then(() => {
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

@@ -820,10 +820,21 @@ class SessionWatcher extends EventEmitter {
     // Trigger notification on waiting/pending — with 30s cooldown to avoid spam
     // Handles: stale timer → waiting, end_turn → waiting, permission hook → pending
     if (!isInitial && (newState.name === 'waiting' || newState.name === 'pending')) {
-      const lastNotif = this.lastNotifTime.get(sessionId) || 0;
-      if (Date.now() - lastNotif > 30000) {
-        this.lastNotifTime.set(sessionId, Date.now());
-        this.emit('session-waiting', session);
+      // Background (headless) sessions are driven by their own channels
+      // (Telegram workers, cron, …) — stay silent unless the user explicitly
+      // enabled this session's bell. Deliberate exception to the v1.7.2 rule
+      // "compact toast shows even with bell off".
+      let muted = false;
+      if (session.isBackground && this.config) {
+        const p = this.config.getNotificationPrefs(sessionId);
+        muted = !p.modal && !p.sound;
+      }
+      if (!muted) {
+        const lastNotif = this.lastNotifTime.get(sessionId) || 0;
+        if (Date.now() - lastNotif > 30000) {
+          this.lastNotifTime.set(sessionId, Date.now());
+          this.emit('session-waiting', session);
+        }
       }
     }
     // Reset cooldown only when the user actually types — THINKING means a

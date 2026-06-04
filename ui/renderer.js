@@ -1479,9 +1479,15 @@ function onDragEnd(e) {
 function saveCurrentOrder() {
   const container = viewContainer();
   const items = container.querySelectorAll('[data-session]');
-  sessionOrder = Array.from(items)
+  const visible = Array.from(items)
     .map(el => el.dataset.session)
     .filter(id => sessions.has(id));
+  // Sessions hidden from the DOM (collapsed Background section) keep their
+  // previous relative order, appended after the visible ones. Grouping into
+  // interactive/background happens after the sort, so position in this flat
+  // list only matters within each group.
+  const hidden = sessionOrder.filter(id => sessions.has(id) && !visible.includes(id));
+  sessionOrder = visible.concat(hidden);
   window.api.setSessionOrder(sessionOrder);
 }
 

@@ -40,6 +40,61 @@ function effectiveStateName(session) {
   return name;
 }
 
+// ─── Workflows multi-agents (tool Workflow) ───
+// workflowActive : sessionId → Set(runId) vus "running" au dernier scan. Sert
+// d'amorçage au tick ET de mémoire de transition : un run découvert déjà
+// completed (watcher démarré après la fin) n'y entre jamais → pas de notif
+// rétroactive. notifiedWorkflowRuns : garde one-shot par runId (un run ne se
+// termine qu'une fois, pas besoin du cooldown 30 s).
+const WORKFLOW_TICK_MS = 2000;
+const workflowActive = new Map();
+const notifiedWorkflowRuns = new Set();
+
+function notifyWorkflowDone(session, wf) {
+  log.info(`[workflow] ${wf.runId} (${wf.name}) completed — ${wf.stats ? wf.stats.agentCount : wf.started} agents`);
+  const prefs = config.getNotificationPrefs(session.sessionId);
+  sendToRenderer('show-notification', {
+    sessionId: session.sessionId,
+    projectName: session.projectName,
+    customName: config.getCustomName(session.sessionId),
+    slug: session.slug,
+    kind: 'workflow-done',
+    workflowName: wf.name,
+    agentCount: (wf.stats && wf.stats.agentCount) || wf.started,
+    durationMs: (wf.stats && wf.stats.durationMs) || null,
+  });
+  if (prefs.sound) {
+    sendToRenderer('play-sound', { kind: 'waiting', sessionId: session.sessionId });
+  }
+}
+
+// Tick 2 s : le JSONL parent peut rester silencieux pendant tout un run (Claude
+// a fini son tour, le workflow tourne détaché) — sans ce tick, ni le badge ni
+// la notif de fin ne bougeraient. No-op disque quand aucun run n'est suivi.
+function workflowTick() {
+  if (!watcher || workflowActive.size === 0) return;
+  const sessions = watcher.getSessions();
+  // Copie : serializeSession ré-insère les clés pendant l'itération, et une clé
+  // delete+set serait revisitée par l'itérateur du Map (boucle infinie).
+  for (const [sessionId, activeRuns] of [...workflowActive]) {
+    const session = sessions.find(s => s.sessionId === sessionId);
+    const dir = session ? sessionDirFor(session) : null;
+    if (!dir) { workflowActive.delete(sessionId); continue; }
+
+    const all = subagentTracker.workflowsForSession(dir);
+    for (const wf of all) {
+      if (wf.status === 'completed' && activeRuns.has(wf.runId) && !notifiedWorkflowRuns.has(wf.runId)) {
+        notifiedWorkflowRuns.add(wf.runId);
+        notifyWorkflowDone(session, wf);
+      }
+    }
+    // serializeSession remet à jour workflowActive (ou la session en sort si
+    // plus aucun run actif) et pousse le badge frais au renderer.
+    workflowActive.delete(sessionId);
+    sendToRenderer('session-updated', serializeSession(session));
+  }
+}
+
 let mainWindow;
 let popoverWindow;
 let watcher;
@@ -210,6 +265,7 @@ function setupWatcher() {
   });
 
   watcher.start();
+  setInterval(workflowTick, WORKFLOW_TICK_MS);
 }
 
 function setupSocket() {
@@ -492,6 +548,15 @@ function serializeSession(session) {
   const subagents = sessionDir
     ? subagentTracker.snapshotForSession(sessionDir, dispatches)
     : [];
+  // Workflows actifs (badge agrégé). Les agents de workflow tournent dans une
+  // task background : ils ne comptent PAS dans hasBlockingForegroundAgent et
+  // ne mutent pas l'état du parent.
+  const workflows = (sessionDir ? subagentTracker.workflowsForSession(sessionDir) : [])
+    .filter(wf => wf.status === 'running')
+    .map(wf => ({ runId: wf.runId, name: wf.name, started: wf.started, done: wf.done, running: wf.running }));
+  if (workflows.length) {
+    workflowActive.set(session.sessionId, new Set(workflows.map(w => w.runId)));
+  }
   // Blocked on a foreground subagent → show running, not pending/orange.
   const state = (session.state.name === 'pending' && hasBlockingForegroundAgent(subagents))
     ? STATES.RUNNING
@@ -512,6 +577,7 @@ function serializeSession(session) {
     isBackground: !!session.isBackground,
     notifEnabled: (() => { const p = config.getNotificationPrefs(session.sessionId); return !!(p.modal || p.sound); })(),
     subagents,
+    workflows,
   };
 }
 

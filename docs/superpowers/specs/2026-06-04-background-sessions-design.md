@@ -68,7 +68,9 @@ Pas d'inspection de process (`ps -o tty`) : redondant, coûteux à chaque scan, 
 ## main.js / IPC
 
 - `serializeSession()` expose `isBackground` au renderer.
-- Aucun nouveau channel IPC.
+- Un nouveau channel IPC : `set-background-collapsed` (persistance du repli de
+  section — le renderer doit pousser le toggle vers le main process).
+  <!-- Amendé post-implémentation : la v initiale disait « aucun nouveau channel ». -->
 
 ## Config (config.js)
 

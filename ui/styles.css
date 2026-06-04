@@ -2252,6 +2252,17 @@ body.micro-mode .usage-reset-icon {
   height: 6px;
   border-width: 1px;
 }
+.micro-group .workflow-row {
+  padding: 2px 6px;
+  font-size: 10px;
+  gap: 5px;
+  border-left-width: 1.5px;
+}
+.micro-group .workflow-spinner {
+  width: 6px;
+  height: 6px;
+  border-width: 1px;
+}
 
 /* ═══ Background (headless) section ═══ */
 .bg-section-header {

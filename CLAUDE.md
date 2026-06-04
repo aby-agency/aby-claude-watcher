@@ -46,3 +46,4 @@ npm run dev      # with devtools
 - PID alive + session file gone = state unchanged (don't force a transition)
 - All data (model, slug, branch) uses latest value (resume-safe)
 - Input sanitization on all shell/AppleScript interpolation
+- Headless sessions (`session.json entrypoint !== "cli"`) → `isBackground`: dedicated collapsible UI section below interactive ones, no click-focus, notifications muted unless the per-session bell is on (deliberate exception to the v1.7.2 compact-toast rule)

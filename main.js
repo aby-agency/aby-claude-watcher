@@ -504,6 +504,7 @@ function serializeSession(session) {
     startedAt: session.startedAt,
     tokens: session.tokens,
     cwd: session.cwd,
+    isBackground: !!session.isBackground,
     notifEnabled: (() => { const p = config.getNotificationPrefs(session.sessionId); return !!(p.modal || p.sound); })(),
     subagents,
   };

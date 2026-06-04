@@ -35,6 +35,7 @@ let windowOpacity = 0.85;
 let searchQuery = '';
 let sessionOrder = []; // User-defined order of session IDs
 let draggedId = null;
+let backgroundCollapsed = false; // "Background" section folded — persisted in config
 
 // ═══ DOM refs ═══
 
@@ -84,6 +85,7 @@ async function init() {
   windowTransparencyEnabled = !!config.windowTransparencyEnabled;
   windowOpacity = config.windowOpacity ?? 0.85;
   sessionOrder = config.sessionOrder || [];
+  backgroundCollapsed = !!config.backgroundSectionCollapsed;
   soundTheme = SOUND_THEMES[config.soundTheme] ? config.soundTheme : 'default';
   regenerateSounds();
   updateSoundThemePicker();
@@ -660,8 +662,35 @@ function viewItemHTML() {
 function fullRender() {
   const sorted = getRenderableSessions();
   const htmlFn = viewItemHTML();
-  viewContainer().innerHTML = sorted.map(s => htmlFn(s)).join('');
+  // Interactive sessions first, headless (claude -p) below under a
+  // collapsible "Background" divider. Header only in grid/compact —
+  // micro is too small, the partition order alone is enough there.
+  const interactive = sorted.filter(s => !s.isBackground);
+  const background = sorted.filter(s => s.isBackground);
+  let html = interactive.map(s => htmlFn(s)).join('');
+  if (background.length > 0) {
+    if (viewMode !== 'micro') html += backgroundSectionHeaderHTML(background.length);
+    if (viewMode === 'micro' || !backgroundCollapsed) {
+      html += background.map(s => htmlFn(s)).join('');
+    }
+  }
+  viewContainer().innerHTML = html;
   reapplyAllBells();
+}
+
+function backgroundSectionHeaderHTML(count) {
+  return `
+    <div class="bg-section-header${backgroundCollapsed ? ' collapsed' : ''}" onclick="toggleBackgroundSection()">
+      <span class="bg-section-chevron">${backgroundCollapsed ? '▸' : '▾'}</span>
+      <span class="bg-section-label">⚙ ${esc(t('background_section', { n: count }))}</span>
+    </div>
+  `;
+}
+
+function toggleBackgroundSection() {
+  backgroundCollapsed = !backgroundCollapsed;
+  window.api.setBackgroundCollapsed(backgroundCollapsed);
+  render();
 }
 
 function updateSession(s) {
@@ -669,6 +698,14 @@ function updateSession(s) {
   const container = viewContainer();
   const selector = `[data-session="${s.sessionId}"]`;
   const existing = container.querySelector(selector);
+
+  if (!existing && s.isBackground && backgroundCollapsed && viewMode !== 'micro') {
+    // Collapsed background session: not in the DOM by design. Without this
+    // guard the `!existing` branch below would fullRender() on every token
+    // update of every hidden headless session.
+    updateStatusBar();
+    return;
+  }
 
   if (!existing) {
     // New session — need full re-render to place it correctly
@@ -784,7 +821,7 @@ function cardHTML(s) {
   const sid = escAttr(s.sessionId);
 
   return `
-    <div class="card" data-state="${stateName}" data-session="${sid}"
+    <div class="card${s.isBackground ? ' bg-session' : ''}" data-state="${stateName}" data-session="${sid}"
          draggable="${!searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
 onclick="handleCardClick(event, '${sid}')">
@@ -855,7 +892,7 @@ function microItemHTML(s) {
     <div class="micro-group" data-session="${sid}"
          draggable="${!searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">
-      <div class="micro-item" data-state="${stateName}"
+      <div class="micro-item${s.isBackground ? ' bg-session' : ''}" data-state="${stateName}"
            title="${escAttr(tooltip)}"
            onclick="handleFocus('${sid}')">
         ${indicator}
@@ -887,7 +924,7 @@ function compactItemHTML(s) {
     : '<span class="compact-card-muted">—</span>';
 
   return `
-    <div class="compact-card" data-state="${stateName}" data-session="${sid}"
+    <div class="compact-card${s.isBackground ? ' bg-session' : ''}" data-state="${stateName}" data-session="${sid}"
          draggable="${!searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
 onclick="handleCardClick(event, '${sid}')">
@@ -931,6 +968,10 @@ function updateDurations() {
 // ═══ Focus terminal ═══
 
 function handleFocus(sessionId) {
+  const s = sessions.get(sessionId);
+  // Headless sessions have no terminal to focus — covers card click,
+  // micro item click and toast click in one place.
+  if (s && s.isBackground) return;
   window.api.focusTerminal(sessionId);
 }
 
@@ -1399,6 +1440,11 @@ function onDragOver(e) {
   e.dataTransfer.dropEffect = 'move';
   const target = e.target.closest('[data-session]');
   if (!target || target.dataset.session === draggedId) return;
+
+  // No cross-section drag: the group is dictated by isBackground, not by position.
+  const ds = sessions.get(draggedId);
+  const ts = sessions.get(target.dataset.session);
+  if (!ds || !ts || !!ds.isBackground !== !!ts.isBackground) return;
 
   const container = target.parentElement;
   const dragged = container.querySelector(`[data-session="${draggedId}"]`);

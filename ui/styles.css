@@ -2213,3 +2213,26 @@ body.micro-mode .usage-reset-icon {
   height: 6px;
   border-width: 1px;
 }
+
+/* ═══ Background (headless) section ═══ */
+.bg-section-header {
+  grid-column: 1 / -1; /* span full width in grid & compact (both display:grid) */
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px 2px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  user-select: none;
+}
+.bg-section-header:hover { color: var(--text-secondary); }
+.bg-section-chevron { font-size: 9px; }
+.card.bg-session,
+.compact-card.bg-session,
+.micro-item.bg-session { cursor: default; }

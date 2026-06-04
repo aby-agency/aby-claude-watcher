@@ -10,6 +10,7 @@
       state_waiting_idle: 'Inactif',
       state_pending: 'Action requise',
       state_error: 'Erreur',
+      background_section: 'Background ({n})',
 
       // Toolbar tooltips
       search_placeholder: 'Rechercher...',
@@ -153,6 +154,7 @@ settings_title: 'Paramètres',
       state_waiting_idle: 'Sleeping',
       state_pending: 'Needs you',
       state_error: 'Error',
+      background_section: 'Background ({n})',
 
       // Toolbar tooltips
       search_placeholder: 'Search...',

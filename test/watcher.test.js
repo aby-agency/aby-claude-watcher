@@ -657,6 +657,20 @@ test('migrateSession conserve isBackground', () => {
   if (!s || s.isBackground !== true) throw new Error('isBackground lost in migration');
 });
 
+test('scan: flip isBackground when entrypoint changes between scans (resume-safe)', () => {
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/proj-flip';
+  writeSessionJson(tree.sessions, 4005, 'FLIP-id', cwd, Date.now(), 'sdk-cli');
+  writeJsonl(tree.projects, cwd, 'FLIP-id', Date.now() - 1000);
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  if (w.sessions.get('FLIP-id').isBackground !== true) throw new Error('expected true after first scan');
+  // Same pid/sessionId resumed interactively (entrypoint now cli)
+  writeSessionJson(tree.sessions, 4005, 'FLIP-id', cwd, Date.now(), 'cli');
+  w.scan();
+  if (w.sessions.get('FLIP-id').isBackground !== false) throw new Error('expected false after entrypoint flip to cli');
+});
+
 runAll().then(() => {
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

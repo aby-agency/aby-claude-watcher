@@ -85,6 +85,7 @@ class SocketServer extends EventEmitter {
           sessionId: msg.sessionId,
           hookEvent: msg.hookEvent,
           toolName: msg.toolName || null,
+          idle: !!msg.idle, // Notification idle reminder (not a permission)
         });
         conn.write(JSON.stringify({ status: 'ok' }) + '\n');
         break;

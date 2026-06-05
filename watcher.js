@@ -957,11 +957,17 @@ class SessionWatcher extends EventEmitter {
   // Defer the pending transition by ~1s. If Claude writes any JSONL event
   // in that window (auto-approved tool, immediate continuation, …), we cancel.
   // Real permission prompts idle for seconds, so they comfortably survive.
-  markPending(sessionId, hookEvent, toolName) {
+  markPending(sessionId, hookEvent, toolName, idle = false) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     if (session.state.name === 'pending') return;
     if (this.pendingTimers.has(sessionId)) return; // already scheduled
+
+    // The 60s idle reminder ("Claude is waiting for your input") is NOT a
+    // permission prompt. An already-waiting session was notified at end_turn —
+    // re-ringing it (and flipping it amber) is spam. If end_turn was missed
+    // (state still looks busy), use the reminder as a WAITING correction.
+    if (idle && session.state.name === 'waiting') return;
 
     // bypassPermissions skips most hooks (Claude auto-approves and proceeds)
     // — EXCEPT for hooks that signal a genuine user-blocking interaction:
@@ -978,15 +984,17 @@ class SessionWatcher extends EventEmitter {
     const lastEvent = session.lastEventTime || 0;
     if (Date.now() - lastEvent < 1000) return; // Claude is actively writing — ignore
 
+    const target = idle ? STATES.WAITING : STATES.PENDING;
+    const trigger = idle ? 'hook:idle-reminder' : `hook:${hookEvent}`;
     const timer = setTimeout(() => {
       this.pendingTimers.delete(sessionId);
       const s = this.sessions.get(sessionId);
       if (!s) return;
-      if (s.state.name === 'pending') return;
+      if (s.state.name === 'pending' || s.state.name === target.name) return;
       // Final check: did an event arrive since we scheduled?
       if (Date.now() - (s.lastEventTime || 0) < 1000) return;
       this.clearWaitingTimer(sessionId);
-      this.setState(sessionId, STATES.PENDING, false, `hook:${hookEvent}`);
+      this.setState(sessionId, target, false, trigger);
     }, 1000);
     this.pendingTimers.set(sessionId, timer);
   }

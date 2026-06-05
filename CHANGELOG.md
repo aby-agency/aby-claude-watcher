@@ -4,6 +4,29 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] — 2026-06-06
+
+### Fixed
+- **Double ding on idle reminder** — Claude Code fires a `Notification` hook
+  ~60 s after each turn ends ("Claude is waiting for your input"). The watcher
+  treated it as a permission request: the already-waiting session flipped back
+  to amber *pending* and rang a second time. The permission hook now forwards
+  an `idle` flag; an already-waiting session ignores the reminder (no re-ring,
+  no state flip), and a session whose `end_turn` was missed is corrected to
+  *waiting* (`hook:idle-reminder`) instead of *pending*.
+
+### Changed
+- **Pending sound deferred 5 s** — permission prompts resolved within seconds
+  (user already at the keyboard, or auto-approved) no longer ring: the sound
+  fires only if the session is still pending/waiting 5 s later. The toast
+  stays immediate.
+
+### Added
+- **Notification forensics** — every emitted notification is logged in
+  `main.log` (`[notif] fired … sound=on|off`), along with played sounds
+  (`[notif] sound …`) and skipped deferred sounds (`[notif] sound skipped …`),
+  so "why did it ding?" is answerable from the log.
+
 ## [1.10.0] — 2026-06-04
 
 ### Added

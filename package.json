@@ -1,6 +1,6 @@
 {
   "name": "aby-claude-watcher",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "description": "Aby Claude Watcher — dashboard desktop pour monitorer en temps réel vos sessions Claude Code",
   "main": "main.js",
   "scripts": {
@@ -16,7 +16,13 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "assets/icon.icns"
     },
@@ -24,12 +30,24 @@
       "title": "Aby Claude Watcher",
       "artifactName": "${productName}-${version}-${arch}.dmg",
       "background": "build/background.png",
-      "window": { "width": 540, "height": 500 },
+      "window": {
+        "width": 540,
+        "height": 500
+      },
       "iconSize": 80,
       "iconTextSize": 12,
       "contents": [
-        { "x": 140, "y": 180, "type": "file" },
-        { "x": 400, "y": 180, "type": "link", "path": "/Applications" }
+        {
+          "x": 140,
+          "y": 180,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "files": [

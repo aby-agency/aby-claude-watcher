@@ -52,6 +52,30 @@ const WORKFLOW_TICK_MS = 2000;
 const workflowActive = new Map();
 const notifiedWorkflowRuns = new Map(); // sessionId → Set(runId) déjà notifiés
 
+// Permissions get approved within seconds when the user is already at the
+// keyboard — defer the pending sound and only ring if the session is still
+// blocked when the timer fires. The toast stays immediate (visual is cheap).
+const PENDING_SOUND_DELAY = 5000;
+const pendingSoundTimers = new Map(); // sessionId → timeout
+
+function schedulePendingSound(sessionId) {
+  const prev = pendingSoundTimers.get(sessionId);
+  if (prev) clearTimeout(prev);
+  const timer = setTimeout(() => {
+    pendingSoundTimers.delete(sessionId);
+    const s = watcher.getSessions().find(x => x.sessionId === sessionId);
+    const name = s && s.state && s.state.name;
+    // waiting still needs the user (pending can collapse into end-of-turn)
+    if ((name !== 'pending' && name !== 'waiting') || (s && blockingForegroundAgent(s))) {
+      log.info(`[notif] sound skipped for ${sessionId.slice(0, 8)} — pending resolved in <${PENDING_SOUND_DELAY / 1000}s`);
+      return;
+    }
+    log.info(`[notif] sound for ${sessionId.slice(0, 8)} — kind=pending (deferred)`);
+    sendToRenderer('play-sound', { kind: 'pending', sessionId });
+  }, PENDING_SOUND_DELAY);
+  pendingSoundTimers.set(sessionId, timer);
+}
+
 function notifyWorkflowDone(session, wf) {
   log.info(`[workflow] ${wf.runId} (${wf.name}) completed — ${wf.stats ? wf.stats.agentCount : wf.started} agents`);
   const prefs = config.getNotificationPrefs(session.sessionId);
@@ -66,6 +90,7 @@ function notifyWorkflowDone(session, wf) {
     durationMs: (wf.stats && wf.stats.durationMs) || null,
   });
   if (prefs.sound) {
+    log.info(`[notif] sound for ${session.sessionId.slice(0, 8)} — kind=workflow-done`);
     sendToRenderer('play-sound', { kind: 'workflow-done', sessionId: session.sessionId });
   }
 }
@@ -255,6 +280,8 @@ function setupWatcher() {
     }
     const prefs = config.getNotificationPrefs(session.sessionId);
     const kind = session.state && session.state.name === 'pending' ? 'pending' : 'waiting';
+    // Forensic trail: every emitted notif, with whether a sound goes out.
+    log.info(`[notif] fired for ${session.sessionId.slice(0, 8)} — kind=${kind} sound=${prefs.sound ? 'on' : 'off'}`);
     // Always fire the visual event — the renderer gates by view mode.
     // Compact view shows the toast regardless of the bell; grid still requires it.
     sendToRenderer('show-notification', {
@@ -265,7 +292,12 @@ function setupWatcher() {
       kind,
     });
     if (prefs.sound) {
-      sendToRenderer('play-sound', { kind, sessionId: session.sessionId });
+      if (kind === 'pending') {
+        schedulePendingSound(session.sessionId);
+      } else {
+        log.info(`[notif] sound for ${session.sessionId.slice(0, 8)} — kind=${kind}`);
+        sendToRenderer('play-sound', { kind, sessionId: session.sessionId });
+      }
     }
   });
 
@@ -273,6 +305,8 @@ function setupWatcher() {
     // Session partie → ses runs de workflow sont morts, on purge le suivi
     workflowActive.delete(sessionId);
     notifiedWorkflowRuns.delete(sessionId);
+    const t = pendingSoundTimers.get(sessionId);
+    if (t) { clearTimeout(t); pendingSoundTimers.delete(sessionId); }
     sendToRenderer('session-removed', sessionId);
   });
 
@@ -303,7 +337,7 @@ function setupSocket() {
   });
 
   socketServer.on('permission-pending', (data) => {
-    if (data.sessionId) watcher.markPending(data.sessionId, data.hookEvent, data.toolName);
+    if (data.sessionId) watcher.markPending(data.sessionId, data.hookEvent, data.toolName, data.idle);
   });
 
   // Resolve pending registrations when sessions are discovered

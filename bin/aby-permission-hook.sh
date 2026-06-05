@@ -22,6 +22,7 @@ if command -v jq >/dev/null 2>&1; then
   SID=$(printf '%s' "$PAYLOAD" | jq -r '.session_id // empty' 2>/dev/null)
   HOOK=$(printf '%s' "$PAYLOAD" | jq -r '.hook_event_name // empty' 2>/dev/null)
   TOOL=$(printf '%s' "$PAYLOAD" | jq -r '.tool_name // empty' 2>/dev/null)
+  NMSG=$(printf '%s' "$PAYLOAD" | jq -r '.message // empty' 2>/dev/null)
 elif command -v python3 >/dev/null 2>&1; then
   SID=$(printf '%s' "$PAYLOAD" | python3 -c "import sys,json
 try: d=json.load(sys.stdin); print(d.get('session_id',''))
@@ -32,13 +33,25 @@ except: pass" 2>/dev/null)
   TOOL=$(printf '%s' "$PAYLOAD" | python3 -c "import sys,json
 try: d=json.load(sys.stdin); print(d.get('tool_name',''))
 except: pass" 2>/dev/null)
+  NMSG=$(printf '%s' "$PAYLOAD" | python3 -c "import sys,json
+try: d=json.load(sys.stdin); print(d.get('message',''))
+except: pass" 2>/dev/null)
 else
   exit 0
 fi
 
 [ -z "$SID" ] && exit 0
 
-MSG="{\"action\":\"permission-pending\",\"sessionId\":\"$SID\",\"hookEvent\":\"$HOOK\",\"toolName\":\"$TOOL\"}"
+# Notification fires both for real permission prompts ("Claude needs your
+# permission…") and for the 60s idle reminder ("Claude is waiting for your
+# input") — flag the latter so the watcher doesn't re-ring an already-waiting
+# session. Boolean flag (not the raw message) to keep the JSON injection-safe.
+case "$NMSG" in
+  *"waiting for your input"*) IDLE=true ;;
+  *) IDLE=false ;;
+esac
+
+MSG="{\"action\":\"permission-pending\",\"sessionId\":\"$SID\",\"hookEvent\":\"$HOOK\",\"toolName\":\"$TOOL\",\"idle\":$IDLE}"
 
 # Send asynchronously so the hook returns fast (Claude waits on us).
 (

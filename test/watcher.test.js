@@ -702,6 +702,39 @@ test('interactive + cloche off → session-waiting émis (comportement inchangé
   if (!fired) throw new Error('session-waiting must fire for interactive sessions');
 });
 
+// ─── refreshSession: relecture hors-bande ────────────────────────
+// Le son pending différé décide de sonner sur l'état du watcher, qui retarde
+// de jusqu'à ~300ms sur le clic réel (flush JSONL + poll 250ms). refreshSession
+// force une relecture immédiate pour que le check au tir voie une approbation
+// fraîchement écrite.
+section('refreshSession — relecture hors-bande:');
+
+test('voit une approbation fraîchement écrite sans attendre le poll', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  const p = tmpJsonl('refresh');
+  fs.writeFileSync(p, '');
+  w.sessions.set('RFR', makeSession('RFR', { jsonlPath: p, state: STATES.PENDING }));
+  w.fileOffsets.set(p, 0);
+  // L'approbation vient d'être flushée par Claude Code — aucun poller armé.
+  fs.appendFileSync(p, JSON.stringify({
+    type: 'assistant',
+    message: { role: 'assistant',
+      content: [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: {} }],
+      stop_reason: 'tool_use' },
+  }) + '\n');
+  if (w.sessions.get('RFR').state.name !== 'pending') throw new Error('précondition: pending');
+  w.refreshSession('RFR');
+  const got = w.sessions.get('RFR').state.name;
+  if (got !== 'running') throw new Error(`état attendu running après refresh, obtenu ${got}`);
+});
+
+test('no-op sans crash pour session inconnue ou sans jsonlPath', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.refreshSession('inconnu');
+  w.sessions.set('NOP', makeSession('NOP'));
+  w.refreshSession('NOP');
+});
+
 runAll().then(() => {
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

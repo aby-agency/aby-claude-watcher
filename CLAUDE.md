@@ -37,7 +37,7 @@ npm run dev      # with devtools
 - Only `end_turn` reliably signals "waiting for user" — no stale timer (caused false positives)
 - Waiting delay: 5s (avoids false positives between rapid tool calls)
 - Notifications: 30s cooldown per session to avoid spam
-- Pending sound deferred 5s — rings only if still pending/waiting at fire time (permissions approved in seconds shouldn't ding); toast stays immediate; every emit/skip logged `[notif]`
+- Pending sound deferred 5s — rings only if still pending/waiting at fire time (permissions approved in seconds shouldn't ding); fire-time check calls `watcher.refreshSession()` first (polled state lags the real click by flush + 250ms poll — approval at the wire must not ring on stale state; residual race = CC flush latency only, irreducible); toast stays immediate; every emit/skip logged `[notif]`
 - Notification hook 60s idle reminder ("waiting for your input") ≠ permission: hook forwards `idle` bool; already-waiting session → ignored (no re-ding, no amber flip); busy-looking session → corrected to waiting (`hook:idle-reminder`), not pending
 - Polling at 250ms (`fs.watch` unreliable on macOS)
 - Config saves debounced 500ms, `saveSync` on shutdown

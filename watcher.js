@@ -437,7 +437,7 @@ class SessionWatcher extends EventEmitter {
       this.fileOffsets.set(jsonlPath, stat.size);
     } catch (e) {}
 
-    // Poll file size every 500ms — more reliable than fs.watch on macOS
+    // Poll file size every 250ms — more reliable than fs.watch on macOS
     const poller = setInterval(() => {
       try {
         const stat = fs.statSync(jsonlPath);
@@ -640,6 +640,15 @@ class SessionWatcher extends EventEmitter {
     } catch (e) {
       // file access error
     }
+  }
+
+  // Relecture hors-bande du JSONL d'une session — l'équivalent d'un tick de
+  // poller, tout de suite. Utilisé avant de sonner le son pending différé :
+  // l'état pollé retarde de jusqu'à ~300ms sur le clic réel (flush JSONL +
+  // poll 250ms), donc on relit pour que le check au tir décide sur du frais.
+  refreshSession(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (session && session.jsonlPath) this.readNewLines(sessionId, session.jsonlPath);
   }
 
   processEvent(sessionId, event, isInitial) {

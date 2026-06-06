@@ -63,6 +63,10 @@ function schedulePendingSound(sessionId) {
   if (prev) clearTimeout(prev);
   const timer = setTimeout(() => {
     pendingSoundTimers.delete(sessionId);
+    // L'état pollé retarde de ~300ms sur le clic réel (flush JSONL + poll
+    // 250ms) — relire le JSONL maintenant pour qu'une permission approuvée
+    // juste avant le tir ne fasse pas sonner sur un état périmé.
+    watcher.refreshSession(sessionId);
     const s = watcher.getSessions().find(x => x.sessionId === sessionId);
     const name = s && s.state && s.state.name;
     // waiting still needs the user (pending can collapse into end-of-turn)

@@ -115,6 +115,8 @@ settings_title: 'Paramètres',
       notif_modal: 'Modal in-app',
       notif_sound: 'Son',
       notif_session_waiting: 'Session en attente',
+      notif_body_pending: 'Permission requise',
+      notif_body_waiting: 'En attente de ta saisie',
 
       // Popover
       popover_empty: 'Aucune session active',
@@ -262,6 +264,8 @@ settings_title: 'Settings',
       notif_modal: 'In-app modal',
       notif_sound: 'Sound',
       notif_session_waiting: 'Session waiting',
+      notif_body_pending: 'Permission required',
+      notif_body_waiting: 'Waiting for your input',
 
       // Popover
       popover_empty: 'No active session',

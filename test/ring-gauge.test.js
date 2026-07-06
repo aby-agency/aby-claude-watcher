@@ -1,5 +1,5 @@
 // Tests for ring-gauge.js. Run: node test/ring-gauge.test.js
-const { gaugeColor, formatCountdown, ringBitmap, trayUsageLabel } = require('../ring-gauge.js');
+const { gaugeColor, formatCountdown, ringBitmap, dotBitmap, trayUsageLabel } = require('../ring-gauge.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -53,6 +53,16 @@ test('color null → track uniquement (gris)', () => {
   assert(Math.abs(p.r - p.g) < 12 && Math.abs(p.g - p.b) < 12, `devrait être gris: ${JSON.stringify(p)}`);
 });
 test('clamp au-delà de 100 sans crash', () => assertEq(ringBitmap(150, RED, SIZE).length, SIZE * SIZE * 4));
+
+console.log('\ndotBitmap:');
+test('taille du buffer = size*size*4', () => assertEq(dotBitmap(RED, SIZE).length, SIZE * SIZE * 4));
+test('centre = couleur opaque (rouge, R dominant)', () => {
+  const p = px(dotBitmap(RED, SIZE), 8, 8, SIZE);
+  assert(p.a > 250, `pas opaque: ${p.a}`);
+  assert(p.r > p.b && p.r > p.g, `rouge non dominant: ${JSON.stringify(p)}`);
+});
+test('coin transparent', () => assertEq(px(dotBitmap(RED, SIZE), 0, 0, SIZE).a, 0));
+test('color null → centre transparent', () => assertEq(px(dotBitmap(null, SIZE), 8, 8, SIZE).a, 0));
 
 console.log('\ntrayUsageLabel:');
 test('5h présent → "5H 27% · 35m"', () => {

@@ -10,7 +10,7 @@ const config = require('./config');
 const i18n = require('./i18n');
 const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
 const { trayGlance } = require('./tray-glance');
-const { gaugeColor, ringBitmap, trayUsageLabel } = require('./ring-gauge');
+const { gaugeColor, ringBitmap, dotBitmap, trayUsageLabel } = require('./ring-gauge');
 const { isFocusActive } = require('./focus-state');
 
 const subagentTracker = new SubagentTracker();
@@ -863,11 +863,10 @@ function generateTrayIcon(color, pct) {
     if (process.platform === 'darwin') img.setTemplateImage(true);
     return img;
   }
-  // Color requested (attention needed) → a small filled dot, NOT a template
-  // image, so macOS renders the actual color instead of tinting it to
-  // monochrome.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="5" fill="${color}"/></svg>`;
-  const img = nativeImage.createFromDataURL('data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'));
+  // Color requested (attention needed) → a small filled dot, drawn as a raw
+  // bitmap: nativeImage can't rasterize SVG data-URLs (they come back empty).
+  const SIZE = 32; // 16pt @2x
+  const img = nativeImage.createFromBitmap(dotBitmap(color, SIZE), { width: SIZE, height: SIZE, scaleFactor: 2 });
   img.setTemplateImage(false);
   return img;
 }

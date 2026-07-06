@@ -80,6 +80,36 @@ function ringBitmap(pct, color, size) {
   return buf;
 }
 
+// Draws a filled dot (attention indicator) into a premultiplied-BGRA buffer.
+// Same rationale as ringBitmap: nativeImage can't rasterize SVG data-URLs.
+function dotBitmap(color, size) {
+  const S = Math.max(1, Math.floor(size) || 16);
+  const buf = Buffer.alloc(S * S * 4);
+  const rgb = hexToRgb(color);
+  if (!rgb) return buf; // no color → fully transparent
+  const cx = S / 2, cy = S / 2, rad = (S * 5) / 16;
+  const SS = 4, inv = 1 / SS, area = SS * SS;
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      let cov = 0;
+      for (let sy = 0; sy < SS; sy++) {
+        for (let sx = 0; sx < SS; sx++) {
+          const dx = x + (sx + 0.5) * inv - cx;
+          const dy = y + (sy + 0.5) * inv - cy;
+          if (Math.sqrt(dx * dx + dy * dy) <= rad) cov++;
+        }
+      }
+      const a = cov / area;
+      const idx = (y * S + x) * 4;
+      buf[idx] = Math.round(rgb[2] * a);       // B (premultiplied)
+      buf[idx + 1] = Math.round(rgb[1] * a);   // G
+      buf[idx + 2] = Math.round(rgb[0] * a);   // R
+      buf[idx + 3] = Math.round(a * 255);      // A
+    }
+  }
+  return buf;
+}
+
 function trayUsageLabel(usage, nowMs) {
   const fh = usage && usage.fiveHour;
   if (!fh || typeof fh.utilization !== 'number' || !Number.isFinite(fh.utilization)) return null;
@@ -87,4 +117,4 @@ function trayUsageLabel(usage, nowMs) {
   return `5H ${pct}% · ${formatCountdown(fh.resetsAt, nowMs)}`;
 }
 
-module.exports = { gaugeColor, formatCountdown, ringBitmap, trayUsageLabel };
+module.exports = { gaugeColor, formatCountdown, ringBitmap, dotBitmap, trayUsageLabel };

@@ -860,6 +860,7 @@ function cardHTML(s) {
          draggable="${!searchQuery}"
          ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)"
 onclick="handleCardClick(event, '${sid}')">
+      <span class="card-bloom"></span>
       <div class="card-header">
         <div class="card-title">
           <div class="project-name editable-name" onclick="event.stopPropagation(); startInlineRename(event, '${sid}')" title="${t('action_rename_hint')}">

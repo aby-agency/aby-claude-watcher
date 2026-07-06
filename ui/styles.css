@@ -760,6 +760,20 @@ body.micro-mode .usage-reset-icon {
 .state-badge.pending { --badge-bg: rgba(245, 158, 11, 0.15); --badge-color: var(--state-pending); }
 .state-badge.error { --badge-bg: rgba(153, 27, 27, 0.15); --badge-color: var(--state-error); }
 
+/* Badges calmes (thinking/running) : inchangés, discrets */
+/* Badges d'action : halo + dot rayonnant */
+.state-badge.pending,
+.state-badge.waiting,
+.state-badge.error {
+  border: 1px solid color-mix(in srgb, var(--badge-color) 40%, transparent);
+  box-shadow: 0 0 16px -4px var(--badge-color);
+}
+.state-badge.pending .dot,
+.state-badge.waiting .dot,
+.state-badge.error .dot {
+  box-shadow: 0 0 7px 0 currentColor;
+}
+
 .state-badge.running .dot,
 .state-badge.thinking .dot {
   animation: pulse 1.5s ease-in-out infinite;
@@ -1613,6 +1627,42 @@ body.micro-mode .usage-reset-icon {
 .card[data-state="waiting"] { --card-accent: var(--state-waiting); }
 .card[data-state="pending"] { --card-accent: var(--state-pending); }
 .card[data-state="error"] { --card-accent: var(--state-error); }
+
+/* Filet d'état 1px en haut — présent sur tous les états (calme) */
+.card::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--card-accent, var(--state-neutral)), transparent);
+  opacity: .55;
+  pointer-events: none;
+}
+
+/* Bloom coloré — SEULEMENT les états qui réclament une action */
+.card[data-state="pending"],
+.card[data-state="waiting"],
+.card[data-state="error"] {
+  border-color: color-mix(in srgb, var(--card-accent) 34%, var(--card-border));
+}
+.card[data-state="pending"] .card-bloom,
+.card[data-state="waiting"] .card-bloom,
+.card[data-state="error"] .card-bloom {
+  position: absolute;
+  left: -6%; bottom: -34%;
+  width: 50%; height: 115%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--card-accent) 40%, transparent), transparent);
+  filter: blur(9px);
+  opacity: var(--glow);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Contenu texte au-dessus du bloom */
+.card-header, .card-details {
+  position: relative;
+  z-index: 1;
+}
 
 /* ═══ List state dots ═══ */
 

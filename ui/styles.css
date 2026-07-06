@@ -1086,7 +1086,7 @@ body.micro-mode .usage-reset-icon {
 .compact-card[data-state="pending"] .compact-dot { background: var(--state-pending); box-shadow: 0 0 7px 0 var(--state-pending); }
 .compact-card[data-state="error"] { --card-accent: var(--state-error); }
 .compact-card[data-state="error"] .compact-card-state { color: var(--state-error); }
-.compact-card[data-state="error"] .compact-dot { background: var(--state-error); box-shadow: 0 0 7px 0 var(--state-error); }
+.compact-card[data-state="error"] .compact-dot { background: var(--state-error); box-shadow: 0 0 7px 0 var(--state-error); animation: breathe 3s ease-in-out infinite; }
 
 /* ═══ Notification modal ═══ */
 

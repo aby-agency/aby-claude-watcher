@@ -10,7 +10,8 @@
       background: transparent;
     }
     .popover-body {
-      background: var(--bg-secondary);
+      /* Soft Glass ground — opaque, no backdrop-filter/translucency */
+      background: var(--bg-primary);
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
@@ -50,6 +51,9 @@
       flex: 1;
       overflow-y: auto;
       padding: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
     .popover-list::-webkit-scrollbar {
       width: 4px;
@@ -66,22 +70,49 @@
       color: var(--text-muted);
       font-size: 12px;
     }
+    /* Soft Glass card row — same recipe as .card: sheen + card-bg gradient
+       layered over a solid base, opaque border, no backdrop-filter. */
     .pop-item {
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 7px 10px;
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: background 0.15s;
+      background: var(--card-sheen), var(--card-bg), var(--bg-secondary);
+      border: 1px solid var(--card-border);
+      transition: border-color var(--transition), background 0.15s;
     }
     .pop-item:hover {
-      background: var(--bg-tertiary);
+      border-color: rgba(255, 255, 255, .18);
+      background: var(--card-sheen), var(--card-bg), var(--bg-tertiary);
+    }
+    /* State color — single-sourced from --state-* via [data-state], same
+       convention as .micro-item[data-state] in styles.css. */
+    .pop-item[data-state="thinking"] { color: var(--state-thinking); }
+    .pop-item[data-state="running"] { color: var(--state-running); }
+    .pop-item[data-state="waiting"] { color: var(--state-waiting); }
+    .pop-item[data-state="pending"] { color: var(--state-pending); }
+    .pop-item[data-state="error"] { color: var(--state-error); }
+    /* Glow-budget: only pending/waiting/error rows glow (action required).
+       thinking/running stay calm — dot/spinner colored, no tint, no halo. */
+    .pop-item[data-state="pending"],
+    .pop-item[data-state="waiting"],
+    .pop-item[data-state="error"] {
+      background: var(--card-sheen), var(--card-bg), color-mix(in srgb, currentColor 12%, var(--bg-secondary));
+      border-color: color-mix(in srgb, currentColor 40%, transparent);
+      box-shadow: 0 0 16px -4px currentColor;
+    }
+    .pop-item[data-state="pending"] .pop-dot,
+    .pop-item[data-state="waiting"] .pop-dot,
+    .pop-item[data-state="error"] .pop-dot {
+      box-shadow: 0 0 7px 0 currentColor;
     }
     .pop-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
+      background: currentColor;
       flex-shrink: 0;
     }
     .pop-spinner {
@@ -89,6 +120,8 @@
       height: 10px;
       border-radius: 50%;
       border: 1.5px solid currentColor;
+      border-top-color: transparent;
+      border-right-color: transparent;
       animation: spin 0.8s linear infinite;
       flex-shrink: 0;
       box-sizing: border-box;

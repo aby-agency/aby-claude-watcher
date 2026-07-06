@@ -1,12 +1,5 @@
 // Popover mini-view — shows active sessions in a compact list
 
-const STATE_COLORS = {
-  thinking: '#a78bfa',
-  running: '#3b82f6',
-  waiting: '#22c55e',
-  error: '#ef4444',
-};
-
 function esc(str) {
   if (!str) return '';
   const div = document.createElement('div');
@@ -40,14 +33,15 @@ function renderPopover(sessions, config) {
 
   $list.innerHTML = sessions.map(s => {
     const stateName = s.state.name;
-    const color = STATE_COLORS[stateName] || '#6b7280';
     const isActive = stateName === 'running' || stateName === 'thinking';
+    // Color comes from CSS via [data-state] (same convention as .micro-item),
+    // not from an inline style — keeps state colors single-sourced in styles.css.
     const indicator = isActive
-      ? `<span class="pop-spinner" style="border-color: ${color}; border-top-color: transparent; border-right-color: transparent"></span>`
-      : `<span class="pop-dot" style="background: ${color}"></span>`;
+      ? `<span class="pop-spinner"></span>`
+      : `<span class="pop-dot"></span>`;
     const displayName = customNames[s.sessionId] || s.projectName;
     return `
-      <div class="pop-item" data-session="${esc(s.sessionId)}">
+      <div class="pop-item" data-session="${esc(s.sessionId)}" data-state="${esc(stateName)}">
         ${indicator}
         <span class="pop-name">${esc(displayName)}</span>
         <span class="pop-state">${esc(window.i18n.t('state_' + s.state.name))}</span>

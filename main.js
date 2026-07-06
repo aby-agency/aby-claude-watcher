@@ -10,6 +10,7 @@ const config = require('./config');
 const i18n = require('./i18n');
 const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
 const { trayGlance } = require('./tray-glance');
+const { gaugeColor, ringBitmap, dotBitmap, trayUsageLabel } = require('./ring-gauge');
 const { isFocusActive } = require('./focus-state');
 
 const subagentTracker = new SubagentTracker();
@@ -845,7 +846,14 @@ function togglePopover() {
   }
 }
 
-function generateTrayIcon(color) {
+function generateTrayIcon(color, pct) {
+  // Anneau de conso : pct fourni → dessine la jauge (image non-template, vraies couleurs).
+  if (typeof pct === 'number' && Number.isFinite(pct) && pct >= 0) {
+    const SIZE = 32; // 16pt @2x pour le rendu Retina de la barre de menu
+    const img = nativeImage.createFromBitmap(ringBitmap(pct, gaugeColor(pct), SIZE), { width: SIZE, height: SIZE, scaleFactor: 2 });
+    img.setTemplateImage(false);
+    return img;
+  }
   // No color → the static template icon (macOS tints it automatically for
   // light/dark menu bars). `Template` suffix tells Electron this is a
   // template image; the @2x variant is auto-loaded from the same directory.
@@ -855,11 +863,10 @@ function generateTrayIcon(color) {
     if (process.platform === 'darwin') img.setTemplateImage(true);
     return img;
   }
-  // Color requested (attention needed) → a small filled dot, NOT a template
-  // image, so macOS renders the actual color instead of tinting it to
-  // monochrome.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="5" fill="${color}"/></svg>`;
-  const img = nativeImage.createFromDataURL('data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'));
+  // Color requested (attention needed) → a small filled dot, drawn as a raw
+  // bitmap: nativeImage can't rasterize SVG data-URLs (they come back empty).
+  const SIZE = 32; // 16pt @2x
+  const img = nativeImage.createFromBitmap(dotBitmap(color, SIZE), { width: SIZE, height: SIZE, scaleFactor: 2 });
   img.setTemplateImage(false);
   return img;
 }
@@ -905,14 +912,18 @@ function refreshTrayGlance() {
   }));
   const usage = { pct5h: lastUsage?.fiveHour?.utilization ?? null, pct7d: lastUsage?.sevenDay?.utilization ?? null };
   const g = trayGlance(sessions, usage);
+  const pct5h = lastUsage?.fiveHour?.utilization;
+  const hasUsage = typeof pct5h === 'number' && Number.isFinite(pct5h);
+  // La conso est affichée en permanence (comme le wifi/l'heure). L'attention
+  // reste signalée par le badge du Dock + les notifs, pas dans le tray.
   try {
-    tray.setImage(generateTrayIcon(g.color));
+    tray.setImage(hasUsage ? generateTrayIcon(null, pct5h) : generateTrayIcon(g.color));
   } catch (e) {
     log.warn('tray icon render failed, fallback', e);
     tray.setImage(generateTrayIcon(null));
   }
-  if (g.count > 0) tray.setTitle(` ${g.count}`);
-  else if (g.usageLabel) tray.setTitle(` ${g.usageLabel}`);
+  if (hasUsage) tray.setTitle(' ' + trayUsageLabel(lastUsage, Date.now()));
+  else if (g.count > 0) tray.setTitle(` ${g.count}`);
   else tray.setTitle('');
 }
 

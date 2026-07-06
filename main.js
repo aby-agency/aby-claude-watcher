@@ -10,6 +10,7 @@ const config = require('./config');
 const i18n = require('./i18n');
 const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
 const { trayGlance } = require('./tray-glance');
+const { gaugeColor, ringBitmap, trayUsageLabel } = require('./ring-gauge');
 const { isFocusActive } = require('./focus-state');
 
 const subagentTracker = new SubagentTracker();
@@ -845,7 +846,14 @@ function togglePopover() {
   }
 }
 
-function generateTrayIcon(color) {
+function generateTrayIcon(color, pct) {
+  // Anneau de conso : pct fourni → dessine la jauge (image non-template, vraies couleurs).
+  if (typeof pct === 'number' && Number.isFinite(pct) && pct >= 0) {
+    const SIZE = 32; // 16pt @2x pour le rendu Retina de la barre de menu
+    const img = nativeImage.createFromBitmap(ringBitmap(pct, gaugeColor(pct), SIZE), { width: SIZE, height: SIZE, scaleFactor: 2 });
+    img.setTemplateImage(false);
+    return img;
+  }
   // No color → the static template icon (macOS tints it automatically for
   // light/dark menu bars). `Template` suffix tells Electron this is a
   // template image; the @2x variant is auto-loaded from the same directory.
@@ -905,14 +913,16 @@ function refreshTrayGlance() {
   }));
   const usage = { pct5h: lastUsage?.fiveHour?.utilization ?? null, pct7d: lastUsage?.sevenDay?.utilization ?? null };
   const g = trayGlance(sessions, usage);
+  const pct5h = lastUsage?.fiveHour?.utilization;
+  const showUsage = g.count === 0 && typeof pct5h === 'number' && Number.isFinite(pct5h);
   try {
-    tray.setImage(generateTrayIcon(g.color));
+    tray.setImage(showUsage ? generateTrayIcon(null, pct5h) : generateTrayIcon(g.color));
   } catch (e) {
     log.warn('tray icon render failed, fallback', e);
     tray.setImage(generateTrayIcon(null));
   }
   if (g.count > 0) tray.setTitle(` ${g.count}`);
-  else if (g.usageLabel) tray.setTitle(` ${g.usageLabel}`);
+  else if (showUsage) tray.setTitle(' ' + trayUsageLabel(lastUsage, Date.now()));
   else tray.setTitle('');
 }
 

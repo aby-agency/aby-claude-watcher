@@ -10,6 +10,7 @@ const config = require('./config');
 const i18n = require('./i18n');
 const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
 const { trayGlance } = require('./tray-glance');
+const { isFocusActive } = require('./focus-state');
 
 const subagentTracker = new SubagentTracker();
 
@@ -76,8 +77,12 @@ function schedulePendingSound(sessionId) {
       return;
     }
     log.info(`[notif] sound for ${sessionId.slice(0, 8)} — kind=pending (deferred)`);
-    sendToRenderer('play-sound', { kind: 'pending', sessionId });
-    emitNativeNotification(sessionId);
+    if (!isFocusActive()) {
+      sendToRenderer('play-sound', { kind: 'pending', sessionId });
+      emitNativeNotification(sessionId);
+    } else {
+      log.info(`[notif] suppressed sound/banner for ${sessionId.slice(0, 8)} — Focus active`);
+    }
   }, PENDING_SOUND_DELAY);
   pendingSoundTimers.set(sessionId, timer);
 }
@@ -324,8 +329,12 @@ function setupWatcher() {
         schedulePendingSound(session.sessionId);
       } else {
         log.info(`[notif] sound for ${session.sessionId.slice(0, 8)} — kind=${kind}`);
-        sendToRenderer('play-sound', { kind, sessionId: session.sessionId });
-        emitNativeNotification(session.sessionId);
+        if (!isFocusActive()) {
+          sendToRenderer('play-sound', { kind, sessionId: session.sessionId });
+          emitNativeNotification(session.sessionId);
+        } else {
+          log.info(`[notif] suppressed sound/banner for ${session.sessionId.slice(0, 8)} — Focus active`);
+        }
       }
     }
   });

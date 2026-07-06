@@ -9,6 +9,7 @@ const { checkForUpdates, downloadAndInstall, abortActiveDownload, GITHUB_OWNER, 
 const config = require('./config');
 const i18n = require('./i18n');
 const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
+const { trayGlance } = require('./tray-glance');
 
 const subagentTracker = new SubagentTracker();
 
@@ -140,6 +141,9 @@ let socketServer;
 let usageMonitor;
 let tray;
 let currentViewMode = 'grid';
+// Latest usage snapshot (from usageMonitor 'update'), kept for the tray glance
+// — usageMonitor itself only pushes to the renderer, it doesn't retain state.
+let lastUsage = null;
 const MICRO_DEFAULT_BOUNDS = { width: 260, height: 200 };
 
 // Window transparency state. The window is fully opaque while focused or
@@ -359,7 +363,14 @@ function setupSocket() {
 
 function setupUsageMonitor() {
   usageMonitor = new UsageMonitor();
-  usageMonitor.on('update', (data) => sendToRenderer('usage-update', data));
+  usageMonitor.on('update', (data) => {
+    lastUsage = data;
+    sendToRenderer('usage-update', data);
+    // Usage ticks independently of session state changes — without this the
+    // tray title (when showing a usage %, no attention pending) would go
+    // stale between session events.
+    refreshTrayGlance();
+  });
   usageMonitor.on('error', (code) => sendToRenderer('usage-error', code));
   usageMonitor.start();
 }
@@ -469,6 +480,7 @@ ipcMain.handle('set-session-order', (_, order) => {
         popoverWindow.webContents.send('popover-update');
       }
       updateTrayMenu();
+      refreshTrayGlance();
     }
   });
 
@@ -520,6 +532,7 @@ ipcMain.handle('set-session-order', (_, order) => {
     }
     // Update tray tooltip with new language
     updateTrayMenu();
+    refreshTrayGlance();
   });
 
   ipcMain.handle('get-language', () => i18n.getLanguage());
@@ -779,19 +792,27 @@ function togglePopover() {
   }
 }
 
-function generateTrayIcon() {
-  // `Template` suffix tells Electron this is a template image (macOS).
-  // The @2x variant is auto-loaded from the same directory.
-  const iconPath = path.join(__dirname, 'assets', 'tray-iconTemplate.png');
-  return nativeImage.createFromPath(iconPath);
+function generateTrayIcon(color) {
+  // No color → the static template icon (macOS tints it automatically for
+  // light/dark menu bars). `Template` suffix tells Electron this is a
+  // template image; the @2x variant is auto-loaded from the same directory.
+  if (!color) {
+    const iconPath = path.join(__dirname, 'assets', 'tray-iconTemplate.png');
+    const img = nativeImage.createFromPath(iconPath);
+    if (process.platform === 'darwin') img.setTemplateImage(true);
+    return img;
+  }
+  // Color requested (attention needed) → a small filled dot, NOT a template
+  // image, so macOS renders the actual color instead of tinting it to
+  // monochrome.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="5" fill="${color}"/></svg>`;
+  const img = nativeImage.createFromDataURL('data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'));
+  img.setTemplateImage(false);
+  return img;
 }
 
 function setupTray() {
   const icon = generateTrayIcon();
-  // Template image mode: macOS only. On Linux/Windows, use colored icon.
-  if (process.platform === 'darwin') {
-    icon.setTemplateImage(true);
-  }
   tray = new Tray(icon);
   tray.setToolTip('Aby Claude Watcher');
 
@@ -799,6 +820,7 @@ function setupTray() {
   tray.on('right-click', togglePopover);
 
   updateTrayMenu();
+  refreshTrayGlance();
 
   // Update tray menu and dock badge when sessions change (debounced)
   let trayTimer;
@@ -807,6 +829,7 @@ function setupTray() {
     trayTimer = setTimeout(() => {
       updateTrayMenu();
       updateDockBadge();
+      refreshTrayGlance();
       // Always send updates (popover might be hidden but still subscribed)
       if (popoverWindow && !popoverWindow.isDestroyed()) {
         popoverWindow.webContents.send('popover-update');
@@ -816,6 +839,28 @@ function setupTray() {
   watcher.on('session-added', debouncedUpdate);
   watcher.on('session-updated', debouncedUpdate);
   watcher.on('session-removed', debouncedUpdate);
+}
+
+// Builds the live menu-bar glance: colored dot + attention count when
+// sessions need the user, else the usage % already shown in the status bar.
+// Priority: attention count > usage label > blank (see tray-glance.js).
+function refreshTrayGlance() {
+  if (!tray) return;
+  const sessions = watcher.getSessions().map((s) => ({
+    state: effectiveStateName(s),
+    isBackground: s.isBackground,
+  }));
+  const usage = { pct5h: lastUsage?.fiveHour?.utilization ?? null, pct7d: lastUsage?.sevenDay?.utilization ?? null };
+  const g = trayGlance(sessions, usage);
+  try {
+    tray.setImage(generateTrayIcon(g.color));
+  } catch (e) {
+    log.warn('tray icon render failed, fallback', e);
+    tray.setImage(generateTrayIcon(null));
+  }
+  if (g.count > 0) tray.setTitle(` ${g.count}`);
+  else if (g.usageLabel) tray.setTitle(` ${g.usageLabel}`);
+  else tray.setTitle('');
 }
 
 function updateDockBadge() {

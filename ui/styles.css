@@ -3,9 +3,9 @@
    ═══════════════════════════════════════════════ */
 
 :root {
-  --bg-primary: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-tertiary: #1c2128;
+  --bg-primary: #090c12;
+  --bg-secondary: #0f141c;
+  --bg-tertiary: #171d27;
   --border: #30363d;
   --border-light: #3d444d;
   --text-primary: #e6edf3;
@@ -27,6 +27,12 @@
   --glow-waiting: rgba(34, 197, 94, 0.15);
 
   --radius: 8px;
+  /* Soft Glass — matière opaque à reflets (aucun backdrop-filter) */
+  --card-bg: linear-gradient(165deg, rgba(255,255,255,.075), rgba(255,255,255,.022));
+  --card-border: rgba(255,255,255,.10);
+  --card-sheen: linear-gradient(158deg, rgba(255,255,255,.10), transparent 44%);
+  --card-inset: inset 0 1px 0 rgba(255,255,255,.13);
+  --glow: 0.5; /* intensité globale du bloom d'état (0 = éteint) */
   --radius-sm: 4px;
   --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -553,29 +559,27 @@ body.micro-mode .usage-reset-icon {
 /* ═══ Card ═══ */
 
 .card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--card-bg), var(--bg-secondary);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius);
   padding: 16px;
   transition: all var(--transition);
   position: relative;
   overflow: hidden;
+  box-shadow: var(--card-inset), 0 8px 22px -16px rgba(0,0,0,.7);
 }
 
 .card::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 3px 0 0 3px;
-  background: var(--card-accent, var(--state-neutral));
-  transition: background var(--transition);
+  inset: 0;
+  background: var(--card-sheen);
+  pointer-events: none;
 }
 
 .card:hover {
-  border-color: var(--border-light);
+  border-color: rgba(255,255,255,.18);
+  box-shadow: var(--card-inset), 0 10px 26px -14px rgba(0,0,0,.8);
 }
 
 .card-header {

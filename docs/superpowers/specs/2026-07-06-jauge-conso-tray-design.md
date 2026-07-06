@@ -67,7 +67,9 @@ Aujourd'hui, une session qui réclame l'attention (`pending`/`error`/`waiting`) 
 - **(B)** Toujours afficher l'anneau conso ; superposer un petit marqueur d'attention.
 - **(C)** Combiner dans le titre : `⏺2 · 5H 27%`.
 
-Défaut retenu : **(A)** — l'urgence prime, la conso reprend la main dès que c'est calme. À confirmer à l'implémentation.
+**Décision finale (révisée en test réel) : la conso est affichée EN PERMANENCE.** L'option (A) a été implémentée puis rejetée : avec plusieurs sessions Claude actives, il y a presque toujours une session en attente → l'anneau restait masqué en permanence, à l'opposé du besoin (« la conso comme le wifi »). Retenu : le tray montre toujours l'anneau + `5H X% · reste` dès que la donnée d'usage est disponible ; l'attention (needs-you) reste signalée par le **badge du Dock + les notifs**, plus par le tray.
+
+Note d'implémentation : `nativeImage.createFromDataURL()` ne rasterise pas les SVG (image vide) — l'anneau et le point d'alerte sont dessinés en **bitmap** (`ringBitmap`/`dotBitmap`, BGRA prémultiplié) et rendus via `createFromBitmap`.
 
 ## Cas limites
 

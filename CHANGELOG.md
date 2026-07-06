@@ -4,6 +4,26 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] — 2026-07-06
+
+### Added
+- **Jauge de consommation Claude dans la barre de menu.** Un anneau de
+  progression coloré (vert < 50 % / ambre 50–80 % / rouge > 80 % du quota 5 h)
+  accompagné de `5H X% · reste`, affiché **en permanence** dans le tray — comme
+  le wifi ou l'heure. La source est l'usage déjà surveillé (endpoint OAuth) ; le
+  temps restant est recalculé en continu depuis l'heure de reset, donc il défile
+  juste même sans session Claude ouverte.
+
+### Fixed
+- **Icônes du tray invisibles.** Le point de couleur signalant une session en
+  attente ne s'affichait pas : `nativeImage` ne sait pas rasteriser les SVG
+  (image vide). Les icônes du tray (anneau + point) sont désormais dessinées en
+  bitmap → point d'alerte de nouveau visible, anneau net en Retina.
+
+### Changed
+- Le tray affiche la consommation en permanence ; l'attention (« needs-you »)
+  reste signalée par le badge du Dock et les notifications, plus par le tray.
+
 ## [1.11.0] — 2026-07-06
 
 ### Added

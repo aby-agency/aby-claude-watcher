@@ -385,50 +385,61 @@ git commit -m "feat(tray): glance menu bar — icône colorée + compteur d'atte
 
 ---
 
-### Task 5: Notifications natives + boutons d'action
+### Task 5: Notification native « needs-you » (bannière macOS)
+
+**Décisions Paul (validées, remplacent la version initiale du plan) :**
+- **Pas de bouton d'action** : `focus.js` n'expose que `focusTerminal` (aucun primitive `resume` n'existe). Notif simple ; **clic → focus terminal** (pour une session interactive, revenir au terminal EST la reprise).
+- **Gating = son de la session ON** (`prefs.sound`). Interprétation de « cloche ON ». On co-localise l'émission de la bannière **exactement là où le son thématique est déjà émis** → elle hérite gratuitement du gating `prefs.sound`, du défèrement 5s pending et de la relecture fraîche au tir. Aucune logique de timing nouvelle.
+- **`silent: true`** : la bannière ne fait pas de son système ; c'est le système de sons thématiques existant qui gère l'audio (pas de double-ding).
+- Toast in-app (`show-notification` / `#notificationOverlay`) **inchangé**. Cooldown 30s (amont, dans le watcher) et suppression background **inchangés**.
 
 **Files:**
-- Modify: `main.js` (émission de notification — chercher `session-waiting` / création `Notification`, refs 280-290, `notifyWorkflowDone` 83)
+- Modify: `main.js` (handler `watcher.on('session-waiting')` ~280-310 ; `schedulePendingSound()` ~62-82)
 
 **Interfaces:**
-- Consumes : `focus.js` (résolution du terminal / resume — repérer la fonction publique existante, ex. `focusTerminal(session)` / `resume(session)`).
-- Produces : `emitNativeNotification(session, { title, body, actions })`.
+- Consumes : `focusTerminal` (déjà importé, `main.js:7`), `watcher.getSessions()`, `watcher.refreshSession()`.
+- Produces : `emitNativeNotification(sessionId)`.
 
-- [ ] **Step 1: Native notification helper with actions**
+- [ ] **Step 1: Native notification helper (no actions, click → focus terminal)**
 
-Ajouter dans `main.js` :
+Ajouter dans `main.js`. Il relit la session fraîche par `sessionId` au clic (comme l'IPC focus existant `main.js:393`), pour ne pas capturer un objet périmé :
 
 ```js
-function emitNativeNotification(session, { title, body }) {
-  const n = new Notification({
-    title,
-    body,
-    silent: false, // le son système ; le son custom reste géré par le renderer
-    actions: [{ type: 'button', text: 'Resume' }, { type: 'button', text: 'Focus terminal' }],
+function emitNativeNotification(sessionId) {
+  const s = watcher.getSessions().find(x => x.sessionId === sessionId);
+  if (!s) return;
+  const title = config.getCustomName(sessionId) || s.projectName || 'Claude Code';
+  const pending = s.state && s.state.name === 'pending';
+  const body = pending ? i18n.t('notif_body_pending') : i18n.t('notif_body_waiting');
+  const n = new Notification({ title, body, silent: true });
+  n.on('click', () => {
+    const fresh = watcher.getSessions().find(x => x.sessionId === sessionId);
+    if (fresh) focusTerminal(fresh);
   });
-  n.on('action', (_e, index) => {
-    if (index === 0) focus.resume(session);        // adapter au nom réel
-    else focus.focusTerminal(session);             // adapter au nom réel
-  });
-  n.on('click', () => focus.focusTerminal(session));
   n.show();
 }
 ```
 
-- [ ] **Step 2: Route action states through it**
+Ajouter les 2 clés i18n `notif_body_pending` (« Permission requise » / « Permission required ») et `notif_body_waiting` (« En attente de ta saisie » / « Waiting for your input ») dans `i18n.js` (FR + EN), en suivant le format des clés existantes. Si `i18n.t` avec clé absente renvoie la clé brute (vérifier), ces libellés doivent exister pour éviter d'afficher le nom de clé.
 
-Au point où la notification « needs-you » est émise pour `pending`/`waiting` (là où vivent le cooldown 30s et le défèrement pending 5s — **ne pas y toucher**), appeler `emitNativeNotification(session, { title: `${session.name} attend ta validation`, body: 'Permission requise' })` en plus (ou à la place) du toast in-app. Le toast visuel (`#notificationOverlay`) reste. Conserver le comportement background-muet et la relecture fraîche au tir du timer.
+- [ ] **Step 2: Emit for `waiting` (immédiat, co-localisé avec le son)**
 
-- [ ] **Step 3: Verification (manual)**
+Dans le handler `session-waiting`, dans la branche `else` qui émet `sendToRenderer('play-sound', { kind, sessionId })` pour `waiting` (sous `if (prefs.sound)`), ajouter juste après : `emitNativeNotification(session.sessionId);`. La bannière ne part donc que si `prefs.sound` est vrai, exactement comme le son.
 
-Run: `npm run dev`, déclencher une permission dans une session Claude.
-Attendu : après le défèrement 5s (si toujours en attente), une **notif macOS native** apparaît avec **Resume** / **Focus terminal**. Cliquer Resume relance ; cliquer Focus terminal active le terminal d'origine. Le cooldown 30s empêche le spam. Vérifier qu'aucune notif n'apparaît pour les sessions background (sauf cloche par-session).
+- [ ] **Step 3: Emit for `pending` (déféré, co-localisé avec le son déféré)**
 
-- [ ] **Step 4: Commit**
+Dans `schedulePendingSound()`, à l'intérieur du callback du timer, juste après la ligne `sendToRenderer('play-sound', { kind: 'pending', sessionId });` (celle qui ne s'exécute que si la session est toujours pending/waiting après relecture fraîche), ajouter : `emitNativeNotification(sessionId);`. La bannière pending hérite ainsi du défèrement 5s + de la garde « pending résolu en <5s → skip ».
+
+- [ ] **Step 4: Verification**
+
+Run: `npm test` (garde la non-régression JS), puis `node --check main.js`.
+Attendu : suite verte, pas d'erreur de syntaxe. Auto-relecture : la bannière n'est émise QUE dans les 2 emplacements du son (donc iff `prefs.sound`), pending passe bien par le chemin déféré, `silent: true`, clic → `focusTerminal` sur session fraîche. Vérif visuelle réelle (bannière macOS) déléguée à la passe finale (Task 7) — pas de display ici.
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add main.js
-git commit -m "feat(notif): notifications natives macOS avec actions Resume / Focus terminal"
+git add main.js i18n.js
+git commit -m "feat(notif): bannière native macOS needs-you (silent, clic→focus terminal, gating son)"
 ```
 
 ---

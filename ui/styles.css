@@ -1659,7 +1659,10 @@ body.micro-mode .usage-reset-icon {
 }
 
 /* Contenu texte au-dessus du bloom */
-.card-header, .card-details {
+.card-header,
+.state-badge,
+.card-details,
+.subagents-block {
   position: relative;
   z-index: 1;
 }

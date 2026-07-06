@@ -913,15 +913,17 @@ function refreshTrayGlance() {
   const usage = { pct5h: lastUsage?.fiveHour?.utilization ?? null, pct7d: lastUsage?.sevenDay?.utilization ?? null };
   const g = trayGlance(sessions, usage);
   const pct5h = lastUsage?.fiveHour?.utilization;
-  const showUsage = g.count === 0 && typeof pct5h === 'number' && Number.isFinite(pct5h);
+  const hasUsage = typeof pct5h === 'number' && Number.isFinite(pct5h);
+  // La conso est affichée en permanence (comme le wifi/l'heure). L'attention
+  // reste signalée par le badge du Dock + les notifs, pas dans le tray.
   try {
-    tray.setImage(showUsage ? generateTrayIcon(null, pct5h) : generateTrayIcon(g.color));
+    tray.setImage(hasUsage ? generateTrayIcon(null, pct5h) : generateTrayIcon(g.color));
   } catch (e) {
     log.warn('tray icon render failed, fallback', e);
     tray.setImage(generateTrayIcon(null));
   }
-  if (g.count > 0) tray.setTitle(` ${g.count}`);
-  else if (showUsage) tray.setTitle(' ' + trayUsageLabel(lastUsage, Date.now()));
+  if (hasUsage) tray.setTitle(' ' + trayUsageLabel(lastUsage, Date.now()));
+  else if (g.count > 0) tray.setTitle(` ${g.count}`);
   else tray.setTitle('');
 }
 

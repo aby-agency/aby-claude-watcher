@@ -32,6 +32,7 @@ let notifPosition = 'top-right';
 let autoLaunch = false;
 let windowTransparencyEnabled = false;
 let windowOpacity = 0.85;
+let vibrancyExperimental = false;
 let searchQuery = '';
 let sessionOrder = []; // User-defined order of session IDs
 let draggedId = null;
@@ -63,6 +64,8 @@ const $transparencyToggle = document.getElementById('transparencyToggle');
 const $opacitySlider = document.getElementById('opacitySlider');
 const $opacityValue = document.getElementById('opacityValue');
 const $opacityRow = document.getElementById('opacityRow');
+const $vibrancyToggle = document.getElementById('vibrancyToggle');
+const $vibrancyRestartHint = document.getElementById('vibrancyRestartHint');
 
 // ═══ Init ═══
 
@@ -84,6 +87,7 @@ async function init() {
   autoLaunch = !!config.autoLaunch;
   windowTransparencyEnabled = !!config.windowTransparencyEnabled;
   windowOpacity = config.windowOpacity ?? 0.85;
+  vibrancyExperimental = !!config.vibrancyExperimental;
   sessionOrder = config.sessionOrder || [];
   backgroundCollapsed = !!config.backgroundSectionCollapsed;
   soundTheme = SOUND_THEMES[config.soundTheme] ? config.soundTheme : 'default';
@@ -99,6 +103,7 @@ async function init() {
   $volumeSlider.value = Math.round(volume * 100);
   $volumeValue.textContent = `${Math.round(volume * 100)}%`;
   updateTransparencyControls();
+  updateVibrancyControls();
 
   const existingSessions = await window.api.getSessions();
   for (const s of existingSessions) {
@@ -177,6 +182,8 @@ async function init() {
 
   // Window transparency
   if ($transparencyToggle) $transparencyToggle.addEventListener('click', toggleTransparency);
+  // Vibrancy (EXPERIMENTAL, off by default, restart required to apply)
+  if ($vibrancyToggle) $vibrancyToggle.addEventListener('click', toggleVibrancy);
   if ($opacitySlider) {
     $opacitySlider.addEventListener('input', (e) => {
       windowOpacity = parseInt(e.target.value) / 100;
@@ -453,6 +460,22 @@ function toggleTransparency() {
   windowTransparencyEnabled = !windowTransparencyEnabled;
   window.api.setWindowTransparencyEnabled(windowTransparencyEnabled);
   updateTransparencyControls();
+}
+
+function updateVibrancyControls() {
+  if ($vibrancyToggle) {
+    $vibrancyToggle.classList.toggle('on', vibrancyExperimental);
+    $vibrancyToggle.setAttribute('aria-checked', String(vibrancyExperimental));
+  }
+}
+
+function toggleVibrancy() {
+  vibrancyExperimental = !vibrancyExperimental;
+  window.api.setVibrancyExperimental(vibrancyExperimental);
+  updateVibrancyControls();
+  // Window material can't be swapped at runtime — surface the "restart to
+  // apply" hint so the change isn't mistaken for a live preview.
+  if ($vibrancyRestartHint) $vibrancyRestartHint.style.display = '';
 }
 
 // ═══ About + updates ═══

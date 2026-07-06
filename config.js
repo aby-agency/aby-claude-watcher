@@ -23,6 +23,7 @@ let config = {
   microWindowBounds: null,   // separate bounds remembered for micro view
   windowTransparencyEnabled: false, // master toggle for window opacity feature
   windowOpacity: 0.85,       // 0.3 - 1.0 — opacity when idle (translucent), full on focus/hover
+  vibrancyExperimental: false, // EXPERIMENTAL real macOS vibrancy (Liquid Glass) — off by default, applied at window creation, requires restart
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
   customNames: {},      // { [sessionId]: "Custom name" }
   backgroundSectionCollapsed: false, // "Background" section folded in the session list
@@ -104,6 +105,11 @@ function setWindowTransparencyEnabled(value) {
 function setWindowOpacity(value) {
   // Floor at 0.3 so the window can never become invisible / unclickable
   config.windowOpacity = Math.max(0.3, Math.min(1, value));
+  save();
+}
+
+function setVibrancyExperimental(value) {
+  config.vibrancyExperimental = !!value;
   save();
 }
 
@@ -217,6 +223,7 @@ module.exports = {
   setVolume,
   setWindowTransparencyEnabled,
   setWindowOpacity,
+  setVibrancyExperimental,
   setNotifPosition,
   setAutoLaunch,
   setLanguage,

@@ -65,6 +65,9 @@ settings_title: 'Paramètres',
       language_hint: "Langue de l'interface",
       transparency_label: 'Transparence de la fenêtre',
       transparency_hint: 'Rendre la fenêtre translucide au repos, opaque au survol ou au focus',
+      vibrancy_label: 'Verre translucide (expérimental)',
+      vibrancy_hint: 'Instable sur macOS Tahoe — désactivé par défaut. Redémarrer l\'app pour appliquer.',
+      vibrancy_restart_hint: 'Redémarrer l\'app pour appliquer.',
 
       // Settings — notifications
       volume_label: 'Volume',
@@ -214,6 +217,9 @@ settings_title: 'Settings',
       language_hint: 'Interface language',
       transparency_label: 'Window transparency',
       transparency_hint: 'Make the window translucent when idle, opaque on hover or focus',
+      vibrancy_label: 'Translucent glass (experimental)',
+      vibrancy_hint: 'Unstable on macOS Tahoe — off by default. Restart the app to apply.',
+      vibrancy_restart_hint: 'Restart the app to apply.',
 
       // Settings — notifications
       volume_label: 'Volume',

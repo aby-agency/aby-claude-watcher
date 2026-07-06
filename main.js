@@ -918,11 +918,12 @@ function refreshTrayGlance() {
 
 function updateDockBadge() {
   if (process.platform !== 'darwin') return;
-  const waiting = watcher.getSessions().filter(s => {
-    const n = effectiveStateName(s);
-    return n === 'waiting' || n === 'pending';
-  }).length;
-  app.dock.setBadge(waiting > 0 ? String(waiting) : '');
+  const sessions = watcher.getSessions().map((s) => ({
+    state: effectiveStateName(s),
+    isBackground: s.isBackground,
+  }));
+  const count = trayGlance(sessions, {}).count;
+  app.dock.setBadge(count > 0 ? String(count) : '');
 }
 
 function updateTrayMenu() {

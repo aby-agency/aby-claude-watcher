@@ -174,10 +174,10 @@ body {
 .micro-item[data-state="thinking"] .micro-item-dot { background: var(--state-thinking); }
 .micro-item[data-state="running"] { color: var(--state-running); }
 .micro-item[data-state="running"] .micro-item-dot { background: var(--state-running); }
-.micro-item[data-state="waiting"] .micro-item-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
+.micro-item[data-state="waiting"] .micro-item-dot { background: var(--state-waiting); box-shadow: 0 0 7px 0 var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
 .micro-item[data-state="pending"] { color: var(--state-pending); }
-.micro-item[data-state="pending"] .micro-item-dot { background: var(--state-pending); }
-.micro-item[data-state="error"] .micro-item-dot { background: var(--state-error); animation: breathe 3s ease-in-out infinite; }
+.micro-item[data-state="pending"] .micro-item-dot { background: var(--state-pending); box-shadow: 0 0 7px 0 var(--state-pending); }
+.micro-item[data-state="error"] .micro-item-dot { background: var(--state-error); box-shadow: 0 0 7px 0 var(--state-error); animation: breathe 3s ease-in-out infinite; }
 
 .micro-item .micro-item-name {
   flex: 1;
@@ -917,8 +917,8 @@ body.micro-mode .usage-reset-icon {
 
 .compact-card {
   position: relative;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--card-bg), var(--bg-secondary);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius);
   padding: 10px 12px;
   cursor: pointer;
@@ -927,6 +927,7 @@ body.micro-mode .usage-reset-icon {
   flex-direction: column;
   gap: 5px;
   overflow: hidden;
+  box-shadow: var(--card-inset), 0 6px 16px -14px rgba(0,0,0,.7);
 }
 
 .compact-card::before {
@@ -941,7 +942,8 @@ body.micro-mode .usage-reset-icon {
 }
 
 .compact-card:hover {
-  border-color: var(--border-light);
+  border-color: rgba(255,255,255,.18);
+  box-shadow: var(--card-inset), 0 8px 20px -12px rgba(0,0,0,.8);
 }
 
 .compact-card-header {
@@ -1078,13 +1080,13 @@ body.micro-mode .usage-reset-icon {
 .compact-card[data-state="running"] .compact-dot { background: var(--state-running); }
 .compact-card[data-state="waiting"] { --card-accent: var(--state-waiting); }
 .compact-card[data-state="waiting"] .compact-card-state { color: var(--state-waiting); }
-.compact-card[data-state="waiting"] .compact-dot { background: var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
+.compact-card[data-state="waiting"] .compact-dot { background: var(--state-waiting); box-shadow: 0 0 7px 0 var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
 .compact-card[data-state="pending"] { --card-accent: var(--state-pending); }
 .compact-card[data-state="pending"] .compact-card-state { color: var(--state-pending); }
-.compact-card[data-state="pending"] .compact-dot { background: var(--state-pending); }
+.compact-card[data-state="pending"] .compact-dot { background: var(--state-pending); box-shadow: 0 0 7px 0 var(--state-pending); }
 .compact-card[data-state="error"] { --card-accent: var(--state-error); }
 .compact-card[data-state="error"] .compact-card-state { color: var(--state-error); }
-.compact-card[data-state="error"] .compact-dot { background: var(--state-error); }
+.compact-card[data-state="error"] .compact-dot { background: var(--state-error); box-shadow: 0 0 7px 0 var(--state-error); }
 
 /* ═══ Notification modal ═══ */
 

@@ -4,6 +4,35 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] — 2026-07-06
+
+### Added
+- **Soft Glass — refonte visuelle.** Cartes opaques à reflets (sheen spéculaire,
+  bordure lumineuse, profondeur) remplaçant le thème plat GitHub-dark. Appliqué
+  aux trois vues (grille / compacte / micro) et au popover, piloté par un jeu de
+  tokens CSS partagés.
+- **Glow-budget.** Le glow coloré est un *signal*, pas un décor : il est réservé
+  aux états qui réclament une action (`pending` / `waiting` / `error`) ;
+  `thinking` / `running` restent calmes. À N sessions, seules celles qui
+  attendent l'utilisateur rayonnent — plus de « sapin de Noël ».
+- **Menu bar glance.** Pastille colorée + compteur des sessions en attente dans
+  la barre macOS (couleur de l'état le plus urgent), ou pourcentage d'usage
+  quand rien n'attend.
+- **Notifications natives macOS.** Bannière « needs-you » système ; un clic
+  ramène le focus sur le terminal d'origine.
+- **Respect de Focus / Ne pas déranger.** Le son et la bannière needs-you sont
+  coupés quand un Focus macOS est actif ; le toast visuel dans l'app reste. La
+  détection est tolérante (format inconnu → pas de suppression, jamais de crash).
+- **Verre translucide (expérimental).** Toggle dans les réglages (désactivé par
+  défaut) pour le vrai Liquid Glass natif, relié à la fenêtre — l'app reste sur
+  le Soft Glass opaque par défaut.
+
+### Changed
+- Fond plus profond et cohérence visuelle sur toute l'app (toolbar, status bar,
+  popover, section background).
+- Compteur du dock aligné sur le glance du menu bar (`pending` + `waiting` +
+  `error`, hors sessions background).
+
 ## [1.10.2] — 2026-06-06
 
 ### Fixed

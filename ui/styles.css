@@ -32,7 +32,7 @@
   --card-border: rgba(255,255,255,.10);
   --card-sheen: linear-gradient(158deg, rgba(255,255,255,.10), transparent 44%);
   --card-inset: inset 0 1px 0 rgba(255,255,255,.13);
-  --glow: 0.5; /* intensité globale du bloom d'état (0 = éteint) */
+  --glow: 0.5; /* intensité des halos d'état du popover (0 = éteint) */
   --radius-sm: 4px;
   --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1678,34 +1678,6 @@ body.micro-mode .usage-reset-icon {
   background: linear-gradient(90deg, transparent, var(--card-accent, var(--state-neutral)), transparent);
   opacity: .55;
   pointer-events: none;
-}
-
-/* Bloom coloré — SEULEMENT les états qui réclament une action */
-.card[data-state="pending"],
-.card[data-state="waiting"],
-.card[data-state="error"] {
-  border-color: color-mix(in srgb, var(--card-accent) 34%, var(--card-border));
-}
-.card[data-state="pending"] .card-bloom,
-.card[data-state="waiting"] .card-bloom,
-.card[data-state="error"] .card-bloom {
-  position: absolute;
-  left: -6%; bottom: -34%;
-  width: 50%; height: 115%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--card-accent) 40%, transparent), transparent);
-  filter: blur(9px);
-  opacity: var(--glow);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Contenu texte au-dessus du bloom */
-.card-header,
-.state-badge,
-.card-details,
-.subagents-block {
-  position: relative;
-  z-index: 1;
 }
 
 @keyframes breathe {

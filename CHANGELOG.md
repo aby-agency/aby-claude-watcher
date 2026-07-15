@@ -4,6 +4,21 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] — 2026-07-15
+
+### Added
+- **Id de session visible sur les cartes.** Une ligne « Session » sous la
+  branche (vues grille et compacte) affiche l'UUID complet de la session ; un
+  clic le copie dans le presse-papier — prêt pour `claude --resume <id>` — avec
+  un feedback « ✓ Copié ». Le clic ne déclenche pas le focus du terminal.
+
+### Changed
+- **Cartes apaisées.** Retrait du halo « liquid glass » (bloom radial flouté)
+  et de la bordure teintée pleine carte sur les états qui réclament une action.
+  L'état passe désormais par le badge (halo léger, point pulsé) et le filet
+  1 px en haut de carte ; le cadre reste neutre. Les halos du popover sont
+  inchangés.
+
 ## [1.12.0] — 2026-07-06
 
 ### Added

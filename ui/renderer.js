@@ -911,6 +911,10 @@ onclick="handleCardClick(event, '${sid}')">
           <span class="detail-label">${t('duration')}</span>
           <span class="detail-value duration-value" data-started="${s.startedAt}">${duration}</span>
         </div>
+        <div class="detail detail-session">
+          <span class="detail-label">${t('session')}</span>
+          <span class="detail-value session-id-value" onclick="handleCopyId(event, '${sid}')" title="${t('action_copy_id')}"><span class="session-id-text">${esc(s.sessionId)}</span><span class="session-id-copy">${ICONS.copy}</span></span>
+        </div>
         <div class="detail">
           <span class="detail-label">${t('tokens')}</span>
           <span class="detail-value">${tokens}</span>
@@ -1009,6 +1013,10 @@ onclick="handleCardClick(event, '${sid}')">
       <div class="compact-card-branch">
         <span class="compact-card-branch-icon">${ICONS.branch || '⎇'}</span>
         <span class="branch-value">${esc(s.gitBranch || '—')}</span>
+      </div>
+      <div class="compact-card-session session-id-value" onclick="handleCopyId(event, '${sid}')" title="${t('action_copy_id')}">
+        <span class="compact-card-branch-icon">${ICONS.copy}</span>
+        <span class="session-id-text">${esc(s.sessionId)}</span>
       </div>
       ${subagentsBlockHTML(s)}
     </div>
@@ -1170,12 +1178,10 @@ function startInlineRename(event, sessionId) {
 
 // ═══ Copy session ID ═══
 
-function handleCopyId(sessionId, slug, event) {
+function handleCopyId(event, sessionId) {
   event.stopPropagation();
   const el = event.currentTarget;
-  // Copy the slug if we have one (that's what the user sees);
-  // otherwise the full UUID is more useful than the 8-char prefix.
-  window.api.copyToClipboard(slug || sessionId);
+  window.api.copyToClipboard(sessionId);
   if (!el) return;
   const original = el.innerHTML;
   el.innerHTML = `<span style="color: var(--state-running)">${t('action_copied')}</span>`;

@@ -37,6 +37,7 @@ settings_title: 'Paramètres',
       tokens: 'Tokens',
       model: 'Modèle',
       branch: 'Branche',
+      session: 'Session',
 
       // Card actions
       action_notifications: 'Notifications',
@@ -189,6 +190,7 @@ settings_title: 'Settings',
       tokens: 'Tokens',
       model: 'Model',
       branch: 'Branch',
+      session: 'Session',
 
       // Card actions
       action_notifications: 'Notifications',

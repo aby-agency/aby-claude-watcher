@@ -837,6 +837,7 @@ body.micro-mode .usage-reset-icon {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .detail-label {
@@ -859,6 +860,38 @@ body.micro-mode .usage-reset-icon {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.detail-session {
+  grid-column: 1 / -1;
+}
+
+.session-id-value {
+  cursor: pointer;
+  gap: 4px;
+  min-width: 0;
+}
+
+.session-id-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-id-value:hover {
+  color: var(--text-primary);
+}
+
+.session-id-copy {
+  display: inline-flex;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.session-id-value:hover .session-id-copy {
+  opacity: 1;
 }
 
 /* ═══ Tool pills ═══ */
@@ -1032,6 +1065,17 @@ body.micro-mode .usage-reset-icon {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.compact-card-session {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  min-width: 0;
+  align-self: flex-start;
 }
 
 /* Fixed-size slot for the leading indicator: dot, pending bell or bell-flash

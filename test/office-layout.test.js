@@ -97,6 +97,23 @@ test('sessions background → bureaux back-office séparés', () => {
   assert(room.zones.backDesks.get('bg1'), 'bg1 sans bureau back-office');
   assert(room.zones.backDesks.get('bg1').ty > room.zones.desks.get('a').ty, 'back-office pas en bas');
 });
+test('workflow porté par une session background → sièges de réunion occupés aussi', () => {
+  const st = OL.createOfficeState();
+  const s = snap([sess('a', 'running')],
+    [sess('bg1', 'running', { isBackground: true, workflows: [{ runId: 'wf_bg', name: 'bg', running: 5 }] })]);
+  OL.layoutRoom(st, s);
+  OL.syncActors(st, s);
+  assertEq([...st.actors.values()].filter(a => a.kind === 'meeting').length, 5);
+});
+test('même runId sur une session ET au niveau snapshot top-level → pas de double comptage', () => {
+  const st = OL.createOfficeState();
+  const wf = { runId: 'wf_dup', name: 'dup', running: 5 };
+  const s = snap([sess('a', 'running', { workflows: [wf] })], [], [wf]);
+  OL.layoutRoom(st, s);
+  OL.syncActors(st, s);
+  // pas 10 (5+5, doublé) : la dédup par runId garde running=5 → 5 sièges occupés, pas 6 (plafond)
+  assertEq([...st.actors.values()].filter(a => a.kind === 'meeting').length, 5);
+});
 
 console.log('\nsyncActors + tickActor:');
 test('nouvelle session → acteur spawn à la porte avec path vers le bureau', () => {
@@ -166,6 +183,22 @@ test('workflow → acteurs kind=meeting (min(running,6))', () => {
   OL.layoutRoom(st, s);
   OL.syncActors(st, s);
   assertEq([...st.actors.values()].filter(a => a.kind === 'meeting').length, 6);
+});
+test('flip background→interactif : l\'acteur repart marcher vers son nouveau bureau', () => {
+  const st = OL.createOfficeState();
+  let s = snap([], [sess('bg1', 'running', { isBackground: true })]);
+  OL.layoutRoom(st, s);
+  OL.syncActors(st, s);
+  // bg1 devient une session interactive (même sessionId, isBackground retiré)
+  s = snap([sess('bg1', 'running')], []);
+  const room = OL.layoutRoom(st, s);
+  OL.syncActors(st, s);
+  const actor = st.actors.get('bg1');
+  const desk = room.zones.desks.get('bg1');
+  assert(actor.path.length > 0, 'pas de marche vers le nouveau bureau');
+  const dest = actor.path[actor.path.length - 1];
+  assertEq(dest.tx, desk.tx + 1);
+  assertEq(dest.ty, desk.ty);
 });
 
 console.log('\nanimFor:');

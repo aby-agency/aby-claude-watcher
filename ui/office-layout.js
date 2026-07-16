@@ -60,14 +60,20 @@
   }
 
   // Les workflows vivent sur chaque session (s.workflows, cf. renderer.js), pas
-  // au niveau du snapshot : on les agrège depuis les sessions interactives.
+  // au niveau du snapshot : on les agrège depuis les sessions interactives ET
+  // background (les sessions headless en portent aussi). Un même run peut
+  // apparaître sur plusieurs sources (session + top-level rétro-compat) →
+  // dédup par runId, première occurrence gagne, pour ne pas doubler `running`.
   function collectWorkflows(snapshot) {
-    const out = [];
-    for (const s of snapshot.interactive || []) {
-      for (const w of s.workflows || []) out.push(w);
-    }
-    for (const w of snapshot.workflows || []) out.push(w); // rétro-compat si fourni au snapshot
-    return out.filter(w => w.running > 0);
+    const byRunId = new Map();
+    const add = (w) => {
+      const key = w && w.runId != null ? w.runId : w; // sans runId : pas de dédup possible
+      if (!byRunId.has(key)) byRunId.set(key, w);
+    };
+    for (const s of snapshot.interactive || []) for (const w of s.workflows || []) add(w);
+    for (const s of snapshot.background || []) for (const w of s.workflows || []) add(w);
+    for (const w of snapshot.workflows || []) add(w); // rétro-compat si fourni au snapshot
+    return [...byRunId.values()].filter(w => w.running > 0);
   }
 
   function layoutRoom(state, snapshot) {
@@ -185,6 +191,11 @@
         actor.activity = activity;
         actor.animFrame = 0;
         retarget(actor, targetFor(activity, s.sessionId, zones));
+      } else if (actor.path.length === 0 && activity !== 'down') {
+        // Immobile mais coordonnées périmées (ex : flip background→interactif,
+        // ou changement de bureau) → repart marcher vers la bonne case.
+        const target = targetFor(activity, s.sessionId, zones);
+        if (target && (target.tx !== actor.tx || target.ty !== actor.ty)) retarget(actor, target);
       }
       // Subagents : max 2 acteurs aux side-desks
       const sides = zones.sideDesks.get(s.sessionId) || [];
@@ -210,7 +221,12 @@
           charIdx: charIndexFor(s.projectName), activity: activityFor(s.state.name),
           tx: d.tx + 1, ty: d.ty, path: [], dir: 'down', animFrame: 0, done: false });
       } else {
-        state.actors.get(s.sessionId).activity = activityFor(s.state.name);
+        const actor = state.actors.get(s.sessionId);
+        actor.activity = activityFor(s.state.name);
+        if (actor.tx !== d.tx + 1 || actor.ty !== d.ty) {
+          // Flip interactif→background : pas de marche en back-office, snap direct.
+          actor.tx = d.tx + 1; actor.ty = d.ty; actor.path = [];
+        }
       }
     }
 

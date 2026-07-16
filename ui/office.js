@@ -143,7 +143,12 @@ const Office = (() => {
   function hitTest(ev) {
     const rects = canvas._hitRects || [];
     const r = canvas.getBoundingClientRect();
-    const x = ev.clientX - r.left, y = ev.clientY - r.top;
+    // Le canvas peut être downscalé par CSS (.office-view canvas { max-width:100% }
+    // dans une fenêtre étroite) : les coordonnées souris sont en espace CSS, les
+    // _hitRects en espace pixel natif du canvas — convertir avant de comparer.
+    const sx = r.width ? canvas.width / r.width : 1;
+    const sy = r.height ? canvas.height / r.height : 1;
+    const x = (ev.clientX - r.left) * sx, y = (ev.clientY - r.top) * sy;
     for (let i = rects.length - 1; i >= 0; i--) {
       const h = rects[i];
       if (x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h) return h;

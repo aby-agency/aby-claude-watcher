@@ -1176,10 +1176,11 @@ const Office = (() => {
 
   function snapshot() {
     const sorted = getSortedSessions();
+    // Pas de workflows au top-level : office-layout les agrège lui-même depuis
+    // s.workflows (collectWorkflows) — les passer ici les compterait deux fois.
     return {
       interactive: sorted.filter(s => !s.isBackground),
       background: sorted.filter(s => s.isBackground),
-      workflows: sorted.flatMap(s => s.workflows || []),
     };
   }
 

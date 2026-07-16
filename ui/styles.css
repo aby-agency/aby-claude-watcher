@@ -2333,3 +2333,29 @@ body.micro-mode .usage-reset-icon {
 .card.bg-session,
 .compact-card.bg-session,
 .micro-item.bg-session { cursor: default; }
+
+/* ═══ Office view ═══ */
+.office-view {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  overflow: auto;
+}
+.office-view canvas {
+  image-rendering: pixelated;
+  max-width: 100%;
+}
+.office-tooltip {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  max-width: 210px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.office-tip-name { font-weight: 600; margin-bottom: 3px; }
+.office-tip-row { color: var(--text-secondary); }

@@ -24,7 +24,7 @@ const ICONS = {
 };
 
 const sessions = new Map();
-let viewMode = 'grid'; // 'grid' | 'compact' | 'micro'
+let viewMode = 'grid'; // 'grid' | 'compact' | 'micro' | 'office'
 let previousViewMode = 'grid'; // remembered when entering micro so Back can restore
 let alwaysOnTop = false;
 let volume = 0.7;
@@ -79,7 +79,7 @@ async function init() {
   viewMode = config.viewMode || 'grid';
   // Migration: old 'list' → 'compact'
   if (viewMode === 'list' || config.compactMode) viewMode = 'compact';
-  if (viewMode !== 'grid' && viewMode !== 'compact' && viewMode !== 'micro') viewMode = 'grid';
+  if (!['grid', 'compact', 'micro', 'office'].includes(viewMode)) viewMode = 'grid';
   previousViewMode = (viewMode === 'micro') ? 'grid' : viewMode;
   alwaysOnTop = config.alwaysOnTop || false;
   volume = config.volume ?? 0.7;
@@ -157,6 +157,12 @@ async function init() {
   $btnGrid.addEventListener('click', () => setView('grid'));
   $btnCompact.addEventListener('click', () => setView('compact'));
   $btnMicro.addEventListener('click', () => setView('micro'));
+  const $btnOffice = document.getElementById('btnOffice');
+  $btnOffice.addEventListener('click', () => setView('office'));
+  Office.probe().then(ok => {
+    if (ok) { $btnOffice.style.display = ''; }
+    else if (viewMode === 'office') setView('grid'); // atlas parti entre deux runs
+  });
   $btnBack.addEventListener('click', () => setView(previousViewMode || 'grid'));
   $btnPinMicro.addEventListener('click', togglePin);
 
@@ -321,6 +327,7 @@ async function init() {
 // ═══ View switching ═══
 
 function setView(mode) {
+  if (mode !== 'office') Office.deactivate();
   // Save previous non-micro view so Back can return to it
   if (mode === 'micro' && viewMode !== 'micro') {
     previousViewMode = viewMode;
@@ -336,6 +343,7 @@ function updateViewToggle() {
   $btnGrid.classList.toggle('active', viewMode === 'grid');
   $btnCompact.classList.toggle('active', viewMode === 'compact');
   $btnMicro.classList.toggle('active', viewMode === 'micro');
+  document.getElementById('btnOffice').classList.toggle('active', viewMode === 'office');
 }
 
 function applyMicroMode() {
@@ -666,6 +674,9 @@ function render() {
   $gridView.style.display = showItems && viewMode === 'grid' ? 'grid' : 'none';
   $compactView.style.display = showItems && viewMode === 'compact' ? 'grid' : 'none';
   $microView.style.display = showItems && viewMode === 'micro' ? 'flex' : 'none';
+  const $officeView = document.getElementById('officeView');
+  $officeView.style.display = viewMode === 'office' ? 'block' : 'none';
+  if (viewMode === 'office') { Office.activate(); return updateStatusBar(); }
 
   // Full rebuild — used for initial load, view switch, add/remove
   fullRender();
@@ -719,6 +730,7 @@ function toggleBackgroundSection() {
 }
 
 function updateSession(s) {
+  if (viewMode === 'office') { Office.notifyUpdate(); updateStatusBar(); return; }
   // Targeted update: find the existing element and patch it in place
   const container = viewContainer();
   const selector = `[data-session="${s.sessionId}"]`;
@@ -783,6 +795,7 @@ function updateSession(s) {
 }
 
 function removeSessionFromDOM(sessionId) {
+  if (viewMode === 'office') { Office.notifyUpdate(); return; }
   clearBell(sessionId);
   for (const container of [$gridView, $compactView]) {
     const el = container.querySelector(`[data-session="${sessionId}"]`);

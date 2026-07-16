@@ -577,9 +577,9 @@ Dans `package.json` → `"scripts"`, ajouter :
 ```
 et remplacer la valeur de `"test"` par la chaîne existante suffixée de :
 ```
- && node test/png-codec.test.js && node test/bake-smoke.test.js && node test/office-layout.test.js
+ && node test/png-codec.test.js && node test/bake-smoke.test.js
 ```
-(office-layout.test.js arrive en Task 3 — l'ajouter dès maintenant est OK : `npm test` ne sera lancé en entier qu'à partir de là.)
+(`office-layout.test.js` sera ajouté à la chaîne en Task 3, quand il existera — chaque commit garde une suite verte.)
 
 Vérifier que `git status` ne montre PAS `ui/office-assets/` :
 Run: `git status --short`
@@ -1105,7 +1105,12 @@ Expected: FAIL — `Cannot find module '../ui/office-layout.js'`
 Run: `node test/office-layout.test.js`
 Expected: PASS — `18 passed, 0 failed`. Si un test de path/slot échoue, corriger l'implémentation (pas le test) — les invariants testés viennent de la spec.
 
-- [ ] **Step 5: Run the full suite**
+- [ ] **Step 5: Ajouter le test à la chaîne + run full suite**
+
+Dans `package.json`, suffixer la valeur de `"test"` de :
+```
+ && node test/office-layout.test.js
+```
 
 Run: `npm test`
 Expected: toutes les suites passent (les suites existantes ne touchent pas à ces fichiers).
@@ -1113,7 +1118,7 @@ Expected: toutes les suites passent (les suites existantes ne touchent pas à ce
 - [ ] **Step 6: Commit**
 
 ```bash
-git add ui/office-layout.js test/office-layout.test.js
+git add ui/office-layout.js test/office-layout.test.js package.json
 git commit -m "feat(office): layout pur — slots stables, pièce, acteurs, chemins"
 ```
 

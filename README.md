@@ -100,6 +100,17 @@ Build the `.dmg` yourself:
 npm run build
 ```
 
+### Vue bureau (assets de jeu)
+
+La vue « bureau » utilise les packs pixel-art de [LimeZu](https://limezu.itch.io/)
+(Modern Interiors, Modern Office). Leur licence interdit la redistribution des
+assets : ils ne sont **pas dans le repo**. Pour générer l'atlas en local :
+
+    BAKE_ASSETS_SRC=/chemin/vers/les/packs npm run bake
+
+Sans atlas, l'app fonctionne normalement — le bouton de vue bureau est
+simplement masqué. Merci à LimeZu pour les assets. 🌱
+
 ---
 
 ## Usage

@@ -7,7 +7,8 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder --mac",
-    "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js && node test/updater.test.js && node test/watcher.test.js && node test/subagents.test.js && node test/workflows.test.js && node test/tray-glance.test.js && node test/focus-state.test.js && node test/ring-gauge.test.js"
+    "bake": "node scripts/bake-assets.js",
+    "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js && node test/updater.test.js && node test/watcher.test.js && node test/subagents.test.js && node test/workflows.test.js && node test/tray-glance.test.js && node test/focus-state.test.js && node test/ring-gauge.test.js && node test/png-codec.test.js && node test/bake-smoke.test.js"
   },
   "build": {
     "appId": "fr.aby-agency.aby-claude-watcher",

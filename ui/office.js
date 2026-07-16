@@ -1,7 +1,8 @@
 // ui/office.js — moteur de rendu de la vue office. Chargé APRÈS office-layout.js,
 // AVANT renderer.js (partage son scope global : sessions, handleFocus, t, …).
-// Boucle : tick anim 8 fps (setInterval 125 ms) quand la vue est active,
-// redraw uniquement si quelque chose a changé (frame, état, souris).
+// Boucle : tick anim 8 fps (setInterval 125 ms) quand la vue est active — chaque
+// tick actif redessine (les anims tournent en continu) ; l'économie CPU vient de
+// la boucle entièrement stoppée quand la vue est inactive (deactivate()).
 const Office = (() => {
   const SCALE_MAX = 3;
   const TICK_MS = 125;
@@ -9,6 +10,7 @@ const Office = (() => {
 
   let atlas = null, manifest = null;     // Image + JSON
   let available = null;                   // null = pas encore sondé
+  let probePromise = null;                // évite un double fetch si probe() est appelé 2x avant résolution
   let state = null;                       // OfficeLayout.createOfficeState()
   let room = null;                        // dernier layoutRoom()
   let timer = null;
@@ -16,20 +18,24 @@ const Office = (() => {
   let hover = null;                       // { sessionId, x, y } sous le curseur
   let canvas, ctx, tooltip;
 
-  async function probe() {
-    if (available !== null) return available;
-    try {
-      const res = await fetch('office-assets/atlas.json');
-      if (!res.ok) throw new Error(res.status);
-      manifest = await res.json();
-      atlas = new Image();
-      await new Promise((ok, ko) => { atlas.onload = ok; atlas.onerror = ko; atlas.src = 'office-assets/atlas.png'; });
-      available = true;
-    } catch (e) {
-      console.warn('[office] atlas indisponible:', e.message || e);
-      available = false;
-    }
-    return available;
+  function probe() {
+    if (available !== null) return Promise.resolve(available);
+    if (probePromise) return probePromise;
+    probePromise = (async () => {
+      try {
+        const res = await fetch('office-assets/atlas.json');
+        if (!res.ok) throw new Error(res.status);
+        manifest = await res.json();
+        atlas = new Image();
+        await new Promise((ok, ko) => { atlas.onload = ok; atlas.onerror = ko; atlas.src = 'office-assets/atlas.png'; });
+        available = true;
+      } catch (e) {
+        console.warn('[office] atlas indisponible:', e.message || e);
+        available = false;
+      }
+      return available;
+    })();
+    return probePromise;
   }
 
   function snapshot() {

@@ -674,9 +674,13 @@ function render() {
   $gridView.style.display = showItems && viewMode === 'grid' ? 'grid' : 'none';
   $compactView.style.display = showItems && viewMode === 'compact' ? 'grid' : 'none';
   $microView.style.display = showItems && viewMode === 'micro' ? 'flex' : 'none';
+  const showOffice = showItems && viewMode === 'office';
   const $officeView = document.getElementById('officeView');
-  $officeView.style.display = viewMode === 'office' ? 'block' : 'none';
-  if (viewMode === 'office') { Office.activate(); return updateStatusBar(); }
+  $officeView.style.display = showOffice ? 'block' : 'none';
+  if (viewMode === 'office') {
+    if (showOffice) Office.activate(); else Office.deactivate();
+    return updateStatusBar();
+  }
 
   // Full rebuild — used for initial load, view switch, add/remove
   fullRender();

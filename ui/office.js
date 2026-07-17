@@ -125,7 +125,12 @@ const Office = (() => {
     for (const a of OfficeLayout.actorsFor(state, s.sessionId)) {
       const fi = a.activity === 'think' ? (a.animFrame >> 2) : a.animFrame;
       const fname = animFrameName(OfficeLayout.animFor(a), fi);
-      const px = a.tx * 16 * scale, py = a.ty * 16 * scale;
+      // Composition « au demi-tile » façon LimeZu (réf du site) : un perso
+      // ASSIS est remonté dans son bureau — sa tête chevauche le bord sud du
+      // plan de travail, les écrans arrivent au niveau du visage. Debout ou
+      // en marche : alignement plein-tuile normal.
+      const seated = a.path.length === 0 && (a.activity === 'work' || a.activity === 'think');
+      const px = a.tx * 16 * scale, py = (a.ty * 16 + (seated ? -6 : 0)) * scale;
       if (fname) drawFrameOn(c2d, fname, px, py, scale);
       if (a.kind === 'session') {
         const emote = OfficeLayout.emoteFor(s, activeBells.has(s.sessionId));

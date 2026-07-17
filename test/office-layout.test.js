@@ -356,21 +356,28 @@ test('C1 : 3 running installés, 1 passe waiting (palier de paires 3→2 franchi
   }
   assertEq(a.roomKey, 'break'); // la migration a bien fini par aboutir
 });
-test('C1 : la salle travail ne rétrécit qu\'une fois le migrant physiquement sorti (rows reste à 7 tant que le slot est tenu)', () => {
+test('C1 : la salle travail ne rétrécit qu\'une fois le migrant physiquement sorti (rows reste à 7 tant que son slot est tenu)', () => {
   const st = OL.createState();
   const snapshot0 = snap([sess('a', 'running'), sess('b', 'running'), sess('c', 'running')]);
   OL.syncActors(st, snapshot0);
   walkToRest(st.actors.get('a'), st); walkToRest(st.actors.get('b'), st); walkToRest(st.actors.get('c'), st);
   assertEq(OL.roomsFor(snapshot0, st).find(r => r.key === 'work').rows, 7);
 
-  const snapshot1 = snap([sess('a', 'waiting'), sess('b', 'running'), sess('c', 'running')]);
+  // C'est 'c' (créé en dernier, slot le PLUS HAUT — 2e pair) qui migre :
+  // c'est son départ qui conditionne un éventuel rétrécissement (fix C2 —
+  // le dimensionnement suit le plus haut slot ENCORE tenu, pas le compte
+  // brut ; si 'a' ou 'b', slots bas, migrait à la place, la salle resterait
+  // à 7 pour toujours tant que 'c' occupe le slot haut — comportement
+  // correct, couvert par les tests C2 dédiés).
+  const snapshot1 = snap([sess('a', 'running'), sess('b', 'running'), sess('c', 'waiting')]);
   OL.syncActors(st, snapshot1);
-  const a = st.actors.get('a');
+  const c = st.actors.get('c');
   // Juste après le changement d'état, AVANT que le migrant ait atteint la
   // porte : la salle rendue doit rester à 7 (sinon C1 se reproduit).
   assertEq(OL.roomsFor(snapshot1, st).find(r => r.key === 'work').rows, 7);
-  while (a.roomKey === 'work') OL.tickActor(a, st);
-  // Une fois sorti (slot libéré) : la salle peut rétrécir au compte réel (2).
+  while (c.roomKey === 'work') OL.tickActor(c, st);
+  // Une fois sorti (slot 2 libéré, plus haut slot tenu retombe à 1 = b) :
+  // la salle peut rétrécir.
   assertEq(OL.roomsFor(snapshot1, st).find(r => r.key === 'work').rows, 5);
 });
 test('roomsFor sans state (2e paramètre omis) reste une fonction pure du snapshot — comportement des tests de géométrie inchangé', () => {
@@ -411,7 +418,7 @@ test('I2 : après résolution de l\'erreur, la migration interrompue reprend pro
 });
 
 console.log('\nI3 (reviewer) — non-traversée en salle Pause (blocs étendus inclus):');
-test('I3 : 9 sessions waiting (blocs étendus) — aucun trajet ne traverse canapés/comptoir/fontaine/distributeur/plantes', () => {
+test('I3 : 13 sessions waiting (2e rangée du bloc étendu couverte) — aucun trajet ne traverse canapés/comptoir/fontaine/distributeur/plantes', () => {
   const st = OL.createState();
   const forbidden = [
     { tx: 2, ty: 3 }, { tx: 5, ty: 3 },   // canapés
@@ -419,14 +426,17 @@ test('I3 : 9 sessions waiting (blocs étendus) — aucun trajet ne traverse cana
     { tx: 0, ty: 4 }, { tx: 7, ty: 4 },  // plantes
   ];
   const isForbidden = p => forbidden.some(f => f.tx === p.tx && f.ty === p.ty);
-  const sessions = Array.from({ length: 9 }, (_, i) => sess('w' + i, 'waiting'));
+  // 13 sessions (bonus reviewer) : dépasse 6 (base) et 12 (1er bloc étendu
+  // complet), couvre donc la 2e rangée du 2e bloc — motif [1,4,6] vérifié à
+  // la main par le reviewer sur ce palier, verrouillé ici.
+  const sessions = Array.from({ length: 13 }, (_, i) => sess('w' + i, 'waiting'));
   OL.syncActors(st, snap(sessions));
   for (const s of sessions) {
     const a = st.actors.get(s.sessionId);
     assert(!a.path.some(isForbidden), `le trajet de ${s.sessionId} vers (${a.path[a.path.length - 1].tx},${a.path[a.path.length - 1].ty}) traverse un obstacle pause`);
   }
 });
-test('I3 : les mêmes 9 acteurs atteignent bien leur siège en marchant, sans jamais fouler un obstacle en cours de route', () => {
+test('I3 : les mêmes 13 acteurs atteignent bien leur siège en marchant, sans jamais fouler un obstacle en cours de route', () => {
   const st = OL.createState();
   const forbidden = [
     { tx: 2, ty: 3 }, { tx: 5, ty: 3 },
@@ -434,7 +444,10 @@ test('I3 : les mêmes 9 acteurs atteignent bien leur siège en marchant, sans ja
     { tx: 0, ty: 4 }, { tx: 7, ty: 4 },
   ];
   const isForbidden = p => forbidden.some(f => f.tx === p.tx && f.ty === p.ty);
-  const sessions = Array.from({ length: 9 }, (_, i) => sess('w' + i, 'waiting'));
+  // 13 sessions (bonus reviewer) : dépasse 6 (base) et 12 (1er bloc étendu
+  // complet), couvre donc la 2e rangée du 2e bloc — motif [1,4,6] vérifié à
+  // la main par le reviewer sur ce palier, verrouillé ici.
+  const sessions = Array.from({ length: 13 }, (_, i) => sess('w' + i, 'waiting'));
   OL.syncActors(st, snap(sessions));
   for (const s of sessions) {
     const a = st.actors.get(s.sessionId);
@@ -444,6 +457,89 @@ test('I3 : les mêmes 9 acteurs atteignent bien leur siège en marchant, sans ja
     }
     assert(!isForbidden({ tx: a.tx, ty: a.ty }), `${s.sessionId} termine sur un obstacle (${a.tx},${a.ty})`);
   }
+});
+
+// Fait sortir COMPLÈTEMENT un acteur (kind:'session') : simule le contrat
+// M5 (« les acteurs done sont supprimés par l'appelant ») — tick jusqu'à
+// `done`, puis retire l'entrée de `state.actors` comme est censé le faire
+// Task 2, jamais `state.slots` (déjà libéré en interne par tickActor).
+function fullyExit(sessionId, st) {
+  const a = st.actors.get(sessionId);
+  for (let i = 0; i < 300 && !a.done; i++) OL.tickActor(a, st);
+  assert(a.done, `${sessionId} jamais done`);
+  st.actors.delete(sessionId);
+}
+
+console.log('\nC2 (reviewer) — fragmentation des slots (dimensionnement par plus haut index tenu):');
+test('C2 : 5 running (slots 0..4) → r0..r3 sortent COMPLÈTEMENT → r4 (slot 4, tuile la plus basse) reste dans les bornes de la salle travail rendue', () => {
+  const st = OL.createState();
+  const five = Array.from({ length: 5 }, (_, i) => sess('r' + i, 'running'));
+  OL.syncActors(st, snap(five));
+  for (const s of five) walkToRest(st.actors.get(s.sessionId), st);
+  const r4 = st.actors.get('r4');
+  assertEq(r4.slotIdx, 4);
+  assertEq(r4.tx, 1); assertEq(r4.ty, 6); // slot 4 = pair 2, colonne 1 → (1,6), salle 7 rangées
+
+  // r0..r3 partent (disparaissent du snapshot) et sortent COMPLÈTEMENT —
+  // pas juste purgées, réellement supprimées par l'appelant (M5).
+  OL.syncActors(st, snap([sess('r4', 'running')]));
+  for (const s of five) if (s.sessionId !== 'r4') fullyExit(s.sessionId, st);
+
+  // Repro reviewer : `state.slots.work.size` est retombé à 1 (fragmenté —
+  // seul r4 tient encore un slot), mais r4 est TOUJOURS assis au slot 4
+  // (tuile (1,6)). Une taille dérivée du COMPTE (workRoomRows(1) → rows=5)
+  // rendrait une salle qui ne contient plus (1,6). Doit rester dans les
+  // bornes, DE FAÇON STABLE (pas transitoire : aucune migration ici).
+  assertEq(st.slots.work.size, 1); // confirme la fragmentation (sinon le test ne reproduit rien)
+  const snapshot = snap([sess('r4', 'running')]);
+  const work = OL.roomsFor(snapshot, st).find(x => x.key === 'work');
+  assert(r4.tx >= 0 && r4.tx < work.cols && r4.ty >= 0 && r4.ty < work.rows,
+    `r4 en (${r4.tx},${r4.ty}) hors bornes de la salle travail rendue (rows=${work.rows})`);
+  // slotIdx=4 → pair 2 (0-indexée), il faut donc au moins 3 paires
+  // (workPairs) pour que la tuile (1,6) existe — un dimensionnement par
+  // COMPTE (logical=1 ou size=1) donnerait workPairs(1)=1, rows=5, et (1,6)
+  // serait hors sol. Le fix (maxHeldSlotIdx+1=5) donne workPairs(5)=3,
+  // rows=9 : (1,6) est bien dans les bornes, avec de la marge.
+  assertEq(work.rows, 9, 'la salle doit rester assez grande pour (1,6) (slot 4 encore tenu), peu importe le compte brut');
+});
+test('C2 : même scénario en salle Pause — 5 waiting, slots bas partent en premier, le dernier (slot haut) reste dans les bornes', () => {
+  const st = OL.createState();
+  const five = Array.from({ length: 5 }, (_, i) => sess('p' + i, 'waiting'));
+  OL.syncActors(st, snap([], [])); // no-op, garde la forme snap() cohérente
+  OL.syncActors(st, snap(five));
+  for (const s of five) walkToRest(st.actors.get(s.sessionId), st);
+  const p4 = st.actors.get('p4');
+  assertEq(p4.slotIdx, 4); // 5e siège du 1er bloc (base) : (4,3)
+  assertEq(p4.tx, 4); assertEq(p4.ty, 3);
+
+  OL.syncActors(st, snap([sess('p4', 'waiting')]));
+  for (const s of five) if (s.sessionId !== 'p4') fullyExit(s.sessionId, st);
+
+  assertEq(st.slots.break.size, 1); // fragmentation confirmée
+  const snapshot = snap([sess('p4', 'waiting')]);
+  const brk = OL.roomsFor(snapshot, st).find(x => x.key === 'break');
+  assert(p4.tx >= 0 && p4.tx < brk.cols && p4.ty >= 0 && p4.ty < brk.rows,
+    `p4 en (${p4.tx},${p4.ty}) hors bornes de la salle pause rendue (rows=${brk.rows})`);
+  assertEq(brk.rows, 5, 'p4 tient dans la base (slot 4 < 6) — mais le principe est vérifié : plus haut idx tenu, pas le compte');
+});
+test('C2 : cas plus sévère en salle Pause — 8 waiting (slot 7, bloc étendu) → les 7 premiers sortent → le 8e reste dans les bornes rendues', () => {
+  const st = OL.createState();
+  const eight = Array.from({ length: 8 }, (_, i) => sess('q' + i, 'waiting'));
+  OL.syncActors(st, snap(eight));
+  for (const s of eight) walkToRest(st.actors.get(s.sessionId), st);
+  const q7 = st.actors.get('q7');
+  assertEq(q7.slotIdx, 7); // 8e siège = bloc étendu (idx 6,7 → within=1 → rowGroup1 → (4,5))
+  assertEq(q7.tx, 4); assertEq(q7.ty, 5);
+
+  OL.syncActors(st, snap([sess('q7', 'waiting')]));
+  for (const s of eight) if (s.sessionId !== 'q7') fullyExit(s.sessionId, st);
+
+  assertEq(st.slots.break.size, 1); // fragmentation : size=1 mais slotIdx=7 encore tenu
+  const snapshot = snap([sess('q7', 'waiting')]);
+  const brk = OL.roomsFor(snapshot, st).find(x => x.key === 'break');
+  assert(q7.tx >= 0 && q7.tx < brk.cols && q7.ty >= 0 && q7.ty < brk.rows,
+    `q7 en (${q7.tx},${q7.ty}) hors bornes de la salle pause rendue (rows=${brk.rows})`);
+  assertEq(brk.rows, 7, 'la salle doit rester assez grande pour (4,5) — un dimensionnement par `size` (1) retomberait à rows=5 et laisserait q7 hors sol');
 });
 
 // ─────────────────────────────────────────────────────────────────────────

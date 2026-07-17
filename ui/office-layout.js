@@ -74,25 +74,48 @@
     return { work, break: brk };
   }
 
-  // Compte de DIMENSIONNEMENT réconcilié (fix reviewer C1) : pendant qu'un
-  // perso migre, `logicalRoomCounts` (snapshot) le retire IMMÉDIATEMENT de sa
-  // salle d'origine dès que l'état change, alors que physiquement (slots) il
-  // continue à l'occuper le temps de marcher jusqu'à la porte. Si `roomsFor`
-  // se dimensionne sur le seul compte logique et que le routage (dans
-  // `syncActors`/`tickActor`) se dimensionne sur le seul compte physique, la
-  // salle RENDUE peut être plus petite que la salle sur laquelle le trajet a
-  // été calculé → le perso marche sur des tuiles jamais dessinées (repro
-  // reviewer : 3→2 occupants franchit un palier de paires, 8/12 tuiles hors
-  // sol rendu). Fix : les DEUX consomment `max(logique, physique)` — la
-  // salle ne rétrécit que lorsque le migrant a fini de sortir (slot libéré
-  // par tickActor à l'arrivée au spawn, cf. tickActor). `state` optionnel :
-  // sans lui (tests de géométrie pure), on retombe sur le compte logique
-  // seul.
+  // Plus haut index de slot ENCORE TENU dans une salle, +1 (ou 0 si vide).
+  // (fix reviewer C2, cf. sizingCounts ci-dessous — surtout PAS
+  // `state.slots[roomKey].size`, qui est un COMPTE d'occupants, pas une
+  // taille : les slots sont stables et jamais renumérotés/compactés (exigé
+  // par le design — une place ne doit jamais bouger tant que son occupant
+  // reste), donc ce compte se FRAGMENTE dès qu'un occupant à un slot bas part
+  // avant un occupant à un slot haut. Repro reviewer : 5 running (slots
+  // 0..4, salle 7 rangées) → r0..r3 partent complètement (slots 0..3
+  // libérés) → seul r4 reste, `size` retombe à 1, mais r4 est TOUJOURS assis
+  // au slot 4 (tuile (1,6)) — une taille dérivée de `size` (workRoomRows(1)
+  // → rows=5) rendrait une salle qui ne contient plus la tuile où r4 est
+  // assis, DÉFINITIVEMENT (pas transitoire : aucune migration en cours ne
+  // vient corriger ça). Le bon proxy de « jusqu'où la salle doit s'étendre »
+  // est donc le plus haut index encore occupé, pas le nombre d'occupants.
+  function maxHeldSlotIdx(state, roomKey) {
+    let max = -1;
+    for (const v of state.slots[roomKey].values()) if (v.idx > max) max = v.idx;
+    return max;
+  }
+
+  // Compte de DIMENSIONNEMENT réconcilié (fix reviewer C1 + C2) : pendant
+  // qu'un perso migre, `logicalRoomCounts` (snapshot) le retire IMMÉDIATEMENT
+  // de sa salle d'origine dès que l'état change, alors que physiquement
+  // (slots) il continue à l'occuper le temps de marcher jusqu'à la porte. Si
+  // `roomsFor` se dimensionne sur le seul compte logique et que le routage
+  // (dans `syncActors`/`tickActor`) se dimensionne sur le seul compte
+  // physique, la salle RENDUE peut être plus petite que la salle sur
+  // laquelle le trajet a été calculé → le perso marche sur des tuiles
+  // jamais dessinées (C1 : 3→2 occupants franchit un palier de paires, 8/12
+  // tuiles hors sol rendu). Fix C1 : les DEUX consomment `max(logique,
+  // physique)`. Fix C2 : le « physique » n'est PAS `state.slots[room].size`
+  // (fragmenté par des départs désordonnés, cf. `maxHeldSlotIdx` ci-dessus)
+  // mais `maxHeldSlotIdx(...) + 1` — la salle ne rétrécit que lorsque le
+  // slot le PLUS HAUT tenu se libère, garantissant qu'aucun occupant restant
+  // (à un slot bas OU haut) ne se retrouve jamais hors sol rendu. `state`
+  // optionnel : sans lui (tests de géométrie pure), on retombe sur le compte
+  // logique seul.
   function sizingCounts(interactive, state) {
     const logical = logicalRoomCounts(interactive);
     return {
-      work: state ? Math.max(logical.work, state.slots.work.size) : logical.work,
-      break: state ? Math.max(logical.break, state.slots.break.size) : logical.break,
+      work: state ? Math.max(logical.work, maxHeldSlotIdx(state, 'work') + 1) : logical.work,
+      break: state ? Math.max(logical.break, maxHeldSlotIdx(state, 'break') + 1) : logical.break,
     };
   }
 

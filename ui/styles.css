@@ -2334,17 +2334,43 @@ body.micro-mode .usage-reset-icon {
 .compact-card.bg-session,
 .micro-item.bg-session { cursor: default; }
 
-/* ═══ Office view ═══ */
+/* ═══ Office view (v2 : pièces-cartes) ═══ */
 .office-view {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
   padding: 12px;
-  overflow: auto;
+  align-content: start;
 }
-.office-view canvas {
+.office-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.office-card canvas {
   image-rendering: pixelated;
-  max-width: 100%;
+  width: 100%;
+  display: block;
 }
+.office-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  min-width: 0;
+}
+.office-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.office-card.bg-session { opacity: 0.75; cursor: default; }
 .office-tooltip {
   position: fixed;
   z-index: 1000;

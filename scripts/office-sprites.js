@@ -30,7 +30,7 @@ const FURNITURE = {
   // au spectateur, pour que le dossier s'intercale visuellement entre lui et
   // la caméra. chairFront/chairBack restent bakés (plus utilisés en room
   // v26, réactivables) mais ne sont plus posés dans roomFor.
-  chairOver:    `${SINGLES_DIR}/Modern_Office_Singles_102.png`, // dossier texturé — plus lisible que le 101 quand le siège est vide (retour Paul)
+  chairOver:    `${SINGLES_DIR}/Modern_Office_Singles_106.png`, // VRAIE vue de dos (dossier plein, pas d'assise visible) — les 101/102 montrent l'assise = siège tourné vers la caméra (retour Paul, 2 itérations)
   plant:        `${SINGLES_DIR}/Modern_Office_Singles_98.png`,
   waterCooler:  `${SINGLES_DIR}/Modern_Office_Singles_173.png`,
   vending:      `${SINGLES_DIR}/Modern_Office_Singles_175.png`,

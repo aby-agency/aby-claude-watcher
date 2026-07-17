@@ -127,38 +127,12 @@ test('papiers uniquement en erreur', () => {
   assert(err.length >= 2, 'pas de papiers en erreur');
   assertEq(run.length, 0);
 });
-test('coin pause : fontaine/distributeur en alternance déterministe par projet', () => {
-  // 2 projets choisis pour tomber de part et d'autre de la parité (mêmes
-  // valeurs que le rapport de vérif CDP) — la fonction est pure, donc si un
-  // jour charIndexFor change de hash, adapter ces 2 noms plutôt que le test.
-  const evenProj = sess('a', 'running', { projectName: 'proj-a' });
-  const oddProj = sess('b', 'running', { projectName: 'proj-b' });
-  const evenFrame = OL.charIndexFor(evenProj.projectName) % 2 === 0 ? 'waterCooler' : 'vending';
-  const oddFrame = OL.charIndexFor(oddProj.projectName) % 2 === 0 ? 'waterCooler' : 'vending';
-  const rEven = OL.roomFor(evenProj), rOdd = OL.roomFor(oddProj);
-  assert(rEven.statics.some(x => x.frame === evenFrame && (x.frame === 'waterCooler' || x.frame === 'vending')));
-  assert(rOdd.statics.some(x => x.frame === oddFrame && (x.frame === 'waterCooler' || x.frame === 'vending')));
-  // Une seule fontaine/distributeur par pièce, jamais les deux.
-  const both = (r) => r.statics.filter(x => x.frame === 'waterCooler' || x.frame === 'vending');
-  assertEq(both(rEven).length, 1);
-  assertEq(both(rOdd).length, 1);
+test('fontaine et distributeur retirés (retour Paul v2.7)', () => {
+  const st = OL.roomFor(sess('a', 'running')).statics;
+  assert(!st.some(x => x.frame === 'waterCooler'), 'fontaine encore présente');
+  assert(!st.some(x => x.frame === 'vending'), 'distributeur encore présent');
 });
-test('coin pause : posé sur une tuile jamais traversée par le perso principal (spawn/café/leave)', () => {
-  const st = OL.createState();
-  const s = sess('a', 'running');
-  OL.syncSession(st, s);
-  const a = st.actors.get('a');
-  const zones = OL.roomFor(s).zones;
-  const breakSpot = OL.roomFor(s).statics.find(x => x.frame === 'waterCooler' || x.frame === 'vending');
-  const onBreakSpot = (p) => p.tx === breakSpot.tx && p.ty === breakSpot.ty;
-  assert(!a.path.some(onBreakSpot), 'le path de spawn traverse le coin pause');
-  while (a.path.length > 0) OL.tickActor(a, zones);           // atteint la chaise
-  OL.syncSession(st, sess('a', 'waiting'));                    // part au café
-  assert(!a.path.some(onBreakSpot), 'le path vers le café traverse le coin pause');
-  while (a.path.length > 0) OL.tickActor(a, zones);           // atteint le café
-  OL.purge(st, new Set());                                     // leave → porte
-  assert(!a.path.some(onBreakSpot), 'le path de leave traverse le coin pause');
-});
+
 test('coin réunion présent seulement si workflow actif', () => {
   const w = sess('a', 'running', { workflows: [{ runId: 'wf1', name: 'r', running: 3 }] });
   assert(OL.roomFor(w).statics.some(x => x.frame === 'meetingTable'));

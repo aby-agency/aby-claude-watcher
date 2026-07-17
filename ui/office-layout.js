@@ -140,7 +140,9 @@
       }
     }
     statics.push({ frame: 'door', tx: DOOR.tx, ty: 0 });   // marqueur programmatique
-    statics.push({ frame: 'whiteboard', tx: WHITEBOARD.tx, ty: WHITEBOARD.ty, dy: 7 });
+    // dy:0 → le bas du tableau affleure la ligne mur/sol (les 7 px hauts du
+    // sprite 23px sortent du canvas, assumé — à dy:7 il mordait sur le sol).
+    statics.push({ frame: 'whiteboard', tx: WHITEBOARD.tx, ty: WHITEBOARD.ty });
     statics.push({ frame: 'desk', tx: DESK.tx, ty: DESK.ty });
     statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
     statics.push({ frame: 'deskLamp', tx: DESK.tx, ty: DESK.ty, dy: DESK_LAMP_DY });
@@ -148,12 +150,8 @@
     statics.push({ frame: 'sideDesk', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty });   // comptoir sous la tasse
     statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty, dy: COFFEE_DY });
     statics.push({ frame: 'plant', tx: PLANT.tx, ty: PLANT.ty });
-    // Coin pause : alterne fontaine/distributeur selon le projet (déterministe,
-    // pas de flicker au re-render). Tuile jamais traversée (cf. BREAK_SPOT).
-    statics.push({
-      frame: charIndexFor(session.projectName) % 2 === 0 ? 'waterCooler' : 'vending',
-      tx: BREAK_SPOT.tx, ty: BREAK_SPOT.ty,
-    });
+    // Fontaine/distributeur retirés (retour Paul v2.7) — le coin pause se
+    // résume au café. Les frames restent bakées, réactivables ici.
     // Note géométrie : la table du 2e subagent (SIDE_SEATS[1].ty - 1 = 3)
     // atterrit sur CORRIDOR_TY (3), colonne 5 (SIDE_SEATS[1].tx) — inoffensif
     // aujourd'hui car routeTo() n'est utilisé que pour le perso principal

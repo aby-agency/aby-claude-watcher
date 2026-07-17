@@ -42,15 +42,14 @@ test('pièce de base 6×4, sans sièges latéraux ni réunion', () => {
   assert(!r.statics.some(x => x.frame === 'laptop'), 'pas de laptop sans subagent');
   assert(!r.statics.some(x => x.frame === 'meetingTable'));
 });
-test('subagents → +1 colonne PAR station (7 avec 1 sub, 8 avec 2)', () => {
+test('subagents → +2 rangées en bas, largeur fixe (v2.9)', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
-  assertEq(r.cols, 7); assertEq(r.rows, 4);
-  assertEq(OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }, { agentId: 'g3' }] })).cols, 8); // plafonné à 2 stations
-  assert(r.statics.some(x => x.frame === 'sideDesk'));
+  assertEq(r.cols, 6); assertEq(r.rows, 6); // 4 base + 2 rangées stations
+  assertEq(OL.roomFor(sess('a', 'running')).cols, 6); // largeur identique sans subs
 });
 test('chaque subagent a une chaise (vue de dos, z:over) et un laptop sur sa table (perso au SUD de sa table)', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }] }));
-  const seats = r.zones.sideSeats;
+  const seats = r.zones.sideSeats.slice(0, 2); // 2 subs → 2 stations occupées
   for (const seat of seats) {
     assert(r.statics.some(x => x.frame === 'chairOver' && x.tx === seat.tx && x.ty === seat.ty),
       `pas de chaise au siège (${seat.tx},${seat.ty})`);
@@ -72,9 +71,11 @@ test('workflow actif → +2 rangées (6 de haut)', () => {
   assertEq(r.cols, 6); assertEq(r.rows, 6);
   assert(r.statics.some(x => x.frame === 'meetingTable'));
 });
-test('subagents + workflow → 7×6', () => {
+test('subagents + workflow → 6×8 (stations puis réunion, empilées)', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
-  assertEq(r.cols, 7); assertEq(r.rows, 6);
+  assertEq(r.cols, 6); assertEq(r.rows, 8);
+  // la réunion est SOUS les stations subagents
+  assert(r.zones.meetingTable.ty > r.zones.sideSeats[0].ty, 'réunion pas sous les stations');
 });
 test('le mur et le sol couvrent les dimensions effectives', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
@@ -87,7 +88,7 @@ test('zones aux positions spécifiées', () => {
   // Vue par-dessus l'épaule : le perso est au SUD du bureau (1,2), pas au nord.
   assertEq(z.deskChar.tx, 1); assertEq(z.deskChar.ty, 2);
   assertEq(z.door.tx, 3); assertEq(z.door.ty, 1);
-  assertEq(z.sideSeats.length, 2);
+  assertEq(z.sideSeats.length, 4); // 4 stations possibles (v2.9)
 });
 test('statics : desk avec screen, machine café, porte', () => {
   const room = OL.roomFor(sess('a', 'running'));
@@ -136,9 +137,10 @@ test('coin réunion présent seulement si workflow actif', () => {
   assertEq(OL.roomFor(w).zones.meetingSeats.length, 4);
   assert(!OL.roomFor(sess('a', 'running')).statics.some(x => x.frame === 'meetingTable'));
 });
-test('subOverflow compte les subagents au-delà de 2', () => {
-  const s = sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }, { agentId: 'g3' }, { agentId: 'g4' }] });
-  assertEq(OL.roomFor(s).zones.subOverflow, 2);
+test('subOverflow compte les subagents au-delà de 4 (v2.9)', () => {
+  const six = Array.from({ length: 6 }, (_, i) => ({ agentId: 'g' + i }));
+  assertEq(OL.roomFor(sess('a', 'running', { subagents: six })).zones.subOverflow, 2);
+  assertEq(OL.roomFor(sess('a', 'running', { subagents: six.slice(0, 4) })).zones.subOverflow, 0);
 });
 
 console.log('\nworkflowRunning (dédup runId):');
@@ -253,12 +255,13 @@ test('session ressuscitée après un leave abouti → done repasse à false, pat
   const dest = a.path[a.path.length - 1];
   assertEq(dest.tx, 1); assertEq(dest.ty, 2);
 });
-test('subagents → 2 acteurs max, aux sièges latéraux', () => {
+test('subagents → 4 acteurs max, aux stations du bas (v2.9)', () => {
   const st = OL.createState();
-  const s = sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }, { agentId: 'g3' }] });
+  const five = Array.from({ length: 5 }, (_, i) => ({ agentId: 'g' + i }));
+  const s = sess('a', 'running', { subagents: five });
   OL.syncSession(st, s);
   const subs = [...st.actors.values()].filter(x => x.kind === 'subagent');
-  assertEq(subs.length, 2);
+  assertEq(subs.length, 4);
   const seats = OL.roomFor(s).zones.sideSeats;
   assertEq(subs[0].tx, seats[0].tx);
 });

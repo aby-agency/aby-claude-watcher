@@ -44,10 +44,11 @@
   const PAPERS = [{ tx: 3, ty: 3 }, { tx: 2, ty: 2 }];
   const FLOOR_WOOD = [{ tx: 4, ty: 1 }, { tx: 5, ty: 1 },
                        { tx: 4, ty: 2 }, { tx: 5, ty: 2 }]; // parquet du coin pause
-  // Postes subagents : rangée d'annexes CÔTE À CÔTE (v2.8, façon cubicles) —
-  // la pièce gagne 1 colonne PAR subagent visible (cols = 6 + min(subs,2)),
-  // chaque station = table+laptop (ty 1) au-dessus du siège (ty 2).
-  const SIDE_SEATS = [{ tx: 6, ty: 2 }, { tx: 7, ty: 2 }];
+  // Postes subagents (v2.9) : EXTENSION EN BAS — la carte garde toujours
+  // 6 colonnes (grille alignée), les subagents ajoutent 2 rangées sous la
+  // pièce (tables+laptops puis persos assis), jusqu'à 4 stations côte à
+  // côte, « +N » au-delà. La hauteur de carte = signal d'activité.
+  const SUB_COLS = [1, 2, 3, 4]; // colonnes des stations dans les rangées ajoutées
   // Fauteuil VU DE DOS (#101, dossier plein face caméra) : posé en passe
   // `z:'over'` — office.js dessine statics normaux → acteurs → statics
   // `z:'over'` → voile → bulle, pour que le dossier chevauche visuellement
@@ -79,9 +80,7 @@
   // l'avant du bureau, côté chaise. Valeurs de départ raisonnables — le
   // réglage pixel-perfect se fait au rendu (Task 3).
   const DESK_LAMP_DY = -4;
-  const MEETING_SEATS = [{ tx: 2, ty: 4 }, { tx: 4, ty: 4 }, { tx: 2, ty: 5 }, { tx: 4, ty: 5 }];
-  const MEETING_TABLE = { tx: 3, ty: 4 };
-  const MAX_SUBS = 2;
+  const MAX_SUBS = 4;
 
   function createState() { return { actors: new Map() }; }
 
@@ -120,14 +119,20 @@
     const subs = (session.subagents || []).length;
     const hasSubs = subs > 0;
     const hasMeeting = workflowRunning(session) > 0;
-    const cols = BASE_COLS + Math.min(subs, MAX_SUBS); // +1 colonne par station subagent
-    const rows = hasMeeting ? BASE_ROWS + 2 : BASE_ROWS;
+    const cols = BASE_COLS; // largeur FIXE : la grille de cartes reste alignée
+    // Extensions par le bas : rangées subagents (tables ty=subRowTy, sièges
+    // ty=subRowTy+1) puis salle de réunion en dessous si workflow.
+    const subRowTy = BASE_ROWS;
+    const meetingTy = BASE_ROWS + (hasSubs ? 2 : 0);
+    const rows = BASE_ROWS + (hasSubs ? 2 : 0) + (hasMeeting ? 2 : 0);
     const zones = {
       door: { ...DOOR },
       deskChar: { ...DESK_CHAR },
-
-      sideSeats: SIDE_SEATS.map(p => ({ ...p })),
-      meetingSeats: hasMeeting ? MEETING_SEATS.map(p => ({ ...p })) : [],
+      sideSeats: SUB_COLS.map(tx => ({ tx, ty: subRowTy + 1 })),
+      meetingSeats: hasMeeting
+        ? [{ tx: 2, ty: meetingTy }, { tx: 4, ty: meetingTy }, { tx: 2, ty: meetingTy + 1 }, { tx: 4, ty: meetingTy + 1 }]
+        : [],
+      meetingTable: hasMeeting ? { tx: 3, ty: meetingTy } : null,
       subOverflow: Math.max(0, subs - MAX_SUBS),
     };
 
@@ -149,20 +154,15 @@
     statics.push({ frame: 'plant', tx: PLANT.tx, ty: PLANT.ty });
     // Fontaine/distributeur retirés (retour Paul v2.7) — le coin pause se
     // résume au café. Les frames restent bakées, réactivables ici.
-    // Note géométrie : la table du 2e subagent (SIDE_SEATS[1].ty - 1 = 3)
-    // atterrit sur CORRIDOR_TY (3), colonne 5 (SIDE_SEATS[1].tx) — inoffensif
-    // aujourd'hui car routeTo() n'est utilisé que pour le perso principal
-    // (kind: 'session'), dont les cibles restent tx∈{1,2,4} (DESK_CHAR,
-    // COFFEE, DOOR) ; les subagents ne marchent jamais (posés directement à
-    // leur siège, jamais de path). À réévaluer si MAX_SUBS augmente ou si les
-    // subagents se mettent à se déplacer.
+    // Les stations subagents vivent dans les rangées AJOUTÉES (sous la
+    // rangée de circulation ty=3) : jamais traversées par le perso principal.
     for (let i = 0; i < Math.min(subs, MAX_SUBS); i++) {
-      const seat = SIDE_SEATS[i];
+      const seat = zones.sideSeats[i];
       statics.push({ frame: 'sideDesk', tx: seat.tx, ty: seat.ty - 1 });
       statics.push({ frame: 'laptop', tx: seat.tx, ty: seat.ty - 1 });
       statics.push({ frame: CHAIR_FRAME, tx: seat.tx, ty: seat.ty, dy: CHAIR_OVER_DY_SUB, z: 'over' });
     }
-    if (hasMeeting) statics.push({ frame: 'meetingTable', tx: MEETING_TABLE.tx, ty: MEETING_TABLE.ty });
+    if (hasMeeting) statics.push({ frame: 'meetingTable', tx: zones.meetingTable.tx, ty: zones.meetingTable.ty });
     if (session.state && session.state.name === 'error') {
       statics.push({ frame: '_papers', tx: PAPERS[0].tx, ty: PAPERS[0].ty });
       statics.push({ frame: '_papers', tx: PAPERS[1].tx, ty: PAPERS[1].ty });
@@ -246,12 +246,12 @@
       }
     });
     // Meeting : min(workflowRunning, 4) sitters.
-    const nSeats = Math.min(workflowRunning(session), MEETING_SEATS.length);
+    const nSeats = Math.min(workflowRunning(session), zones.meetingSeats.length);
     for (let i = 0; i < nSeats; i++) {
       const aid = `${sid}:wf:${i}`;
       wanted.add(aid);
       if (!state.actors.has(aid)) {
-        const seat = MEETING_SEATS[i];
+        const seat = zones.meetingSeats[i];
         state.actors.set(aid, { id: aid, sessionId: sid, kind: 'meeting',
           charIdx: (charIndexFor(sid) + i + 1) % 10, activity: 'work',
           tx: seat.tx, ty: seat.ty, path: [], dir: seat.ty === 5 ? 'down' : 'up',

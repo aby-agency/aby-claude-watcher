@@ -241,6 +241,12 @@
           charIdx: i % 10, activity: 'work',
           tx: zones.meeting[i].tx, ty: zones.meeting[i].ty, path: [], dir: i < 3 ? 'down' : 'up',
           animFrame: 0, done: false });
+      } else {
+        // La table peut descendre (une rangée de bureaux s'ouvre pendant le
+        // workflow) : sitters statiques, on snap directement sur le nouveau
+        // siège plutôt que de faire marcher l'acteur.
+        const actor = state.actors.get(aid);
+        actor.tx = zones.meeting[i].tx; actor.ty = zones.meeting[i].ty; actor.path = [];
       }
     }
 

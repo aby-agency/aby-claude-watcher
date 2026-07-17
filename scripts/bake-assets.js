@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { decodePNG, encodePNG } = require('./png-codec.js');
-const { CHAR_ROWS, DIRS, charFrameRect, FURNITURE, TILES, COFFEE, premadePath } = require('./office-sprites.js');
+const { CHAR_ROWS, charFrameRect, FURNITURE, TILES, COFFEE, premadePath } = require('./office-sprites.js');
 
 const SRC = process.env.BAKE_ASSETS_SRC || path.join(os.homedir(), 'Project', 'Games', 'Assets');
 const OUT = path.join(__dirname, '..', 'ui', 'office-assets');

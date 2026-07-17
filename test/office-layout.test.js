@@ -201,6 +201,32 @@ test('flip background→interactif : l\'acteur repart marcher vers son nouveau b
   assertEq(dest.ty, desk.ty);
 });
 
+test('table de réunion qui descend (4e session ouvre une rangée) → acteurs meeting repositionnés', () => {
+  const st = OL.createOfficeState();
+  let s = snap([sess('a', 'running'), sess('b', 'running'), sess('c', 'running', {
+    workflows: [{ runId: 'wf_1', name: 'rev', running: 3 }],
+  })]);
+  let room = OL.layoutRoom(st, s);
+  OL.syncActors(st, s);
+  assertEq([...st.actors.values()].filter(a => a.kind === 'meeting').length, 3);
+
+  // 4e session interactive → une rangée de bureaux s'ouvre, la table (et donc
+  // la réunion) descend d'autant.
+  s = snap([sess('a', 'running'), sess('b', 'running'), sess('c', 'running', {
+    workflows: [{ runId: 'wf_1', name: 'rev', running: 3 }],
+  }), sess('d', 'running')]);
+  room = OL.layoutRoom(st, s);
+  OL.syncActors(st, s);
+
+  for (let i = 0; i < 3; i++) {
+    const actor = st.actors.get(`meeting:${i}`);
+    assert(actor, `meeting:${i} manquant`);
+    assertEq(actor.ty, room.zones.meeting[i].ty);
+    assertEq(actor.tx, room.zones.meeting[i].tx);
+    assertEq(actor.path.length, 0);
+  }
+});
+
 console.log('\nanimFor:');
 test('acteur en mouvement → walk.<dir>', () => {
   const a = { charIdx: 3, activity: 'coffee', path: [{ tx: 5, ty: 2 }], dir: 'left' };

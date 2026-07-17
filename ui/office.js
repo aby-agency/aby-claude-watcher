@@ -134,6 +134,10 @@ const Office = (() => {
       OfficeLayout.tickActor(a, room ? room.zones : null);
       if (a.done) state.actors.delete(a.id);
     }
+    // Dernier acteur parti (porte franchie) et plus aucune session : la vue
+    // n'a plus rien à animer → render() retombe sur l'empty state et gate
+    // showOffice à false, ce qui stoppe la boucle (deactivate()).
+    if (sessions.size === 0 && state.actors.size === 0) { render(); return; }
     // Les anims tournent en continu (idle bob, café) : chaque tick change des
     // frames, donc chaque tick redessine. L'économie CPU vient de la boucle
     // entièrement stoppée quand la vue est inactive (deactivate()).
@@ -167,7 +171,7 @@ const Office = (() => {
     tooltip.innerHTML = `
       <div class="office-tip-name">${esc(s.customName || s.projectName)}</div>
       <div class="office-tip-row">${esc(getStateLabel(s))} · ${esc(s.gitBranch || '—')}</div>
-      <div class="office-tip-row">${formatModel(s.model)} · ${formatDuration(s.startedAt)}</div>`;
+      <div class="office-tip-row">${esc(formatModel(s.model))} · ${formatDuration(s.startedAt)}</div>`;
     tooltip.style.display = 'block';
     tooltip.style.left = `${Math.min(ev.clientX + 12, window.innerWidth - 220)}px`;
     tooltip.style.top = `${ev.clientY + 12}px`;

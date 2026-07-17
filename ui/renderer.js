@@ -676,7 +676,7 @@ function render() {
   $microView.style.display = showItems && viewMode === 'micro' ? 'flex' : 'none';
   const showOffice = showItems && viewMode === 'office';
   const $officeView = document.getElementById('officeView');
-  $officeView.style.display = showOffice ? 'block' : 'none';
+  $officeView.style.display = showOffice ? 'flex' : 'none';
   if (viewMode === 'office') {
     if (showOffice) Office.activate(); else Office.deactivate();
     return updateStatusBar();
@@ -734,7 +734,18 @@ function toggleBackgroundSection() {
 }
 
 function updateSession(s) {
-  if (viewMode === 'office') { Office.notifyUpdate(); updateStatusBar(); return; }
+  if (viewMode === 'office') {
+    Office.notifyUpdate();
+    const stateName = s.state.name;
+    const isActiveAgain = stateName === 'running' || stateName === 'thinking';
+    const isInactive = stateName === 'error';
+    if (isActiveAgain || isInactive) {
+      clearBell(s.sessionId, { skipRender: true });
+      dismissToastForSession(s.sessionId);
+    }
+    updateStatusBar();
+    return;
+  }
   // Targeted update: find the existing element and patch it in place
   const container = viewContainer();
   const selector = `[data-session="${s.sessionId}"]`;
@@ -799,7 +810,12 @@ function updateSession(s) {
 }
 
 function removeSessionFromDOM(sessionId) {
-  if (viewMode === 'office') { Office.notifyUpdate(); return; }
+  if (viewMode === 'office') {
+    clearBell(sessionId);
+    Office.notifyUpdate();
+    updateStatusBar();
+    return;
+  }
   clearBell(sessionId);
   for (const container of [$gridView, $compactView]) {
     const el = container.querySelector(`[data-session="${sessionId}"]`);

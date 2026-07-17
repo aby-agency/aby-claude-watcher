@@ -20,15 +20,23 @@ function charFrameRect(row, i) {
 // Mobilier : singles Modern Office (canvas 32×48, rogné à la bbox au bake).
 const SINGLES_DIR = 'Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16';
 const FURNITURE = {
-  desk:         `${SINGLES_DIR}/Modern_Office_Singles_284.png`,
+  // v26 (swaps Paul 2026-07-17) : bureau principal en blanc, 2 tuiles.
+  desk:         `${SINGLES_DIR}/Modern_Office_Singles_263.png`,
   deskSetup:    `${SINGLES_DIR}/Modern_Office_Singles_227.png`,
   chairBack:    `${SINGLES_DIR}/Modern_Office_Singles_106.png`,
   chairFront:   `${SINGLES_DIR}/Modern_Office_Singles_196.png`,
+  // Fauteuil de bureau VU DE DOS (dossier plein face caméra) — dessiné en
+  // passe `z:'over'` (cf. office.js drawRoom) PAR-DESSUS le perso assis dos
+  // au spectateur, pour que le dossier s'intercale visuellement entre lui et
+  // la caméra. chairFront/chairBack restent bakés (plus utilisés en room
+  // v26, réactivables) mais ne sont plus posés dans roomFor.
+  chairOver:    `${SINGLES_DIR}/Modern_Office_Singles_101.png`,
   plant:        `${SINGLES_DIR}/Modern_Office_Singles_98.png`,
   waterCooler:  `${SINGLES_DIR}/Modern_Office_Singles_173.png`,
   vending:      `${SINGLES_DIR}/Modern_Office_Singles_175.png`,
   meetingTable: `${SINGLES_DIR}/Modern_Office_Singles_191.png`,
-  sideDesk:     `${SINGLES_DIR}/Modern_Office_Singles_246.png`,
+  // Table subagent en blanc, façade 1 tuile.
+  sideDesk:     `${SINGLES_DIR}/Modern_Office_Singles_75.png`,
   poster:       `${SINGLES_DIR}/Modern_Office_Singles_96.png`,
   laptop:       `${SINGLES_DIR}/Modern_Office_Singles_136.png`, // laptop ouvert, écran visible (top-down)
   // v2.4 — mobilier de densité cubicle (choisi au preview parmi 141-146 / 170-172 / 113-115).
@@ -74,51 +82,47 @@ const UI_ICONS_SHEET = 'modernuserinterface-win/16x16/Modern_UI_Style_1.png';
 
 // Bulle vide (médaillon rond sans contenu), 2 frames quasi identiques (léger
 // antialiasing différent sur le contour = wobble naturel) — support de
-// compositing pour TOOL_EMOTES et MAIL_EMOTE.
+// compositing pour TOOL_EMOTES (mail/think/work sont natifs depuis v26, plus
+// de compositing pour eux).
 const EMOTE_BUBBLE_EMPTY = { src: EMOTE_SHEET, frames: [{ x: 96, y: 64 }, { x: 112, y: 64 }] };
 
 // Émotes natives : extraction directe de 2 frames (médaillon rangées 4-9), pas de
-// compositing. Rouge = urgence (angry/error), doré = neutre (alert/pending).
-// NB « think » : pas d'entrée ici — vérifié à l'œil (dump pixel direct, cf. rapport
-// task-1) qu'aucune des 2 sheets n'a de picto « … » ellipsis propre (rangée y=144
-// col4-5 qu'on croyait « points » au premier coup d'œil sur le contact-sheet est en
-// fait un pansement rose). Synthétisé au bake sur EMOTE_BUBBLE_EMPTY via
-// THINK_DOTS_INK ci-dessous, pour rester dans le même style médaillon.
+// compositing. Rouge = urgence (angry/error), doré = neutre (alert/pending/mail).
+// v26 (swaps Paul 2026-07-17) :
+//  - think : L9C2+L9C3 (points bleus natifs du sheet) remplace les points
+//    synthétisés au bake (stampThinkDots, retiré — plus utilisé).
+//  - work  : L4C4+L4C5 (marteau) — nouvelle émote "running", remplace le
+//    mapping par-outil dans emoteFor (débranché, pas retiré des bakes).
+//  - mail  : L4C0+L4C1, mêmes coordonnées que `alert` ("!" doré) — Paul
+//    veut le même picto pour notif et pending ; nom d'anim `emote.mail`
+//    conservé (rien à changer côté layout/priorité bell > état > outil).
 const EMOTES = {
-  alert: { src: EMOTE_SHEET, frames: [{ x: 0, y: 64 }, { x: 16, y: 64 }] },    // "!" doré
-  angry: { src: EMOTE_SHEET, frames: [{ x: 0, y: 80 }, { x: 16, y: 80 }] },   // "!" rouge
-  zzz:   { src: EMOTE_SHEET, frames: [{ x: 96, y: 80 }, { x: 112, y: 80 }] }, // "Z" bleu
+  alert: { src: EMOTE_SHEET, frames: [{ x: 0, y: 64 }, { x: 16, y: 64 }] },     // "!" doré
+  angry: { src: EMOTE_SHEET, frames: [{ x: 0, y: 80 }, { x: 16, y: 80 }] },     // "!" rouge
+  zzz:   { src: EMOTE_SHEET, frames: [{ x: 96, y: 80 }, { x: 112, y: 80 }] },   // "Z" bleu
+  think: { src: EMOTE_SHEET, frames: [{ x: 32, y: 144 }, { x: 48, y: 144 }] },  // "…" points bleus (natif)
+  work:  { src: EMOTE_SHEET, frames: [{ x: 64, y: 64 }, { x: 80, y: 64 }] },    // marteau (running)
+  mail:  { src: EMOTE_SHEET, frames: [{ x: 0, y: 64 }, { x: 16, y: 64 }] },     // "!" doré (notif, bell active)
 };
-
-// Encre des 3 points « … » de emote.think, synthétisés au bake (stampThinkDots
-// dans bake-assets.js) — même teinte que le contour bleu-nuit des médaillons, pour
-// que la bulle reste cohérente avec alert/angry/zzz/mail malgré l'absence de
-// picto source.
-const THINK_DOTS_INK = [58, 62, 96, 255];
 
 // Icônes composées dans EMOTE_BUBBLE_EMPTY (bake-assets.js centre l'icône
 // bbox-trimmée sur chacune des 2 frames de bulle). `agents` fait exception :
 // aucune icône Modern UI ne rendait mieux qu'un médaillon déjà présent dans le
 // sheet émotes (petit visage/casque robotique, rangée 7) → frames natives
 // directement, comme EMOTES (cf. rapport task-1, § agents).
+// v26 : le mapping par-outil (terminal/search/write/web/gear/agents) est
+// débranché dans emoteFor (running → toujours emote.work, choix Paul
+// 2026-07-17) mais reste baké ici — réactivable sans retoucher le bake.
 const TOOL_EMOTES = {
   terminal: { icon: { src: UI_ICONS_SHEET, x: 304, y: 48, w: 16, h: 16 } },  // écran/moniteur (Bash)
   search:   { icon: { src: UI_ICONS_SHEET, x: 224, y: 144, w: 16, h: 16 } }, // loupe (Read/Grep/Glob)
   write:    { icon: { src: UI_ICONS_SHEET, x: 448, y: 160, w: 16, h: 16 } }, // crayon (Edit/Write/NotebookEdit)
-  web:      { icon: { src: UI_ICONS_SHEET, x: 384, y: 128, w: 16, h: 16 } }, // flèches de rechargement circulaires (pas de globe dans le pack — WebFetch/WebSearch) ; distinct de MAIL_EMOTE (v2.4.1 : était pixel-identique à l'enveloppe, confondu avec le signal needs-you)
+  web:      { icon: { src: UI_ICONS_SHEET, x: 384, y: 128, w: 16, h: 16 } }, // flèches de rechargement circulaires (pas de globe dans le pack — WebFetch/WebSearch)
   gear:     { icon: { src: UI_ICONS_SHEET, x: 240, y: 0, w: 16, h: 16 } },   // engrenage (mcp__*/inconnu)
   agents:   { src: EMOTE_SHEET, frames: [{ x: 0, y: 112 }, { x: 16, y: 112 }] }, // médaillon natif (Task)
 };
 
-// Enveloppe compositée dans EMOTE_BUBBLE_EMPTY — notif (bell active), priorité
-// maximale dans emoteFor (Task 2). Icône dédiée (ne PAS réutiliser pour un autre
-// TOOL_EMOTE) : c'est LE signal needs-you de la vue office, aucune bulle outil ne
-// doit lui ressembler (v2.4.1 : était pixel-identique à TOOL_EMOTES.web, confusion
-// WebFetch / notif).
-const MAIL_EMOTE = { icon: { src: UI_ICONS_SHEET, x: 432, y: 128, w: 16, h: 16 } };
-
 module.exports = {
   CHAR_ROWS, DIRS, charFrameRect, FURNITURE, TILES, COFFEE, premadePath,
-  EMOTE_SHEET, UI_ICONS_SHEET, EMOTE_BUBBLE_EMPTY, EMOTES, TOOL_EMOTES, MAIL_EMOTE,
-  THINK_DOTS_INK,
+  EMOTE_SHEET, UI_ICONS_SHEET, EMOTE_BUBBLE_EMPTY, EMOTES, TOOL_EMOTES,
 };

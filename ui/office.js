@@ -86,18 +86,18 @@ const Office = (() => {
     c2d.clearRect(0, 0, w, h);
 
     const stateName = s.state.name;
-    for (const st of room.statics) {
+    function drawStatic(st) {
       const px = st.tx * 16 * scale, py = (st.ty * 16 + (st.dy || 0)) * scale;
       if (st.frame === 'coffeeMachine') {
         drawFrameOn(c2d, animFrameName('coffee', tickCount >> 1), px, py, scale);
-        continue;
+        return;
       }
-      if (st.frame === 'door') { c2d.fillStyle = '#1a1a22'; c2d.fillRect(px, py, 16 * scale, 16 * scale); continue; }
+      if (st.frame === 'door') { c2d.fillStyle = '#1a1a22'; c2d.fillRect(px, py, 16 * scale, 16 * scale); return; }
       if (st.frame === '_papers') {
         c2d.fillStyle = '#d8d3c3';
         c2d.fillRect(px + 3 * scale, py + 6 * scale, 5 * scale, 3 * scale);
         c2d.fillRect(px + 9 * scale, py + 10 * scale, 4 * scale, 3 * scale);
-        continue;
+        return;
       }
       drawFrameOn(c2d, st.frame, px, py, scale);
       if (st.screen) {
@@ -114,6 +114,9 @@ const Office = (() => {
         }
       }
     }
+
+    // Passe 1 : statics normaux (sol, meubles, bureau…), sous les acteurs.
+    for (const st of room.statics) { if (st.z !== 'over') drawStatic(st); }
 
     // Bulle du perso principal : calculée ici mais DESSINÉE en dernier —
     // sur les cartes background, le voile sombre la ternirait sinon.
@@ -132,6 +135,11 @@ const Office = (() => {
         }
       }
     }
+
+    // Passe 2 : statics `z:'over'` (fauteuil vu de dos) — PAR-DESSUS les
+    // acteurs, pour que le dossier s'intercale entre le perso (dos au
+    // spectateur) et la caméra (fix « sens des objets », Paul 2026-07-17).
+    for (const st of room.statics) { if (st.z === 'over') drawStatic(st); }
     if (room.zones.subOverflow > 0) {
       // Coin mur haut-droit (rangée 0, dernière colonne = la colonne ajoutée
       // quand il y a des subagents (leurs tables sont en tx=5) : toujours

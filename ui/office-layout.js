@@ -47,9 +47,26 @@
                        { tx: 0, ty: 4 }, { tx: 1, ty: 4 }, { tx: 2, ty: 4 }];
   // Sièges subagents = position du perso (SUD de sa table, cf. push table ty-1 plus bas).
   const SIDE_SEATS = [{ tx: 5, ty: 2 }, { tx: 5, ty: 4 }];
-  const CHAIR_FRAME = 'chairFront';   // dossier au sud du perso dos-au-spectateur : chairFront lit mieux ici
-  const CHAIR_DY = 3;    // décale la chaise vers le bas pour que le dossier dépasse sous le perso (côté spectateur)
+  // Fauteuil VU DE DOS (#101, dossier plein face caméra) : posé en passe
+  // `z:'over'` — office.js dessine statics normaux → acteurs → statics
+  // `z:'over'` → voile → bulle, pour que le dossier chevauche visuellement
+  // le bas du perso (dos au spectateur) au lieu d'être caché derrière lui.
+  const CHAIR_FRAME = 'chairOver';
+  const CHAIR_DY = 16;    // décale le dossier pour chevaucher le bas du perso sans manger tout le corps
+  // Sièges subagents : dy plus modeste que CHAIR_DY — les 2 sièges latéraux ne
+  // sont séparés que d'une rangée (SIDE_SEATS[0].ty=2, table de SIDE_SEATS[1]
+  // en ty=3) ; à CHAIR_DY=16 le dossier du 1er siège déborde jusque dans la
+  // tête du 2e perso assis (collision visuelle vérifiée à l'œil, cf. rapport).
+  // 8 reste sous la limite de collision (marge testée) tout en laissant le
+  // dossier chevaucher visiblement le bas du perso.
+  const CHAIR_OVER_DY_SUB = 8;
   const COFFEE_DY = -3;   // pose la tasse sur le comptoir sans qu'elle déborde de sa tuile
+  // Coin pause (v26) : fontaine/distributeur en alternance déterministe par
+  // projet, sur une tuile de la rangée du bas jamais traversée par le perso
+  // principal (routeTo ne descend en ty=4 qu'à la colonne du café, tx=2) —
+  // à côté de la plante (4,4), sans collision avec le 2e siège subagent
+  // (5,4, colonne qui n'existe même qu'avec des subagents).
+  const BREAK_SPOT = { tx: 3, ty: 4 };
   // Densité bureau (v2.4) : lampe + papiers posés sur le bureau, tous deux
   // côté tx=DESK.tx (le tx=DESK.tx+1 reste libre pour l'indicateur d'état
   // dessiné sur le "moniteur droit", cf. office.js). dy négatif = lampe qui
@@ -122,10 +139,16 @@
     statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
     statics.push({ frame: 'deskLamp', tx: DESK.tx, ty: DESK.ty, dy: DESK_LAMP_DY });
     statics.push({ frame: 'papersDesk', tx: DESK.tx, ty: DESK.ty, dy: PAPERS_DESK_DY });
-    statics.push({ frame: CHAIR_FRAME, tx: DESK_CHAR.tx, ty: DESK_CHAR.ty, dy: CHAIR_DY });
+    statics.push({ frame: CHAIR_FRAME, tx: DESK_CHAR.tx, ty: DESK_CHAR.ty, dy: CHAIR_DY, z: 'over' });
     statics.push({ frame: 'sideDesk', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty });   // comptoir sous la tasse
     statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty, dy: COFFEE_DY });
     statics.push({ frame: 'plant', tx: PLANT.tx, ty: PLANT.ty });
+    // Coin pause : alterne fontaine/distributeur selon le projet (déterministe,
+    // pas de flicker au re-render). Tuile jamais traversée (cf. BREAK_SPOT).
+    statics.push({
+      frame: charIndexFor(session.projectName) % 2 === 0 ? 'waterCooler' : 'vending',
+      tx: BREAK_SPOT.tx, ty: BREAK_SPOT.ty,
+    });
     // Note géométrie : la table du 2e subagent (SIDE_SEATS[1].ty - 1 = 3)
     // atterrit sur CORRIDOR_TY (3), colonne 5 (SIDE_SEATS[1].tx) — inoffensif
     // aujourd'hui car routeTo() n'est utilisé que pour le perso principal
@@ -137,7 +160,7 @@
       const seat = SIDE_SEATS[i];
       statics.push({ frame: 'sideDesk', tx: seat.tx, ty: seat.ty - 1 });
       statics.push({ frame: 'laptop', tx: seat.tx, ty: seat.ty - 1 });
-      statics.push({ frame: CHAIR_FRAME, tx: seat.tx, ty: seat.ty, dy: CHAIR_DY });
+      statics.push({ frame: CHAIR_FRAME, tx: seat.tx, ty: seat.ty, dy: CHAIR_OVER_DY_SUB, z: 'over' });
     }
     if (hasMeeting) statics.push({ frame: 'meetingTable', tx: MEETING_TABLE.tx, ty: MEETING_TABLE.ty });
     if (session.state && session.state.name === 'error') {
@@ -321,6 +344,9 @@
   // Mapping outil → émote, valable uniquement en `running` (lastTool n'a de
   // sens que là). mcp__* et tout outil inconnu/absent retombent sur
   // l'engrenage générique.
+  // v26 (choix Paul 2026-07-17) : débranché de emoteFor (running → toujours
+  // emote.work, le marteau) mais gardé — réactivable sans retoucher le bake
+  // (les anims emote.tool.* restent générées, cf. office-sprites.js/bake-assets.js).
   function toolEmote(toolName) {
     switch (toolName) {
       case 'Bash':
@@ -341,7 +367,9 @@
   function emoteFor(session, bellActive) {
     if (bellActive) return 'emote.mail';
     const stateName = session && session.state && session.state.name;
-    if (stateName === 'running') return toolEmote(session.lastTool);
+    // v26 : plus de variation par outil, running → toujours le marteau
+    // (emote.work) — cf. toolEmote ci-dessus pour le mapping débranché.
+    if (stateName === 'running') return 'emote.work';
     if (Object.prototype.hasOwnProperty.call(STATE_EMOTES, stateName)) return STATE_EMOTES[stateName];
     return null;   // état inconnu/absent (ex. acteur subagent, pas de bulle en v1)
   }

@@ -35,13 +35,13 @@ test('toutes les anims référencent des frames existantes', () => {
 });
 test('frames obligatoires présentes', () => {
   for (const req of ['floor', 'floorDark', 'floorWood', 'wall', 'desk', 'deskSetup',
-                     'chairBack', 'plant', 'coffee.0', 'meetingTable', 'sideDesk', 'laptop',
-                     'deskLamp', 'whiteboard', 'papersDesk']) {
+                     'chairBack', 'chairFront', 'chairOver', 'plant', 'coffee.0', 'meetingTable', 'sideDesk', 'laptop',
+                     'deskLamp', 'whiteboard', 'papersDesk', 'waterCooler', 'vending']) {
     assert(manifest.frames[req], `frame manquante: ${req}`);
   }
 });
-test('anims émotes obligatoires présentes (v2.4, 2 frames chacune, loop)', () => {
-  for (const req of ['emote.think', 'emote.alert', 'emote.angry', 'emote.zzz', 'emote.mail',
+test('anims émotes obligatoires présentes (v2.4/v26, 2 frames chacune, loop)', () => {
+  for (const req of ['emote.think', 'emote.alert', 'emote.angry', 'emote.zzz', 'emote.mail', 'emote.work',
                      'emote.tool.terminal', 'emote.tool.search', 'emote.tool.write',
                      'emote.tool.web', 'emote.tool.agents', 'emote.tool.gear']) {
     const a = manifest.anims[req];

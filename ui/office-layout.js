@@ -7,29 +7,57 @@
   else root.OfficeLayout = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
 
-  // Pièce adaptative : base 7×5, +1 colonne si subagents, +2 rangées si workflow actif.
-  const BASE_COLS = 7, BASE_ROWS = 5;
+  // Pièce adaptative : base 6×5 (v2.4, cubicle dense), +1 colonne si
+  // subagents, +2 rangées si workflow actif.
+  //
+  // v2.4 visait 6×4 (une rangée en moins) : proposition du plan tentée
+  // sérieusement (cf. rapport task-2), abandonnée — sur 4 rangées, seules 3
+  // sont des rangées de sol utilisables (ty 1..3, ty 0 = mur), et les 2
+  // sièges subagents ont chacun besoin d'une rangée-table au nord (seat.ty-1).
+  // Avec seulement 3 rangées de sol, tout choix de 2 sièges non adjacents
+  // pousse une des deux tables sur la rangée mur (ty 0, visuellement une
+  // chaise/laptop encastrée dans le mur) ; tout choix de sièges adjacents fait
+  // coïncider la table de l'un avec le siège de l'autre (collision de tuile
+  // réelle, pas seulement esthétique). 6×5 restaure la 4e rangée de sol et
+  // supprime les deux problèmes d'un coup, en gardant la densité (colonne en
+  // moins + mobilier ajouté : lampe, papiers, tableau blanc) — voir schéma
+  // dans le rapport.
+  const BASE_COLS = 6, BASE_ROWS = 5;
   // Vue par-dessus l'épaule : le perso est au SUD de son bureau (1,2), dos au
   // spectateur, face à l'écran qui lui fait face plein sud. Colonne 1 (pas 2)
   // pour ne pas s'aligner avec le café (2,4) : sinon le perso debout au café
   // (tx2, 1 rangée sous ty3) recouvre la chaise vide en visuel.
   const DESK_CHAR = { tx: 1, ty: 3 };
-  const DOOR = { tx: 5, ty: 1 };
+  const DOOR = { tx: 4, ty: 1 };
   const COFFEE = { tx: 2, ty: 4 };
-  const POSTER = { tx: 2, ty: 0 };
+  // Tableau blanc mural (densité v2.4, remplace l'ancien poster) : sprite
+  // 30×23 (~2 tuiles de large), ancré tx=1 pour déborder visuellement sur
+  // tx=2, au-dessus du bureau.
+  const WHITEBOARD = { tx: 1, ty: 0 };
   const DESK = { tx: 1, ty: 2 };
   // Décalée en colonne 0 (pas 1, sous le siège) : sinon la machine (poussée
   // vers le haut) et la chaise (poussée vers le bas) se chevauchent en pixels.
   const COFFEE_MACHINE = { tx: 0, ty: 4 };
-  const PLANT = { tx: 5, ty: 4 };
+  // Colonne 4 (pas 5) : la colonne 5 est celle des sièges subagents
+  // (SIDE_SEATS[1] = (5,4)) — sinon la plante et le 2e subagent assis
+  // occupent la même tuile quand 2 subagents sont actifs.
+  const PLANT = { tx: 4, ty: 4 };
   const PAPERS = [{ tx: 3, ty: 3 }, { tx: 2, ty: 2 }];
   const FLOOR_WOOD = [{ tx: 0, ty: 3 }, { tx: 1, ty: 3 }, { tx: 2, ty: 3 },
                        { tx: 0, ty: 4 }, { tx: 1, ty: 4 }, { tx: 2, ty: 4 }];
   // Sièges subagents = position du perso (SUD de sa table, cf. push table ty-1 plus bas).
-  const SIDE_SEATS = [{ tx: 6, ty: 2 }, { tx: 6, ty: 4 }];
+  const SIDE_SEATS = [{ tx: 5, ty: 2 }, { tx: 5, ty: 4 }];
   const CHAIR_FRAME = 'chairFront';   // dossier au sud du perso dos-au-spectateur : chairFront lit mieux ici
   const CHAIR_DY = 3;    // décale la chaise vers le bas pour que le dossier dépasse sous le perso (côté spectateur)
   const COFFEE_DY = -3;   // pose la tasse sur le comptoir sans qu'elle déborde de sa tuile
+  // Densité bureau (v2.4) : lampe + papiers posés sur le bureau, tous deux
+  // côté tx=DESK.tx (le tx=DESK.tx+1 reste libre pour l'indicateur d'état
+  // dessiné sur le "moniteur droit", cf. office.js). dy négatif = lampe qui
+  // dépasse au-dessus du plan de travail ; dy positif = papiers posés à
+  // l'avant du bureau, côté chaise. Valeurs de départ raisonnables — le
+  // réglage pixel-perfect se fait au rendu (Task 3).
+  const DESK_LAMP_DY = -4;
+  const PAPERS_DESK_DY = 3;
   const MEETING_SEATS = [{ tx: 2, ty: 5 }, { tx: 4, ty: 5 }, { tx: 2, ty: 6 }, { tx: 4, ty: 6 }];
   const MEETING_TABLE = { tx: 3, ty: 5 };
   const MAX_SUBS = 2;
@@ -89,9 +117,11 @@
       }
     }
     statics.push({ frame: 'door', tx: DOOR.tx, ty: 0 });   // marqueur programmatique
-    statics.push({ frame: 'poster', tx: POSTER.tx, ty: POSTER.ty });
+    statics.push({ frame: 'whiteboard', tx: WHITEBOARD.tx, ty: WHITEBOARD.ty });
     statics.push({ frame: 'desk', tx: DESK.tx, ty: DESK.ty });
     statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
+    statics.push({ frame: 'deskLamp', tx: DESK.tx, ty: DESK.ty, dy: DESK_LAMP_DY });
+    statics.push({ frame: 'papersDesk', tx: DESK.tx, ty: DESK.ty, dy: PAPERS_DESK_DY });
     statics.push({ frame: CHAIR_FRAME, tx: DESK_CHAR.tx, ty: DESK_CHAR.ty, dy: CHAIR_DY });
     statics.push({ frame: 'sideDesk', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty });   // comptoir sous la tasse
     statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty, dy: COFFEE_DY });
@@ -262,7 +292,60 @@
     }
   }
 
+  // --- Émotes (bulle au-dessus du perso principal) -------------------------
+  // Priorité : enveloppe (bell active) > émote d'état > émote d'outil (running).
+  // `emoteFor` est PURE : bellActive est fourni par l'appelant (Task 3 lit
+  // `activeBells`, une Map de renderer.js) — cette fonction n'accède à aucun
+  // état global ni horloge.
+  //
+  // Choix "waiting long" (zzz) : la session telle qu'elle arrive ici est
+  // celle sérialisée par `serializeSession()` dans main.js (sessionId,
+  // projectName, state, lastTool, model, gitBranch, startedAt, tokens, cwd,
+  // isBackground, notifEnabled, subagents, workflows) — AUCUN timestamp
+  // d'entrée d'état n'y figure. `watcher.js` a bien un `session.lastEventTime`
+  // interne, mais il est strippé par `serializeSession` avant d'atteindre le
+  // renderer/UI (vérifié : grep ne le trouve nulle part côté ui/*.js), et
+  // `startedAt` est l'heure de démarrage de la session entière, pas l'heure
+  // d'entrée dans l'état waiting. Sans signal fiable exposé jusqu'ici,
+  // `waiting` retombe systématiquement sur `emote.zzz` (pas de distinction
+  // waiting-frais / waiting-inactif à ce stade — dette documentée, à
+  // reprendre si un `state.since` est un jour exposé côté serialization).
+  const STATE_EMOTES = {
+    thinking: 'emote.think',
+    pending: 'emote.alert',
+    error: 'emote.angry',
+    waiting: 'emote.zzz',
+  };
+
+  // Mapping outil → émote, valable uniquement en `running` (lastTool n'a de
+  // sens que là). mcp__* et tout outil inconnu/absent retombent sur
+  // l'engrenage générique.
+  function toolEmote(toolName) {
+    switch (toolName) {
+      case 'Bash':
+      case 'BashOutput': return 'emote.tool.terminal';
+      case 'Read':
+      case 'Grep':
+      case 'Glob': return 'emote.tool.search';
+      case 'Edit':
+      case 'Write':
+      case 'NotebookEdit': return 'emote.tool.write';
+      case 'WebFetch':
+      case 'WebSearch': return 'emote.tool.web';
+      case 'Task': return 'emote.tool.agents';
+      default: return 'emote.tool.gear';   // mcp__*, inconnu, absent
+    }
+  }
+
+  function emoteFor(session, bellActive) {
+    if (bellActive) return 'emote.mail';
+    const stateName = session && session.state && session.state.name;
+    if (stateName === 'running') return toolEmote(session.lastTool);
+    if (Object.prototype.hasOwnProperty.call(STATE_EMOTES, stateName)) return STATE_EMOTES[stateName];
+    return null;   // état inconnu/absent (ex. acteur subagent, pas de bulle en v1)
+  }
+
   return { createState, roomFor, syncSession, purge, actorsFor, tickActor,
            animFor, activityFor, charIndexFor, pathTo, routeTo, workflowRunning,
-           BASE_COLS, BASE_ROWS, DESK, CORRIDOR_TY };
+           emoteFor, BASE_COLS, BASE_ROWS, DESK, CORRIDOR_TY };
 });

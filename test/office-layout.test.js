@@ -29,20 +29,22 @@ test('mapping complet des activités', () => {
 
 console.log('\nroomFor (géométrie):');
 test('exporte BASE_COLS/BASE_ROWS (plus ROOM_COLS/ROOM_ROWS)', () => {
-  assertEq(OL.BASE_COLS, 7); assertEq(OL.BASE_ROWS, 5);
+  // v2.4 : 6×5 (cubicle dense — tentative 6×4 documentée dans le rapport,
+  // abandonnée à cause d'une collision géométrique table/siège subagent).
+  assertEq(OL.BASE_COLS, 6); assertEq(OL.BASE_ROWS, 5);
   assertEq(OL.ROOM_COLS, undefined); assertEq(OL.ROOM_ROWS, undefined);
 });
-test('pièce de base 7×5, sans sièges latéraux ni réunion', () => {
+test('pièce de base 6×5, sans sièges latéraux ni réunion', () => {
   const r = OL.roomFor(sess('a', 'running'));
-  assertEq(r.cols, 7); assertEq(r.rows, 5);
+  assertEq(r.cols, 6); assertEq(r.rows, 5);
   // le seul sideDesk de la pièce de base est le comptoir sous la tasse de café
   assertEq(r.statics.filter(x => x.frame === 'sideDesk').length, 1);
   assert(!r.statics.some(x => x.frame === 'laptop'), 'pas de laptop sans subagent');
   assert(!r.statics.some(x => x.frame === 'meetingTable'));
 });
-test('subagents → +1 colonne (8 de large)', () => {
+test('subagents → +1 colonne (7 de large)', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
-  assertEq(r.cols, 8); assertEq(r.rows, 5);
+  assertEq(r.cols, 7); assertEq(r.rows, 5);
   assert(r.statics.some(x => x.frame === 'sideDesk'));
 });
 test('chaque subagent a une chaise et un laptop sur sa table (perso au SUD de sa table)', () => {
@@ -63,12 +65,12 @@ test('un seul subagent → chaise/laptop uniquement au 1er siège', () => {
 });
 test('workflow actif → +2 rangées (7 de haut)', () => {
   const r = OL.roomFor(sess('a', 'running', { workflows: [{ runId: 'w', running: 2 }] }));
-  assertEq(r.cols, 7); assertEq(r.rows, 7);
+  assertEq(r.cols, 6); assertEq(r.rows, 7);
   assert(r.statics.some(x => x.frame === 'meetingTable'));
 });
-test('subagents + workflow → 8×7', () => {
+test('subagents + workflow → 7×7', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
-  assertEq(r.cols, 8); assertEq(r.rows, 7);
+  assertEq(r.cols, 7); assertEq(r.rows, 7);
 });
 test('le mur et le sol couvrent les dimensions effectives', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
@@ -80,7 +82,7 @@ test('zones aux positions spécifiées', () => {
   const z = OL.roomFor(sess('a', 'running')).zones;
   // Vue par-dessus l'épaule : le perso est au SUD du bureau (1,2), pas au nord.
   assertEq(z.deskChar.tx, 1); assertEq(z.deskChar.ty, 3);
-  assertEq(z.door.tx, 5); assertEq(z.door.ty, 1);
+  assertEq(z.door.tx, 4); assertEq(z.door.ty, 1);
   assertEq(z.coffee.tx, 2); assertEq(z.coffee.ty, 4);
   assertEq(z.sideSeats.length, 2);
 });
@@ -101,6 +103,24 @@ test('statics : desk avec screen, machine café, porte', () => {
   // recouvre la chaise vide (v23 : régression corrigée en décalant la colonne).
   assert(room.zones.deskChar.tx !== room.zones.coffee.tx, 'chaise alignée avec le point café');
   assert(room.zones.deskChar.tx !== coffeeMachineStatic.tx, 'chaise alignée avec la machine à café');
+});
+test('densité cubicle : tableau blanc au mur, lampe et papiers sur le bureau (toujours présents)', () => {
+  const room = OL.roomFor(sess('a', 'running'));
+  const st = room.statics;
+  const whiteboard = st.find(x => x.frame === 'whiteboard');
+  assert(whiteboard, 'pas de tableau blanc');
+  assertEq(whiteboard.ty, 0); // au mur, rangée 0
+  const lamp = st.find(x => x.frame === 'deskLamp');
+  assert(lamp, 'pas de lampe');
+  assertEq(lamp.tx, room.zones ? OL.DESK.tx : lamp.tx);
+  assertEq(lamp.ty, OL.DESK.ty);
+  const papers = st.find(x => x.frame === 'papersDesk');
+  assert(papers, 'pas de papiers sur le bureau');
+  assertEq(papers.tx, OL.DESK.tx);
+  assertEq(papers.ty, OL.DESK.ty);
+  // lampe et papiers sont posés SUR le bureau (offset dy pour "flotter" au-dessus/devant)
+  assert(typeof lamp.dy === 'number' && lamp.dy !== 0, 'lampe pas décalée sur le bureau');
+  assert(typeof papers.dy === 'number' && papers.dy !== 0, 'papiers pas décalés sur le bureau');
 });
 test('papiers uniquement en erreur', () => {
   const err = OL.roomFor(sess('a', 'error')).statics.filter(x => x.frame === '_papers');
@@ -136,7 +156,7 @@ test('nouvelle session → acteur spawn à la porte, path vers la chaise', () =>
   OL.syncSession(st, s);
   const a = st.actors.get('a');
   assert(a, 'pas d\'acteur');
-  assertEq(a.tx, 5); assertEq(a.ty, 1);
+  assertEq(a.tx, 4); assertEq(a.ty, 1);
   const dest = a.path[a.path.length - 1];
   assertEq(dest.tx, 1); assertEq(dest.ty, 3);
 });
@@ -159,7 +179,7 @@ test('leave (chaise→porte) contourne le bureau : le path ne traverse pas (1,2)
   const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
   assert(!a.path.some(onDesk), 'le path de leave traverse le bureau');
 });
-test('leave depuis le café (2,4) évite la plante (5,4) et le bureau (1,2)/(2,2)', () => {
+test('leave depuis le café (2,4) évite la plante (4,4) et le bureau (1,2)/(2,2)', () => {
   const st = OL.createState();
   const s = sess('a', 'waiting');
   OL.syncSession(st, s);
@@ -169,7 +189,7 @@ test('leave depuis le café (2,4) évite la plante (5,4) et le bureau (1,2)/(2,2
   assertEq(a.tx, 2); assertEq(a.ty, 4);
   OL.purge(st, new Set());                             // déclenche le leave → porte
   const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
-  const onPlant = (p) => p.tx === 5 && p.ty === 4;
+  const onPlant = (p) => p.tx === 4 && p.ty === 4;
   assert(!a.path.some(onDesk), 'le path de leave depuis le café traverse le bureau');
   assert(!a.path.some(onPlant), 'le path de leave depuis le café traverse la plante');
 });
@@ -292,6 +312,44 @@ test('work en réunion (kind meeting) → idle.down, pas idle.up', () => {
 });
 test('coffee arrivé → idle.left (machine à gauche du point café)', () => {
   assertEq(OL.animFor({ charIdx: 1, activity: 'coffee', path: [], dir: 'left' }), 'char1.idle.left');
+});
+
+console.log('\nemoteFor (fonction pure, priorité bell > état > outil):');
+test('priorité 1 : enveloppe (bell active) prime sur tout état', () => {
+  assertEq(OL.emoteFor(sess('a', 'thinking'), true), 'emote.mail');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'Bash' }), true), 'emote.mail');
+  assertEq(OL.emoteFor(sess('a', 'pending'), true), 'emote.mail');
+  assertEq(OL.emoteFor(sess('a', 'error'), true), 'emote.mail');
+  assertEq(OL.emoteFor(sess('a', 'waiting'), true), 'emote.mail');
+});
+test('priorité 2 : émote d\'état sans bell (thinking/pending/error/waiting)', () => {
+  assertEq(OL.emoteFor(sess('a', 'thinking'), false), 'emote.think');
+  assertEq(OL.emoteFor(sess('a', 'pending'), false), 'emote.alert');
+  assertEq(OL.emoteFor(sess('a', 'error'), false), 'emote.angry');
+  assertEq(OL.emoteFor(sess('a', 'waiting'), false), 'emote.zzz');
+});
+test('priorité 3 : mapping outil en running (6 familles)', () => {
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'Bash' }), false), 'emote.tool.terminal');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'BashOutput' }), false), 'emote.tool.terminal');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'Read' }), false), 'emote.tool.search');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'Grep' }), false), 'emote.tool.search');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'Glob' }), false), 'emote.tool.search');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'Edit' }), false), 'emote.tool.write');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'Write' }), false), 'emote.tool.write');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'NotebookEdit' }), false), 'emote.tool.write');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'WebFetch' }), false), 'emote.tool.web');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'WebSearch' }), false), 'emote.tool.web');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'Task' }), false), 'emote.tool.agents');
+});
+test('running + mcp__* ou outil inconnu/absent → engrenage générique', () => {
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'mcp__qonto__list_transactions' }), false), 'emote.tool.gear');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'SomeFutureTool' }), false), 'emote.tool.gear');
+  assertEq(OL.emoteFor(sess('a', 'running', { lastTool: null }), false), 'emote.tool.gear');
+});
+test('null si pas de bulle : état inconnu, ou objet sans state (ex. acteur subagent)', () => {
+  assertEq(OL.emoteFor(sess('a', 'some-unknown-state'), false), null);
+  assertEq(OL.emoteFor({ kind: 'subagent', activity: 'work' }, false), null);
+  assertEq(OL.emoteFor({}, false), null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

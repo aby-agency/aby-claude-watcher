@@ -12,7 +12,10 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { decodePNG, encodePNG } = require('./png-codec.js');
-const { CHAR_ROWS, charFrameRect, FURNITURE, TILES, COFFEE, premadePath } = require('./office-sprites.js');
+const {
+  CHAR_ROWS, charFrameRect, FURNITURE, TILES, COFFEE, premadePath,
+  EMOTE_BUBBLE_EMPTY, EMOTES, TOOL_EMOTES, MAIL_EMOTE, THINK_DOTS_INK,
+} = require('./office-sprites.js');
 
 const SRC = process.env.BAKE_ASSETS_SRC || path.join(os.homedir(), 'Project', 'Games', 'Assets');
 const OUT = path.join(__dirname, '..', 'ui', 'office-assets');
@@ -44,6 +47,70 @@ function bbox(img) {
       }
   if (maxX < 0) return { x: 0, y: 0, w: 1, h: 1 };
   return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+// Bbox non transparente d'un rect (sx,sy,w,h) dans img (pour rogner une icône
+// dans sa cellule 16×16 avant compositing — cf. compositeIconCentered).
+function bboxRect(img, sx, sy, w, h) {
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      if (img.data[((sy + y) * img.width + (sx + x)) * 4 + 3] > 10) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+  if (maxX < 0) return { x: 0, y: 0, w: 1, h: 1 };
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+// Composite une icône (bbox-trimmée, centrée) sur une copie 16×16 d'une bulle
+// vide — alpha-over simple (les sources sont du pixel art à antialiasing léger,
+// pas besoin de premultiplied alpha). Retourne un buffer RGBA autonome 16×16.
+function compositeIconCentered(bubbleImg, bx, by, iconImg, ix, iy) {
+  const b = bboxRect(iconImg, ix, iy, 16, 16);
+  const dx = Math.floor((16 - b.w) / 2), dy = Math.floor((16 - b.h) / 2);
+  const out = Buffer.alloc(16 * 16 * 4);
+  for (let y = 0; y < 16; y++) {
+    const from = ((by + y) * bubbleImg.width + bx) * 4;
+    bubbleImg.data.copy(out, y * 16 * 4, from, from + 16 * 4);
+  }
+  for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) {
+    const sIdx = ((iy + b.y + y) * iconImg.width + (ix + b.x + x)) * 4;
+    const a = iconImg.data[sIdx + 3];
+    if (a === 0) continue;
+    const dIdx = ((dy + y) * 16 + (dx + x)) * 4;
+    if (a >= 250) { iconImg.data.copy(out, dIdx, sIdx, sIdx + 4); continue; }
+    const sa = a / 255;
+    for (let c = 0; c < 3; c++) out[dIdx + c] = Math.round(iconImg.data[sIdx + c] * sa + out[dIdx + c] * (1 - sa));
+    out[dIdx + 3] = Math.max(out[dIdx + 3], a);
+  }
+  return { width: 16, height: 16, data: out };
+}
+
+// Copie autonome d'une cellule 16×16 d'un sheet (pour la retoucher ensuite, ex.
+// tamponner les points de emote.think — cf. compositeThinkDots).
+function extract16(img, sx, sy) {
+  const out = Buffer.alloc(16 * 16 * 4);
+  for (let y = 0; y < 16; y++) {
+    const from = ((sy + y) * img.width + sx) * 4;
+    img.data.copy(out, y * 16 * 4, from, from + 16 * 4);
+  }
+  return { width: 16, height: 16, data: out };
+}
+
+// emote.think : aucun picto « … » propre dans les sheets sources (vérifié à l'œil,
+// cf. rapport task-1) → 3 points 2×2 tamponnés sur une copie de la bulle vide,
+// légèrement décalés verticalement entre les 2 frames (rebond).
+function stampThinkDots(bubbleFrame16, yOffset) {
+  const [r, g, b, a] = THINK_DOTS_INK;
+  for (const dx of [4, 7, 10]) {
+    for (let py = 0; py < 2; py++) for (let px = 0; px < 2; px++) {
+      const idx = ((6 + yOffset + py) * 16 + (dx + px)) * 4;
+      bubbleFrame16.data[idx] = r; bubbleFrame16.data[idx + 1] = g;
+      bubbleFrame16.data[idx + 2] = b; bubbleFrame16.data[idx + 3] = a;
+    }
+  }
+  return bubbleFrame16;
 }
 
 // ─── Collecte des sprites à packer ───
@@ -94,6 +161,75 @@ for (const [name, t] of Object.entries(TILES)) {
   anims['coffee'] = { frames, loop: true };
 }
 
+// ─── Émotes-bulles (v2.4) ───
+// Émotes natives : extraction directe de 2 frames (médaillons du sheet émotes).
+for (const [name, spec] of Object.entries(EMOTES)) {
+  const img = load(spec.src);
+  const frames = [];
+  spec.frames.forEach((f, i) => {
+    const key = `emote.${name}.${i}`;
+    items.push({ name: key, img, sx: f.x, sy: f.y, w: 16, h: 16 });
+    frames.push(key);
+  });
+  anims[`emote.${name}`] = { frames, loop: true };
+}
+
+// emote.think : synthétisé sur la bulle vide (cf. stampThinkDots, § pourquoi dans
+// office-sprites.js). Fait à part de la boucle EMOTES car ce n'est pas une
+// extraction directe.
+{
+  const bubbleImg = load(EMOTE_BUBBLE_EMPTY.src);
+  const frames = [];
+  EMOTE_BUBBLE_EMPTY.frames.forEach((bf, i) => {
+    const frame = stampThinkDots(extract16(bubbleImg, bf.x, bf.y), i === 0 ? 0 : 1);
+    const key = `emote.think.${i}`;
+    items.push({ name: key, img: frame, sx: 0, sy: 0, w: 16, h: 16 });
+    frames.push(key);
+  });
+  anims['emote.think'] = { frames, loop: true };
+}
+
+// Icônes-outils : composées dans la bulle vide (2 frames), sauf entrées déjà
+// natives (ex. agents — cf. office-sprites.js) traitées comme EMOTES.
+{
+  const bubbleImg = load(EMOTE_BUBBLE_EMPTY.src);
+  for (const [name, spec] of Object.entries(TOOL_EMOTES)) {
+    const animName = `emote.tool.${name}`;
+    const frames = [];
+    if (spec.frames) {
+      // Native : mêmes sheet/coords qu'EMOTES, juste un autre img/sheet possible.
+      const img = load(spec.src);
+      spec.frames.forEach((f, i) => {
+        const key = `${animName}.${i}`;
+        items.push({ name: key, img, sx: f.x, sy: f.y, w: 16, h: 16 });
+        frames.push(key);
+      });
+    } else {
+      const iconImg = load(spec.icon.src);
+      EMOTE_BUBBLE_EMPTY.frames.forEach((bf, i) => {
+        const composited = compositeIconCentered(bubbleImg, bf.x, bf.y, iconImg, spec.icon.x, spec.icon.y);
+        const key = `${animName}.${i}`;
+        items.push({ name: key, img: composited, sx: 0, sy: 0, w: 16, h: 16 });
+        frames.push(key);
+      });
+    }
+    anims[animName] = { frames, loop: true };
+  }
+
+  // Enveloppe compositée — notif (bell active).
+  {
+    const iconImg = load(MAIL_EMOTE.icon.src);
+    const frames = [];
+    EMOTE_BUBBLE_EMPTY.frames.forEach((bf, i) => {
+      const composited = compositeIconCentered(bubbleImg, bf.x, bf.y, iconImg, MAIL_EMOTE.icon.x, MAIL_EMOTE.icon.y);
+      const key = `emote.mail.${i}`;
+      items.push({ name: key, img: composited, sx: 0, sy: 0, w: 16, h: 16 });
+      frames.push(key);
+    });
+    anims['emote.mail'] = { frames, loop: true };
+  }
+}
+
 // ─── Packing shelf (rangées de hauteur fixe, atlas 1024 de large) ───
 const ATLAS_W = 1024;
 let cx = 0, cy = 0, rowH = 0;
@@ -123,7 +259,17 @@ if (process.argv.includes('--preview')) {
   const picks = ['char0.idle.down.0', 'char0.idle.right.0', 'char0.idle.up.0', 'char0.idle.left.0',
                  'char0.walk.down.2', 'char0.phone.right.3', 'char0.hurt.7', 'char3.idle.down.0',
                  'desk', 'deskSetup', 'chairBack', 'plant', 'coffee.0', 'coffee.3',
-                 'floor', 'floorDark', 'floorWood', 'wall', 'meetingTable', 'sideDesk', 'vending', 'waterCooler'];
+                 'floor', 'floorDark', 'floorWood', 'wall', 'meetingTable', 'sideDesk', 'vending', 'waterCooler',
+                 'deskLamp', 'whiteboard', 'papersDesk',
+                 'emote.think.0', 'emote.think.1', 'emote.alert.0', 'emote.alert.1',
+                 'emote.angry.0', 'emote.angry.1', 'emote.zzz.0', 'emote.zzz.1',
+                 'emote.mail.0', 'emote.mail.1',
+                 'emote.tool.terminal.0', 'emote.tool.terminal.1',
+                 'emote.tool.search.0', 'emote.tool.search.1',
+                 'emote.tool.write.0', 'emote.tool.write.1',
+                 'emote.tool.web.0', 'emote.tool.web.1',
+                 'emote.tool.agents.0', 'emote.tool.agents.1',
+                 'emote.tool.gear.0', 'emote.tool.gear.1'];
   const SCALE = 4, CELL_W = 40 * SCALE, CELL_H = 48 * SCALE, COLS = 6;
   const rows = Math.ceil(picks.length / COLS);
   const pw = COLS * CELL_W, ph = rows * CELL_H;

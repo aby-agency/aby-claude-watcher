@@ -35,8 +35,28 @@ test('toutes les anims référencent des frames existantes', () => {
 });
 test('frames obligatoires présentes', () => {
   for (const req of ['floor', 'floorDark', 'floorWood', 'wall', 'desk', 'deskSetup',
-                     'chairBack', 'plant', 'coffee.0', 'meetingTable', 'sideDesk', 'laptop']) {
+                     'chairBack', 'plant', 'coffee.0', 'meetingTable', 'sideDesk', 'laptop',
+                     'deskLamp', 'whiteboard', 'papersDesk']) {
     assert(manifest.frames[req], `frame manquante: ${req}`);
+  }
+});
+test('anims émotes obligatoires présentes (v2.4, 2 frames chacune, loop)', () => {
+  for (const req of ['emote.think', 'emote.alert', 'emote.angry', 'emote.zzz', 'emote.mail',
+                     'emote.tool.terminal', 'emote.tool.search', 'emote.tool.write',
+                     'emote.tool.web', 'emote.tool.agents', 'emote.tool.gear']) {
+    const a = manifest.anims[req];
+    assert(a, `anim manquante: ${req}`);
+    assert(a.frames.length === 2, `${req}: attendu 2 frames, trouvé ${a.frames.length}`);
+    assert(a.loop === true, `${req}: attendu loop=true`);
+  }
+});
+test('frames émotes 16×16 (tile natif, pas de scale)', () => {
+  for (const [name, a] of Object.entries(manifest.anims)) {
+    if (!name.startsWith('emote.')) continue;
+    for (const f of a.frames) {
+      const r = manifest.frames[f];
+      assert(r.w === 16 && r.h === 16, `${f}: attendu 16x16, trouvé ${r.w}x${r.h}`);
+    }
   }
 });
 test('10 personnages avec anims complètes', () => {

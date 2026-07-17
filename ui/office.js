@@ -103,13 +103,14 @@ const Office = (() => {
       if (st.screen) {
         const color = STATE_COLORS[stateName];
         if (color && stateName !== 'waiting') {
-          // Ancrée sur le moniteur droit (plat, pas le secondaire pivoté) —
-          // fixe par rapport au bureau, indépendante de la colonne où le
-          // perso est assis (le siège peut être décalé pour éviter le café).
-          const screenTx = OfficeLayout.DESK.tx + 1;
+          // Ancrée sur le moniteur SECONDAIRE incliné (colonne gauche du
+          // setup) : depuis l'offset d'assise -9px, la tête du perso assis
+          // recouvre le bas du grand écran (colonne droite) — le petit
+          // moniteur reste toujours dégagé.
+          const screenTx = OfficeLayout.DESK.tx;
           c2d.fillStyle = color;
           c2d.globalAlpha = (stateName === 'running' && (tickCount & 4)) ? 0.4 : 0.9;
-          c2d.fillRect((screenTx * 16 + 4) * scale, (st.ty * 16 - 6) * scale, 6 * scale, 4 * scale);
+          c2d.fillRect((screenTx * 16 + 5) * scale, (st.ty * 16 - 8) * scale, 6 * scale, 4 * scale);
           c2d.globalAlpha = 1;
         }
       }
@@ -130,7 +131,7 @@ const Office = (() => {
       // plan de travail, les écrans arrivent au niveau du visage. Debout ou
       // en marche : alignement plein-tuile normal.
       const seated = a.path.length === 0 && (a.activity === 'work' || a.activity === 'think');
-      const px = a.tx * 16 * scale, py = (a.ty * 16 + (seated ? -6 : 0)) * scale;
+      const px = a.tx * 16 * scale, py = (a.ty * 16 + (seated ? -9 : 0)) * scale;
       if (fname) drawFrameOn(c2d, fname, px, py, scale);
       if (a.kind === 'session') {
         const emote = OfficeLayout.emoteFor(s, activeBells.has(s.sessionId));

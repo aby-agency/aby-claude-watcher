@@ -160,7 +160,10 @@ async function init() {
   const $btnOffice = document.getElementById('btnOffice');
   $btnOffice.addEventListener('click', () => setView('office'));
   Office.probe().then(ok => {
-    if (ok) { $btnOffice.style.display = ''; }
+    if (ok) {
+      $btnOffice.style.display = '';
+      if (viewMode === 'office') render(); // le 1er render() est parti avant la résolution du probe
+    }
     else if (viewMode === 'office') setView('grid'); // atlas parti entre deux runs
   });
   $btnBack.addEventListener('click', () => setView(previousViewMode || 'grid'));
@@ -750,6 +753,7 @@ function updateSession(s) {
   if (!existing) {
     // New session — need full re-render to place it correctly
     fullRender();
+    if (viewMode === 'office') Office.onDomRendered();
     return;
   }
 
@@ -761,6 +765,7 @@ function updateSession(s) {
                 !!existing.querySelector(':scope > .micro-item.bg-session');
   if (!!s.isBackground !== wasBg) {
     fullRender();
+    if (viewMode === 'office') Office.onDomRendered();
     updateStatusBar();
     return;
   }

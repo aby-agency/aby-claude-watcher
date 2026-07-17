@@ -49,7 +49,7 @@ test('chaque subagent a une chaise et un laptop sur sa table (perso au SUD de sa
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }] }));
   const seats = r.zones.sideSeats;
   for (const seat of seats) {
-    assert(r.statics.some(x => (x.frame === 'chairBack' || x.frame === 'chairFront') && x.tx === seat.tx && x.ty === seat.ty),
+    assert(r.statics.some(x => x.frame === 'chairFront' && x.tx === seat.tx && x.ty === seat.ty),
       `pas de chaise au siège (${seat.tx},${seat.ty})`);
     // La table/laptop est au NORD du perso (dos au spectateur, face à l'écran).
     assert(r.statics.some(x => x.frame === 'laptop' && x.tx === seat.tx && x.ty === seat.ty - 1),
@@ -59,7 +59,7 @@ test('chaque subagent a une chaise et un laptop sur sa table (perso au SUD de sa
 test('un seul subagent → chaise/laptop uniquement au 1er siège', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
   assertEq(r.statics.filter(x => x.frame === 'laptop').length, 1);
-  assertEq(r.statics.filter(x => (x.frame === 'chairBack' || x.frame === 'chairFront') && x.tx === r.zones.sideSeats[1].tx && x.ty === r.zones.sideSeats[1].ty).length, 0);
+  assertEq(r.statics.filter(x => x.frame === 'chairFront' && x.tx === r.zones.sideSeats[1].tx && x.ty === r.zones.sideSeats[1].ty).length, 0);
 });
 test('workflow actif → +2 rangées (7 de haut)', () => {
   const r = OL.roomFor(sess('a', 'running', { workflows: [{ runId: 'w', running: 2 }] }));
@@ -90,7 +90,7 @@ test('statics : desk avec screen, machine café, porte', () => {
   assert(st.some(x => x.frame === 'deskSetup' && x.screen === 'a'), 'pas de screen');
   assert(st.some(x => x.frame === 'coffeeMachine'), 'pas de machine');
   assert(st.some(x => x.frame === 'door'), 'pas de porte');
-  assert(st.some(x => (x.frame === 'chairBack' || x.frame === 'chairFront') && x.tx === room.zones.deskChar.tx && x.ty === room.zones.deskChar.ty),
+  assert(st.some(x => x.frame === 'chairFront' && x.tx === room.zones.deskChar.tx && x.ty === room.zones.deskChar.ty),
     'pas de chaise au bureau principal');
   const coffeeMachineStatic = st.find(x => x.frame === 'coffeeMachine');
   assert(typeof coffeeMachineStatic.dy === 'number' && coffeeMachineStatic.dy < 0, 'tasse pas décalée sur le comptoir');
@@ -139,6 +139,25 @@ test('nouvelle session → acteur spawn à la porte, path vers la chaise', () =>
   assertEq(a.tx, 5); assertEq(a.ty, 1);
   const dest = a.path[a.path.length - 1];
   assertEq(dest.tx, 1); assertEq(dest.ty, 3);
+});
+test('spawn (porte→chaise) contourne le bureau : le path ne traverse pas (1,2)/(2,2)', () => {
+  const st = OL.createState();
+  const s = sess('a', 'running');
+  OL.syncSession(st, s);
+  const a = st.actors.get('a');
+  const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
+  assert(!a.path.some(onDesk), 'le path de spawn traverse le bureau');
+});
+test('leave (chaise→porte) contourne le bureau : le path ne traverse pas (1,2)/(2,2)', () => {
+  const st = OL.createState();
+  const s = sess('a', 'running');
+  OL.syncSession(st, s);
+  const a = st.actors.get('a');
+  const zones = OL.roomFor(s).zones;
+  while (a.path.length > 0) OL.tickActor(a, zones);   // atteint la chaise (1,3)
+  OL.purge(st, new Set());                             // déclenche le leave → porte
+  const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
+  assert(!a.path.some(onDesk), 'le path de leave traverse le bureau');
 });
 test('l\'acteur atteint sa chaise en marchant', () => {
   const st = OL.createState();

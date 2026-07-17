@@ -23,7 +23,8 @@
   const COFFEE_MACHINE = { tx: 0, ty: 4 };
   const PLANT = { tx: 5, ty: 4 };
   const PAPERS = [{ tx: 3, ty: 3 }, { tx: 2, ty: 2 }];
-  const FLOOR_WOOD = [{ tx: 1, ty: 3 }, { tx: 2, ty: 3 }, { tx: 1, ty: 4 }, { tx: 2, ty: 4 }];
+  const FLOOR_WOOD = [{ tx: 0, ty: 3 }, { tx: 1, ty: 3 }, { tx: 2, ty: 3 },
+                       { tx: 0, ty: 4 }, { tx: 1, ty: 4 }, { tx: 2, ty: 4 }];
   // Sièges subagents = position du perso (SUD de sa table, cf. push table ty-1 plus bas).
   const SIDE_SEATS = [{ tx: 6, ty: 2 }, { tx: 6, ty: 4 }];
   const CHAIR_FRAME = 'chairFront';   // dossier au sud du perso dos-au-spectateur : chairFront lit mieux ici
@@ -109,9 +110,31 @@
     return { cols, rows, statics, zones };
   }
 
+  // Primitive : L horizontal-d'abord puis vertical. Ne PAS l'utiliser pour
+  // les trajets du perso principal (porte/chaise/café) — sur cette géométrie
+  // ça traverse le bureau (1,2)-(2,2). Gardée pour composer / usages futurs.
   function pathTo(from, to) {
     const path = [];
     let { tx, ty } = from;
+    while (tx !== to.tx) { tx += Math.sign(to.tx - tx); path.push({ tx, ty }); }
+    while (ty !== to.ty) { ty += Math.sign(to.ty - ty); path.push({ tx, ty }); }
+    return path;
+  }
+
+  // Rangée libre au sud du bureau (desk/deskSetup occupent ty=2). Porte
+  // (5,1), chaise (1,3) et café (2,4) sont tous accessibles depuis cette
+  // rangée sans traverser le bureau ni la plante (5,4).
+  const CORRIDOR_TY = 3;
+
+  // Routage en couloir : vertical jusqu'à CORRIDOR_TY, horizontal le long de
+  // cette rangée, puis vertical jusqu'à la cible. Chaque segment vide est
+  // sauté (aucune tuile poussée si déjà aligné). Remplace pathTo pour tous
+  // les trajets du perso principal (porte↔chaise↔café) afin de contourner
+  // le bureau (1,2)/(2,2) au lieu de le traverser.
+  function routeTo(from, to) {
+    const path = [];
+    let { tx, ty } = from;
+    while (ty !== CORRIDOR_TY) { ty += Math.sign(CORRIDOR_TY - ty); path.push({ tx, ty }); }
     while (tx !== to.tx) { tx += Math.sign(to.tx - tx); path.push({ tx, ty }); }
     while (ty !== to.ty) { ty += Math.sign(to.ty - ty); path.push({ tx, ty }); }
     return path;
@@ -127,7 +150,7 @@
     if (!target) return;
     const last = actor.path.length ? actor.path[actor.path.length - 1] : { tx: actor.tx, ty: actor.ty };
     if (last.tx === target.tx && last.ty === target.ty) return;
-    actor.path = pathTo({ tx: actor.tx, ty: actor.ty }, target);
+    actor.path = routeTo({ tx: actor.tx, ty: actor.ty }, target);
   }
 
   function syncSession(state, session) {
@@ -234,6 +257,6 @@
   }
 
   return { createState, roomFor, syncSession, purge, actorsFor, tickActor,
-           animFor, activityFor, charIndexFor, pathTo, workflowRunning,
-           BASE_COLS, BASE_ROWS, DESK };
+           animFor, activityFor, charIndexFor, pathTo, routeTo, workflowRunning,
+           BASE_COLS, BASE_ROWS, DESK, CORRIDOR_TY };
 });

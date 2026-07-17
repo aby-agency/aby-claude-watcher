@@ -2334,47 +2334,56 @@ body.micro-mode .usage-reset-icon {
 .compact-card.bg-session,
 .micro-item.bg-session { cursor: default; }
 
-/* ═══ Office view (v2 : pièces-cartes) ═══ */
+/* ═══ Office view (v3 : 3 salles fixes — Travail/Pause/Recherche) ═══ */
 .office-view {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-  padding: 12px;
-  align-content: start;
-  /* Sans ça, les cartes s'étirent à la hauteur de la plus grande de la
-     rangée et l'espace excédentaire gonfle le footer (pièces larges =
-     canvas moins haut). Chaque carte garde sa hauteur naturelle. */
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+  align-items: stretch;
 }
-.office-card {
+.office-room-card {
   display: flex;
   flex-direction: column;
   border-radius: 10px;
   overflow: hidden;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  cursor: pointer;
 }
-.office-card canvas {
+.office-room-canvas {
   image-rendering: pixelated;
-  width: 100%;
   display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+  cursor: default;
 }
-.office-card-footer {
+.office-room-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 8px;
+  padding: 6px 10px;
   min-width: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
-.office-card-name {
+.office-room-name {
   font-size: 12px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.office-card.bg-session { opacity: 0.75; cursor: default; }
+.office-room-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.office-room-overflow {
+  color: var(--text-muted);
+}
 .office-tooltip {
   position: fixed;
   z-index: 1000;

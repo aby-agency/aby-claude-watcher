@@ -43,6 +43,17 @@ const FURNITURE = {
   deskLamp:     `${SINGLES_DIR}/Modern_Office_Singles_141.png`, // lampe articulée argentée
   whiteboard:   `${SINGLES_DIR}/Modern_Office_Singles_171.png`, // tableau blanc + petit graphe (moins chargé que 172)
   wallFrame:    `${SINGLES_DIR}/Modern_Office_Singles_113.png`, // diplôme encadré — accroché au MUR (retour Paul : pas posé sur le bureau)
+  // v3 (Task 2, salle Pause) : canapé pour les persos en salle pause. Choisi
+  // parmi les singles 200-206 (regardés zoomés, --preview) : 200/205 sont
+  // deux 2-places droits (accoudoirs symétriques des deux côtés, bandeau
+  // d'assise pleine largeur face caméra sud — l'orientation voulue pour des
+  // persos assis face caméra) ; 201/202/203/204 sont des fragments de canapé
+  // d'angle (chaise longue en L, un seul accoudoir, coupé à mi-corps) —
+  // écartés, ils ne lisent pas comme un canapé autonome posés seuls sur une
+  // tuile. 206 est un fauteuil 1 place (trop étroit pour deux persos assis).
+  // Retenu : 205 — accoudoirs nets des deux côtés, dossier plus haut/carré
+  // que 200 (silhouette plus lisible en miniature 16×16 rogné).
+  sofa:         `${SINGLES_DIR}/Modern_Office_Singles_205.png`,
 };
 
 // Tiles 16×16 découpées dans le Room Builder.

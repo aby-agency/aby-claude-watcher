@@ -666,6 +666,29 @@ function getRenderableSessions() {
 
 function render() {
   const count = sessions.size;
+
+  // Vue office (v3) : les 3 salles sont GLOBALES, indépendantes du flux
+  // cartes-par-session (pas de filtre recherche, pas de tri — spec
+  // office-salles §Hors périmètre). Early path assumé : on ne passe jamais
+  // par getRenderableSessions()/fullRender() ici, Office possède son propre
+  // container et sa propre boucle de sync. `showOffice` ne dépend que du
+  // nombre TOTAL de sessions (pas de la recherche) : tant qu'il en existe au
+  // moins une, les 3 salles restent affichées (une salle vide reste visible,
+  // taille minimale — seule la disparition de TOUTE session bascule vers
+  // l'état vide générique, cf. Office.tick()).
+  if (viewMode === 'office') {
+    $emptyState.style.display = count === 0 ? 'flex' : 'none';
+    $emptyFiltered.style.display = 'none';
+    $gridView.style.display = 'none';
+    $compactView.style.display = 'none';
+    $microView.style.display = 'none';
+    const showOffice = count > 0;
+    document.getElementById('officeView').style.display = showOffice ? 'flex' : 'none';
+    if (showOffice) Office.renderRooms(); else Office.deactivate();
+    updateStatusBar();
+    return;
+  }
+
   const visibleCount = getRenderableSessions().length;
 
   const showNoSessions = count === 0;
@@ -677,28 +700,22 @@ function render() {
   $gridView.style.display = showItems && viewMode === 'grid' ? 'grid' : 'none';
   $compactView.style.display = showItems && viewMode === 'compact' ? 'grid' : 'none';
   $microView.style.display = showItems && viewMode === 'micro' ? 'flex' : 'none';
-  const showOffice = showItems && viewMode === 'office';
-  const $officeView = document.getElementById('officeView');
-  $officeView.style.display = showOffice ? 'grid' : 'none';
-  if (viewMode === 'office' && !showOffice) Office.deactivate();
+  document.getElementById('officeView').style.display = 'none';
 
   // Full rebuild — used for initial load, view switch, add/remove
   fullRender();
-  if (showOffice) Office.onDomRendered();
   updateStatusBar();
 }
 
 function viewContainer() {
   if (viewMode === 'grid') return $gridView;
   if (viewMode === 'compact') return $compactView;
-  if (viewMode === 'office') return document.getElementById('officeView');
   return $microView;
 }
 
 function viewItemHTML() {
   if (viewMode === 'grid') return cardHTML;
   if (viewMode === 'compact') return compactItemHTML;
-  if (viewMode === 'office') return Office.cardHTML;
   return microItemHTML;
 }
 
@@ -737,6 +754,14 @@ function toggleBackgroundSection() {
 }
 
 function updateSession(s) {
+  // Vue office (v3) : pas de DOM par session à patcher (3 salles fixes) —
+  // Office.notifyUpdate() re-sync/redessine depuis `sessions` directement.
+  if (viewMode === 'office') {
+    Office.notifyUpdate();
+    updateStatusBar();
+    return;
+  }
+
   // Targeted update: find the existing element and patch it in place
   const container = viewContainer();
   const selector = `[data-session="${s.sessionId}"]`;
@@ -753,7 +778,6 @@ function updateSession(s) {
   if (!existing) {
     // New session — need full re-render to place it correctly
     fullRender();
-    if (viewMode === 'office') Office.onDomRendered();
     return;
   }
 
@@ -765,7 +789,6 @@ function updateSession(s) {
                 !!existing.querySelector(':scope > .micro-item.bg-session');
   if (!!s.isBackground !== wasBg) {
     fullRender();
-    if (viewMode === 'office') Office.onDomRendered();
     updateStatusBar();
     return;
   }
@@ -799,14 +822,13 @@ function updateSession(s) {
   }
   if (isActiveAgain || isInactive) dismissToastForSession(s.sessionId);
 
-  if (viewMode === 'office') Office.onDomRendered();
   updateStatusBar();
 }
 
 function removeSessionFromDOM(sessionId) {
   if (viewMode === 'office') {
     clearBell(sessionId);
-    Office.notifyRemoved(sessionId);   // l'acteur sort, tick() retirera la carte
+    Office.notifyUpdate();   // l'acteur sort, le prochain tick() retirera son sprite
     updateStatusBar();
     return;
   }
@@ -1556,7 +1578,9 @@ function onDragOver(e) {
   if (!dragged) return;
 
   const rect = target.getBoundingClientRect();
-  const isGrid = viewMode === 'grid' || viewMode === 'office';
+  // Vue office (v3) : pas de drag-drop (pas de DOM par session), cette
+  // branche n'est jamais atteinte en viewMode 'office'.
+  const isGrid = viewMode === 'grid';
   const mid = isGrid
     ? rect.left + rect.width / 2
     : rect.top + rect.height / 2;

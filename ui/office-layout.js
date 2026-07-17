@@ -22,7 +22,9 @@
   // supprime les deux problèmes d'un coup, en gardant la densité (colonne en
   // moins + mobilier ajouté : lampe, papiers, tableau blanc) — voir schéma
   // dans le rapport.
-  const BASE_COLS = 6, BASE_ROWS = 5;
+  const BASE_COLS = 6, BASE_ROWS = 4; // v2.8 : caméra remontée — la rangée
+  // du bas ne servait plus (waiting reste au PC), le coin pause est monté
+  // contre le mur en haut à droite.
   // Vue par-dessus l'épaule : le perso est au SUD de son bureau (1,2), dos au
   // spectateur, face à l'écran qui lui fait face plein sud. Colonne 1 (pas 2)
   // pour ne pas s'aligner avec le café (2,4) : sinon le perso debout au café
@@ -35,23 +37,17 @@
   // Tableau blanc mural (densité v2.4, remplace l'ancien poster) : sprite
   // 30×23 (~2 tuiles de large), ancré tx=1 pour déborder visuellement sur
   // tx=2, au-dessus du bureau.
-  const WHITEBOARD = { tx: 4, ty: 0 }; // tout à droite (retour Paul)
-  const DESK = { tx: 0, ty: 1 };
-  // Décalée en colonne 0 (pas 1, sous le siège) : sinon la machine (poussée
-  // vers le haut) et la chaise (poussée vers le bas) se chevauchent en pixels.
-  const COFFEE_MACHINE = { tx: 0, ty: 4 };
-  // Colonne 4 (pas 5) : la colonne 5 est celle des sièges subagents
-  // (SIDE_SEATS[1] = (6,4)) — sinon la plante et le 2e subagent assis
-  // occupent la même tuile quand 2 subagents sont actifs.
-  const PLANT = { tx: 4, ty: 4 };
+    const DESK = { tx: 0, ty: 1 };
+  // Coin pause en HAUT À DROITE contre le mur (retour Paul v2.8).
+  const COFFEE_MACHINE = { tx: 5, ty: 1 };
+  const PLANT = { tx: 4, ty: 1 }; // fait partie du coin pause haut-droit
   const PAPERS = [{ tx: 3, ty: 3 }, { tx: 2, ty: 2 }];
-  const FLOOR_WOOD = [{ tx: 0, ty: 3 }, { tx: 1, ty: 3 }, { tx: 2, ty: 3 },
-                       { tx: 0, ty: 4 }, { tx: 1, ty: 4 }, { tx: 2, ty: 4 }];
-  // Sièges subagents = position du perso (SUD de sa table, cf. push table ty-1
-  // plus bas). Colonne 6 = LA colonne annexe ajoutée quand il y a des
-  // subagents (cols passe à 7) — les postes vivent dedans, sinon elle reste
-  // vide et déséquilibre le cadrage (retour Paul v2.7).
-  const SIDE_SEATS = [{ tx: 6, ty: 2 }, { tx: 6, ty: 4 }];
+  const FLOOR_WOOD = [{ tx: 4, ty: 1 }, { tx: 5, ty: 1 },
+                       { tx: 4, ty: 2 }, { tx: 5, ty: 2 }]; // parquet du coin pause
+  // Postes subagents : rangée d'annexes CÔTE À CÔTE (v2.8, façon cubicles) —
+  // la pièce gagne 1 colonne PAR subagent visible (cols = 6 + min(subs,2)),
+  // chaque station = table+laptop (ty 1) au-dessus du siège (ty 2).
+  const SIDE_SEATS = [{ tx: 6, ty: 2 }, { tx: 7, ty: 2 }];
   // Fauteuil VU DE DOS (#101, dossier plein face caméra) : posé en passe
   // `z:'over'` — office.js dessine statics normaux → acteurs → statics
   // `z:'over'` → voile → bulle, pour que le dossier chevauche visuellement
@@ -83,8 +79,8 @@
   // l'avant du bureau, côté chaise. Valeurs de départ raisonnables — le
   // réglage pixel-perfect se fait au rendu (Task 3).
   const DESK_LAMP_DY = -4;
-  const MEETING_SEATS = [{ tx: 2, ty: 5 }, { tx: 4, ty: 5 }, { tx: 2, ty: 6 }, { tx: 4, ty: 6 }];
-  const MEETING_TABLE = { tx: 3, ty: 5 };
+  const MEETING_SEATS = [{ tx: 2, ty: 4 }, { tx: 4, ty: 4 }, { tx: 2, ty: 5 }, { tx: 4, ty: 5 }];
+  const MEETING_TABLE = { tx: 3, ty: 4 };
   const MAX_SUBS = 2;
 
   function createState() { return { actors: new Map() }; }
@@ -124,7 +120,7 @@
     const subs = (session.subagents || []).length;
     const hasSubs = subs > 0;
     const hasMeeting = workflowRunning(session) > 0;
-    const cols = hasSubs ? BASE_COLS + 1 : BASE_COLS;
+    const cols = BASE_COLS + Math.min(subs, MAX_SUBS); // +1 colonne par station subagent
     const rows = hasMeeting ? BASE_ROWS + 2 : BASE_ROWS;
     const zones = {
       door: { ...DOOR },
@@ -144,9 +140,6 @@
       }
     }
     statics.push({ frame: 'door', tx: DOOR.tx, ty: 0 });   // marqueur programmatique
-    // dy:0 → le bas du tableau affleure la ligne mur/sol (les 7 px hauts du
-    // sprite 23px sortent du canvas, assumé — à dy:7 il mordait sur le sol).
-    statics.push({ frame: 'whiteboard', tx: WHITEBOARD.tx, ty: WHITEBOARD.ty });
     statics.push({ frame: 'desk', tx: DESK.tx, ty: DESK.ty });
     statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
     statics.push({ frame: 'deskLamp', tx: DESK.tx, ty: DESK.ty, dy: DESK_LAMP_DY });

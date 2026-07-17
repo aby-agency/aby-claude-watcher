@@ -31,20 +31,21 @@ console.log('\nroomFor (géométrie):');
 test('exporte BASE_COLS/BASE_ROWS (plus ROOM_COLS/ROOM_ROWS)', () => {
   // v2.4 : 6×5 (cubicle dense — tentative 6×4 documentée dans le rapport,
   // abandonnée à cause d'une collision géométrique table/siège subagent).
-  assertEq(OL.BASE_COLS, 6); assertEq(OL.BASE_ROWS, 5);
+  assertEq(OL.BASE_COLS, 6); assertEq(OL.BASE_ROWS, 4); // v2.8 : caméra remontée
   assertEq(OL.ROOM_COLS, undefined); assertEq(OL.ROOM_ROWS, undefined);
 });
-test('pièce de base 6×5, sans sièges latéraux ni réunion', () => {
+test('pièce de base 6×4, sans sièges latéraux ni réunion', () => {
   const r = OL.roomFor(sess('a', 'running'));
-  assertEq(r.cols, 6); assertEq(r.rows, 5);
+  assertEq(r.cols, 6); assertEq(r.rows, 4);
   // le seul sideDesk de la pièce de base est le comptoir sous la tasse de café
   assertEq(r.statics.filter(x => x.frame === 'sideDesk').length, 1);
   assert(!r.statics.some(x => x.frame === 'laptop'), 'pas de laptop sans subagent');
   assert(!r.statics.some(x => x.frame === 'meetingTable'));
 });
-test('subagents → +1 colonne (7 de large)', () => {
+test('subagents → +1 colonne PAR station (7 avec 1 sub, 8 avec 2)', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
-  assertEq(r.cols, 7); assertEq(r.rows, 5);
+  assertEq(r.cols, 7); assertEq(r.rows, 4);
+  assertEq(OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }, { agentId: 'g3' }] })).cols, 8); // plafonné à 2 stations
   assert(r.statics.some(x => x.frame === 'sideDesk'));
 });
 test('chaque subagent a une chaise (vue de dos, z:over) et un laptop sur sa table (perso au SUD de sa table)', () => {
@@ -66,14 +67,14 @@ test('un seul subagent → chaise/laptop uniquement au 1er siège', () => {
   assertEq(r.statics.filter(x => x.frame === 'laptop').length, 1);
   assertEq(r.statics.filter(x => x.frame === 'chairOver' && x.tx === r.zones.sideSeats[1].tx && x.ty === r.zones.sideSeats[1].ty).length, 0);
 });
-test('workflow actif → +2 rangées (7 de haut)', () => {
+test('workflow actif → +2 rangées (6 de haut)', () => {
   const r = OL.roomFor(sess('a', 'running', { workflows: [{ runId: 'w', running: 2 }] }));
-  assertEq(r.cols, 6); assertEq(r.rows, 7);
+  assertEq(r.cols, 6); assertEq(r.rows, 6);
   assert(r.statics.some(x => x.frame === 'meetingTable'));
 });
-test('subagents + workflow → 7×7', () => {
+test('subagents + workflow → 7×6', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
-  assertEq(r.cols, 7); assertEq(r.rows, 7);
+  assertEq(r.cols, 7); assertEq(r.rows, 6);
 });
 test('le mur et le sol couvrent les dimensions effectives', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
@@ -105,18 +106,15 @@ test('statics : desk avec screen, machine café, porte', () => {
   // overlay conditionnel) : personne n'est jamais recouvert par le dossier.
   assert(room.zones.deskChar.tx !== coffeeMachineStatic.tx, 'chaise alignée avec la machine à café');
 });
-test('densité cubicle : tableau blanc au mur, lampe et papiers sur le bureau (toujours présents)', () => {
+test('densité cubicle : lampe sur le bureau, ni tableau ni diplôme', () => {
   const room = OL.roomFor(sess('a', 'running'));
   const st = room.statics;
-  const whiteboard = st.find(x => x.frame === 'whiteboard');
-  assert(whiteboard, 'pas de tableau blanc');
-  assertEq(whiteboard.ty, 0); // au mur, rangée 0
+  assert(!st.some(x => x.frame === 'whiteboard'), 'le tableau blanc a été retiré (retour Paul v2.8)');
   const lamp = st.find(x => x.frame === 'deskLamp');
   assert(lamp, 'pas de lampe');
   assertEq(lamp.tx, OL.DESK.tx);
   assertEq(lamp.ty, OL.DESK.ty);
   assert(!st.some(x => x.frame === 'wallFrame'), 'le diplôme a été retiré (retour Paul v2.7)');
-  assertEq(whiteboard.tx, 4); // tout à droite (retour Paul v2.7)
   // la lampe est posée SUR le bureau (offset dy pour "flotter" au-dessus)
   assert(typeof lamp.dy === 'number' && lamp.dy !== 0, 'lampe pas décalée sur le bureau');
 });

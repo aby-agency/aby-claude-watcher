@@ -35,13 +35,30 @@ test('exporte BASE_COLS/BASE_ROWS (plus ROOM_COLS/ROOM_ROWS)', () => {
 test('pièce de base 7×5, sans sièges latéraux ni réunion', () => {
   const r = OL.roomFor(sess('a', 'running'));
   assertEq(r.cols, 7); assertEq(r.rows, 5);
-  assert(!r.statics.some(x => x.frame === 'sideDesk'));
+  // le seul sideDesk de la pièce de base est le comptoir sous la tasse de café
+  assertEq(r.statics.filter(x => x.frame === 'sideDesk').length, 1);
+  assert(!r.statics.some(x => x.frame === 'laptop'), 'pas de laptop sans subagent');
   assert(!r.statics.some(x => x.frame === 'meetingTable'));
 });
 test('subagents → +1 colonne (8 de large)', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
   assertEq(r.cols, 8); assertEq(r.rows, 5);
   assert(r.statics.some(x => x.frame === 'sideDesk'));
+});
+test('chaque subagent a une chaise et un laptop sur sa table', () => {
+  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }] }));
+  const seats = r.zones.sideSeats;
+  for (const seat of seats) {
+    assert(r.statics.some(x => x.frame === 'chairBack' && x.tx === seat.tx && x.ty === seat.ty),
+      `pas de chaise au siège (${seat.tx},${seat.ty})`);
+    assert(r.statics.some(x => x.frame === 'laptop' && x.tx === seat.tx && x.ty === seat.ty + 1),
+      `pas de laptop à la table (${seat.tx},${seat.ty + 1})`);
+  }
+});
+test('un seul subagent → chaise/laptop uniquement au 1er siège', () => {
+  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
+  assertEq(r.statics.filter(x => x.frame === 'laptop').length, 1);
+  assertEq(r.statics.filter(x => x.frame === 'chairBack' && x.tx === r.zones.sideSeats[1].tx && x.ty === r.zones.sideSeats[1].ty).length, 0);
 });
 test('workflow actif → +2 rangées (7 de haut)', () => {
   const r = OL.roomFor(sess('a', 'running', { workflows: [{ runId: 'w', running: 2 }] }));
@@ -66,10 +83,17 @@ test('zones aux positions spécifiées', () => {
   assertEq(z.sideSeats.length, 2);
 });
 test('statics : desk avec screen, machine café, porte', () => {
-  const st = OL.roomFor(sess('a', 'running')).statics;
+  const room = OL.roomFor(sess('a', 'running'));
+  const st = room.statics;
   assert(st.some(x => x.frame === 'deskSetup' && x.screen === 'a'), 'pas de screen');
   assert(st.some(x => x.frame === 'coffeeMachine'), 'pas de machine');
   assert(st.some(x => x.frame === 'door'), 'pas de porte');
+  assert(st.some(x => x.frame === 'chairBack' && x.tx === room.zones.deskChar.tx && x.ty === room.zones.deskChar.ty),
+    'pas de chaise au bureau principal');
+  const coffeeMachineStatic = st.find(x => x.frame === 'coffeeMachine');
+  assert(typeof coffeeMachineStatic.dy === 'number' && coffeeMachineStatic.dy < 0, 'tasse pas décalée sur le comptoir');
+  assert(st.some(x => x.frame === 'sideDesk' && x.tx === coffeeMachineStatic.tx && x.ty === coffeeMachineStatic.ty),
+    'pas de comptoir sous la tasse');
 });
 test('papiers uniquement en erreur', () => {
   const err = OL.roomFor(sess('a', 'error')).statics.filter(x => x.frame === '_papers');

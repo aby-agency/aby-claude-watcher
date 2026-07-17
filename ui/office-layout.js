@@ -19,6 +19,8 @@
   const PAPERS = [{ tx: 3, ty: 3 }, { tx: 2, ty: 2 }];
   const FLOOR_WOOD = [{ tx: 1, ty: 3 }, { tx: 2, ty: 3 }, { tx: 1, ty: 4 }, { tx: 2, ty: 4 }];
   const SIDE_SEATS = [{ tx: 6, ty: 1 }, { tx: 6, ty: 3 }];
+  const CHAIR_DY = -8;    // décale le dossier vers le haut pour qu'il dépasse au-dessus de la tête
+  const COFFEE_DY = -3;   // pose la tasse sur le comptoir sans qu'elle déborde de sa tuile
   const MEETING_SEATS = [{ tx: 2, ty: 5 }, { tx: 4, ty: 5 }, { tx: 2, ty: 6 }, { tx: 4, ty: 6 }];
   const MEETING_TABLE = { tx: 3, ty: 5 };
   const MAX_SUBS = 2;
@@ -79,12 +81,16 @@
     }
     statics.push({ frame: 'door', tx: DOOR.tx, ty: 0 });   // marqueur programmatique
     statics.push({ frame: 'poster', tx: POSTER.tx, ty: POSTER.ty });
+    statics.push({ frame: 'chairBack', tx: DESK_CHAR.tx, ty: DESK_CHAR.ty, dy: CHAIR_DY });
     statics.push({ frame: 'desk', tx: DESK.tx, ty: DESK.ty });
     statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
-    statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty });
+    statics.push({ frame: 'sideDesk', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty });   // comptoir sous la tasse
+    statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty, dy: COFFEE_DY });
     statics.push({ frame: 'plant', tx: PLANT.tx, ty: PLANT.ty });
     for (let i = 0; i < Math.min(subs, MAX_SUBS); i++) {
+      statics.push({ frame: 'chairBack', tx: SIDE_SEATS[i].tx, ty: SIDE_SEATS[i].ty, dy: CHAIR_DY });
       statics.push({ frame: 'sideDesk', tx: SIDE_SEATS[i].tx, ty: SIDE_SEATS[i].ty + 1 });
+      statics.push({ frame: 'laptop', tx: SIDE_SEATS[i].tx, ty: SIDE_SEATS[i].ty + 1 });
     }
     if (hasMeeting) statics.push({ frame: 'meetingTable', tx: MEETING_TABLE.tx, ty: MEETING_TABLE.ty });
     if (session.state && session.state.name === 'error') {

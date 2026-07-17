@@ -30,6 +30,7 @@ const FURNITURE = {
   meetingTable: `${SINGLES_DIR}/Modern_Office_Singles_191.png`,
   sideDesk:     `${SINGLES_DIR}/Modern_Office_Singles_246.png`,
   poster:       `${SINGLES_DIR}/Modern_Office_Singles_96.png`,
+  laptop:       `${SINGLES_DIR}/Modern_Office_Singles_136.png`, // laptop ouvert, écran visible (top-down)
 };
 
 // Tiles 16×16 découpées dans le Room Builder.

@@ -88,7 +88,7 @@ const Office = (() => {
 
     const stateName = s.state.name;
     for (const st of room.statics) {
-      const px = st.tx * 16 * scale, py = st.ty * 16 * scale;
+      const px = st.tx * 16 * scale, py = (st.ty * 16 + (st.dy || 0)) * scale;
       if (st.frame === 'coffeeMachine') {
         drawFrameOn(c2d, animFrameName('coffee', tickCount >> 1), px, py, scale);
         continue;
@@ -106,7 +106,7 @@ const Office = (() => {
         if (color && stateName !== 'waiting') {
           c2d.fillStyle = color;
           c2d.globalAlpha = (stateName === 'running' && (tickCount & 4)) ? 0.4 : 0.9;
-          c2d.fillRect((st.tx * 16 + 3) * scale, (st.ty * 16 - 6) * scale, 6 * scale, 4 * scale);
+          c2d.fillRect((room.zones.deskChar.tx * 16 + 4) * scale, (st.ty * 16 - 6) * scale, 6 * scale, 4 * scale);
           c2d.globalAlpha = 1;
         }
       }

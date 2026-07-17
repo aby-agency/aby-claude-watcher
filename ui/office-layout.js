@@ -1,17 +1,26 @@
 // ui/office-layout.js — logique pure de la vue office v2 : une mini-pièce
-// par session (pièces-cartes). Géométrie fixe 10×8, machine d'activité,
-// chemins en L. Aucune dépendance DOM/canvas → testable en node.
+// par session (pièces-cartes). Géométrie adaptative (base 7×5, +1 colonne si
+// subagents, +2 rangées si workflow actif), machine d'activité, chemins en L.
+// Aucune dépendance DOM/canvas → testable en node.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.OfficeLayout = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
 
-  const ROOM_COLS = 10, ROOM_ROWS = 8;
-  const DESK_CHAR = { tx: 3, ty: 2 };
-  const DOOR = { tx: 8, ty: 1 };
-  const COFFEE = { tx: 2, ty: 6 };
-  const SIDE_SEATS = [{ tx: 6, ty: 2 }, { tx: 7, ty: 2 }];
-  const MEETING_SEATS = [{ tx: 4, ty: 5 }, { tx: 6, ty: 5 }, { tx: 4, ty: 6 }, { tx: 6, ty: 6 }];
+  // Pièce adaptative : base 7×5, +1 colonne si subagents, +2 rangées si workflow actif.
+  const BASE_COLS = 7, BASE_ROWS = 5;
+  const DESK_CHAR = { tx: 2, ty: 1 };
+  const DOOR = { tx: 5, ty: 1 };
+  const COFFEE = { tx: 2, ty: 4 };
+  const POSTER = { tx: 2, ty: 0 };
+  const DESK = { tx: 1, ty: 2 };
+  const COFFEE_MACHINE = { tx: 1, ty: 4 };
+  const PLANT = { tx: 5, ty: 4 };
+  const PAPERS = [{ tx: 3, ty: 3 }, { tx: 2, ty: 2 }];
+  const FLOOR_WOOD = [{ tx: 1, ty: 3 }, { tx: 2, ty: 3 }, { tx: 1, ty: 4 }, { tx: 2, ty: 4 }];
+  const SIDE_SEATS = [{ tx: 6, ty: 1 }, { tx: 6, ty: 3 }];
+  const MEETING_SEATS = [{ tx: 2, ty: 5 }, { tx: 4, ty: 5 }, { tx: 2, ty: 6 }, { tx: 4, ty: 6 }];
+  const MEETING_TABLE = { tx: 3, ty: 5 };
   const MAX_SUBS = 2;
 
   function createState() { return { actors: new Map() }; }
@@ -47,7 +56,10 @@
 
   function roomFor(session) {
     const subs = (session.subagents || []).length;
+    const hasSubs = subs > 0;
     const hasMeeting = workflowRunning(session) > 0;
+    const cols = hasSubs ? BASE_COLS + 1 : BASE_COLS;
+    const rows = hasMeeting ? BASE_ROWS + 2 : BASE_ROWS;
     const zones = {
       door: { ...DOOR },
       deskChar: { ...DESK_CHAR },
@@ -58,28 +70,28 @@
     };
 
     const statics = [];
-    for (let x = 0; x < ROOM_COLS; x++) statics.push({ frame: 'wall', tx: x, ty: 0 });
-    for (let y = 1; y < ROOM_ROWS; y++) {
-      for (let x = 0; x < ROOM_COLS; x++) {
-        const wood = x >= 1 && x <= 2 && y >= 5 && y <= 6;
+    for (let x = 0; x < cols; x++) statics.push({ frame: 'wall', tx: x, ty: 0 });
+    for (let y = 1; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const wood = FLOOR_WOOD.some(p => p.tx === x && p.ty === y);
         statics.push({ frame: wood ? 'floorWood' : 'floor', tx: x, ty: y });
       }
     }
-    statics.push({ frame: 'door', tx: 8, ty: 0 });   // marqueur programmatique
-    statics.push({ frame: 'poster', tx: 4, ty: 0 });
-    statics.push({ frame: 'desk', tx: 2, ty: 3 });
-    statics.push({ frame: 'deskSetup', tx: 2, ty: 3, screen: session.sessionId });
-    statics.push({ frame: 'coffeeMachine', tx: 1, ty: 6 });
-    statics.push({ frame: 'plant', tx: 8, ty: 6 });
+    statics.push({ frame: 'door', tx: DOOR.tx, ty: 0 });   // marqueur programmatique
+    statics.push({ frame: 'poster', tx: POSTER.tx, ty: POSTER.ty });
+    statics.push({ frame: 'desk', tx: DESK.tx, ty: DESK.ty });
+    statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
+    statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty });
+    statics.push({ frame: 'plant', tx: PLANT.tx, ty: PLANT.ty });
     for (let i = 0; i < Math.min(subs, MAX_SUBS); i++) {
       statics.push({ frame: 'sideDesk', tx: SIDE_SEATS[i].tx, ty: SIDE_SEATS[i].ty + 1 });
     }
-    if (hasMeeting) statics.push({ frame: 'meetingTable', tx: 5, ty: 5 });
+    if (hasMeeting) statics.push({ frame: 'meetingTable', tx: MEETING_TABLE.tx, ty: MEETING_TABLE.ty });
     if (session.state && session.state.name === 'error') {
-      statics.push({ frame: '_papers', tx: 4, ty: 4 });
-      statics.push({ frame: '_papers', tx: 2, ty: 5 });
+      statics.push({ frame: '_papers', tx: PAPERS[0].tx, ty: PAPERS[0].ty });
+      statics.push({ frame: '_papers', tx: PAPERS[1].tx, ty: PAPERS[1].ty });
     }
-    return { cols: ROOM_COLS, rows: ROOM_ROWS, statics, zones };
+    return { cols, rows, statics, zones };
   }
 
   function pathTo(from, to) {
@@ -203,5 +215,5 @@
 
   return { createState, roomFor, syncSession, purge, actorsFor, tickActor,
            animFor, activityFor, charIndexFor, pathTo, workflowRunning,
-           ROOM_COLS, ROOM_ROWS };
+           BASE_COLS, BASE_ROWS };
 });

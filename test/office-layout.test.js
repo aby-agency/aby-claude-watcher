@@ -28,15 +28,41 @@ test('mapping complet des activités', () => {
 });
 
 console.log('\nroomFor (géométrie):');
-test('dimensions fixes 10×8', () => {
+test('exporte BASE_COLS/BASE_ROWS (plus ROOM_COLS/ROOM_ROWS)', () => {
+  assertEq(OL.BASE_COLS, 7); assertEq(OL.BASE_ROWS, 5);
+  assertEq(OL.ROOM_COLS, undefined); assertEq(OL.ROOM_ROWS, undefined);
+});
+test('pièce de base 7×5, sans sièges latéraux ni réunion', () => {
   const r = OL.roomFor(sess('a', 'running'));
-  assertEq(r.cols, 10); assertEq(r.rows, 8);
+  assertEq(r.cols, 7); assertEq(r.rows, 5);
+  assert(!r.statics.some(x => x.frame === 'sideDesk'));
+  assert(!r.statics.some(x => x.frame === 'meetingTable'));
+});
+test('subagents → +1 colonne (8 de large)', () => {
+  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
+  assertEq(r.cols, 8); assertEq(r.rows, 5);
+  assert(r.statics.some(x => x.frame === 'sideDesk'));
+});
+test('workflow actif → +2 rangées (7 de haut)', () => {
+  const r = OL.roomFor(sess('a', 'running', { workflows: [{ runId: 'w', running: 2 }] }));
+  assertEq(r.cols, 7); assertEq(r.rows, 7);
+  assert(r.statics.some(x => x.frame === 'meetingTable'));
+});
+test('subagents + workflow → 8×7', () => {
+  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
+  assertEq(r.cols, 8); assertEq(r.rows, 7);
+});
+test('le mur et le sol couvrent les dimensions effectives', () => {
+  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
+  assertEq(r.statics.filter(x => x.frame === 'wall').length, r.cols);
+  const floor = r.statics.filter(x => x.frame === 'floor' || x.frame === 'floorWood');
+  assertEq(floor.length, r.cols * (r.rows - 1));
 });
 test('zones aux positions spécifiées', () => {
   const z = OL.roomFor(sess('a', 'running')).zones;
-  assertEq(z.deskChar.tx, 3); assertEq(z.deskChar.ty, 2);
-  assertEq(z.door.tx, 8); assertEq(z.door.ty, 1);
-  assertEq(z.coffee.tx, 2); assertEq(z.coffee.ty, 6);
+  assertEq(z.deskChar.tx, 2); assertEq(z.deskChar.ty, 1);
+  assertEq(z.door.tx, 5); assertEq(z.door.ty, 1);
+  assertEq(z.coffee.tx, 2); assertEq(z.coffee.ty, 4);
   assertEq(z.sideSeats.length, 2);
 });
 test('statics : desk avec screen, machine café, porte', () => {
@@ -79,9 +105,9 @@ test('nouvelle session → acteur spawn à la porte, path vers la chaise', () =>
   OL.syncSession(st, s);
   const a = st.actors.get('a');
   assert(a, 'pas d\'acteur');
-  assertEq(a.tx, 8); assertEq(a.ty, 1);
+  assertEq(a.tx, 5); assertEq(a.ty, 1);
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 3); assertEq(dest.ty, 2);
+  assertEq(dest.tx, 2); assertEq(dest.ty, 1);
 });
 test('l\'acteur atteint sa chaise en marchant', () => {
   const st = OL.createState();
@@ -90,7 +116,7 @@ test('l\'acteur atteint sa chaise en marchant', () => {
   const a = st.actors.get('a');
   const zones = OL.roomFor(s).zones;
   for (let i = 0; i < 100 && a.path.length > 0; i++) OL.tickActor(a, zones);
-  assertEq(a.tx, 3); assertEq(a.ty, 2);
+  assertEq(a.tx, 2); assertEq(a.ty, 1);
 });
 test('waiting → path vers le café ; retour running en route → demi-tour vers la chaise', () => {
   const st = OL.createState();
@@ -104,7 +130,7 @@ test('waiting → path vers le café ; retour running en route → demi-tour ver
   OL.tickActor(a, zones); OL.tickActor(a, zones);
   OL.syncSession(st, sess('a', 'running'));
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 3); assertEq(dest.ty, 2);
+  assertEq(dest.tx, 2); assertEq(dest.ty, 1);
 });
 test('un acteur en erreur ne marche pas', () => {
   const st = OL.createState();
@@ -141,7 +167,7 @@ test('session ressuscitée après un leave abouti → done repasse à false, pat
   OL.syncSession(st, sess('a', 'running'));
   assertEq(a.done, false);
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 3); assertEq(dest.ty, 2);
+  assertEq(dest.tx, 2); assertEq(dest.ty, 1);
 });
 test('subagents → 2 acteurs max, aux sièges latéraux', () => {
   const st = OL.createState();

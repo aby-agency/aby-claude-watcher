@@ -52,14 +52,18 @@
   // `z:'over'` → voile → bulle, pour que le dossier chevauche visuellement
   // le bas du perso (dos au spectateur) au lieu d'être caché derrière lui.
   const CHAIR_FRAME = 'chairOver';
-  const CHAIR_DY = 16;    // décale le dossier pour chevaucher le bas du perso sans manger tout le corps
+  // Fauteuil 16×23 ancré bas-de-tuile, dessiné PAR-DESSUS le perso (z:'over').
+  // dy=8 : tête+épaules visibles au-dessus du dossier (perso couvert de la
+  // taille aux pieds), débord de 8 px sous les pieds. Calé à l'œil :
+  // dy=16 → fauteuil une tuile trop bas (retour Paul), dy=2 → perso avalé.
+  const CHAIR_DY = 8;
   // Sièges subagents : dy plus modeste que CHAIR_DY — les 2 sièges latéraux ne
   // sont séparés que d'une rangée (SIDE_SEATS[0].ty=2, table de SIDE_SEATS[1]
   // en ty=3) ; à CHAIR_DY=16 le dossier du 1er siège déborde jusque dans la
   // tête du 2e perso assis (collision visuelle vérifiée à l'œil, cf. rapport).
   // 8 reste sous la limite de collision (marge testée) tout en laissant le
   // dossier chevaucher visiblement le bas du perso.
-  const CHAIR_OVER_DY_SUB = 8;
+  const CHAIR_OVER_DY_SUB = 8; // même calage que le poste principal (validé à l'œil)
   const COFFEE_DY = -3;   // pose la tasse sur le comptoir sans qu'elle déborde de sa tuile
   // Coin pause (v26) : fontaine/distributeur en alternance déterministe par
   // projet, sur une tuile de la rangée du bas jamais traversée par le perso

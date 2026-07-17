@@ -30,14 +30,14 @@
   // (2,3) : sous le GRAND écran du setup (colonne DESK.tx+1, celle de la LED)
   // — retour Paul. Le point café est passé en (1,4) pour libérer la colonne 2
   // (le dossier overlay du fauteuil recouvrirait la tête du perso au café).
-  const DESK_CHAR = { tx: 2, ty: 3 };
-  const DOOR = { tx: 4, ty: 1 };
+  const DESK_CHAR = { tx: 1, ty: 2 };
+  const DOOR = { tx: 3, ty: 1 };
   const COFFEE = { tx: 1, ty: 4 }; // collé à la machine (0,4), toujours sur le parquet
   // Tableau blanc mural (densité v2.4, remplace l'ancien poster) : sprite
   // 30×23 (~2 tuiles de large), ancré tx=1 pour déborder visuellement sur
   // tx=2, au-dessus du bureau.
-  const WHITEBOARD = { tx: 1, ty: 0 };
-  const DESK = { tx: 1, ty: 2 };
+  const WHITEBOARD = { tx: 4, ty: 0 }; // tout à droite (retour Paul)
+  const DESK = { tx: 0, ty: 1 };
   // Décalée en colonne 0 (pas 1, sous le siège) : sinon la machine (poussée
   // vers le haut) et la chaise (poussée vers le bas) se chevauchent en pixels.
   const COFFEE_MACHINE = { tx: 0, ty: 4 };
@@ -81,10 +81,6 @@
   // l'avant du bureau, côté chaise. Valeurs de départ raisonnables — le
   // réglage pixel-perfect se fait au rendu (Task 3).
   const DESK_LAMP_DY = -4;
-  // Diplôme encadré : accroché au MUR (rangée 0), tuile libre entre le
-  // tableau blanc (cols 1-2) et la porte (col 4) — retour Paul : un cadre
-  // ne se pose pas sur un bureau.
-  const WALL_FRAME = { tx: 3, ty: 0 };
   const MEETING_SEATS = [{ tx: 2, ty: 5 }, { tx: 4, ty: 5 }, { tx: 2, ty: 6 }, { tx: 4, ty: 6 }];
   const MEETING_TABLE = { tx: 3, ty: 5 };
   const MAX_SUBS = 2;
@@ -148,7 +144,6 @@
     statics.push({ frame: 'desk', tx: DESK.tx, ty: DESK.ty });
     statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
     statics.push({ frame: 'deskLamp', tx: DESK.tx, ty: DESK.ty, dy: DESK_LAMP_DY });
-    statics.push({ frame: 'wallFrame', tx: WALL_FRAME.tx, ty: WALL_FRAME.ty, dy: 2 });
     statics.push({ frame: CHAIR_FRAME, tx: DESK_CHAR.tx, ty: DESK_CHAR.ty, dy: CHAIR_DY, z: 'over' });
     statics.push({ frame: 'sideDesk', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty });   // comptoir sous la tasse
     statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty, dy: COFFEE_DY });

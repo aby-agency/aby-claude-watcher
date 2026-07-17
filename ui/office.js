@@ -116,14 +116,28 @@ const Office = (() => {
       }
     }
 
-    // Passe 1 : statics normaux (sol, meubles, bureau…), sous les acteurs.
-    for (const st of room.statics) { if (st.z !== 'over') drawStatic(st); }
+    // Le fauteuil principal n'est dessiné PAR-DESSUS le perso que s'il y est
+    // assis : le couloir de circulation passe sous le bureau depuis la dispo
+    // v2.7, un marcheur qui traverse la tuile du fauteuil serait sinon
+    // « décapité » par le dossier en overlay.
+    const roomActors = OfficeLayout.actorsFor(state, s.sessionId);
+    const mainActor = roomActors.find(a => a.kind === 'session');
+    const mainSeated = !!mainActor && mainActor.path.length === 0 &&
+      mainActor.tx === room.zones.deskChar.tx && mainActor.ty === room.zones.deskChar.ty;
+    const isMainChair = (st) => st.frame === 'chairOver' &&
+      st.tx === room.zones.deskChar.tx && st.ty === room.zones.deskChar.ty;
+
+    // Passe 1 : statics normaux (sol, meubles, bureau…), sous les acteurs —
+    // plus le fauteuil principal quand personne n'y est assis.
+    for (const st of room.statics) {
+      if (st.z !== 'over' || (isMainChair(st) && !mainSeated)) drawStatic(st);
+    }
 
     // Bulle du perso principal : calculée ici mais DESSINÉE en dernier —
     // sur les cartes background, le voile sombre la ternirait sinon.
     // Un seul perso 'session' par pièce, donc au plus une bulle à tracer.
     let bubble = null;
-    for (const a of OfficeLayout.actorsFor(state, s.sessionId)) {
+    for (const a of roomActors) {
       const fi = a.activity === 'think' ? (a.animFrame >> 2) : a.animFrame;
       const fname = animFrameName(OfficeLayout.animFor(a), fi);
       // Composition « au demi-tile » façon LimeZu (réf du site) : un perso
@@ -145,7 +159,9 @@ const Office = (() => {
     // Passe 2 : statics `z:'over'` (fauteuil vu de dos) — PAR-DESSUS les
     // acteurs, pour que le dossier s'intercale entre le perso (dos au
     // spectateur) et la caméra (fix « sens des objets », Paul 2026-07-17).
-    for (const st of room.statics) { if (st.z === 'over') drawStatic(st); }
+    for (const st of room.statics) {
+      if (st.z === 'over' && !(isMainChair(st) && !mainSeated)) drawStatic(st);
+    }
     if (room.zones.subOverflow > 0) {
       // Coin mur haut-droit (rangée 0, dernière colonne = la colonne ajoutée
       // quand il y a des subagents (leurs tables sont en tx=5) : toujours

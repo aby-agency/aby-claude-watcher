@@ -84,8 +84,8 @@ test('le mur et le sol couvrent les dimensions effectives', () => {
 test('zones aux positions spécifiées', () => {
   const z = OL.roomFor(sess('a', 'running')).zones;
   // Vue par-dessus l'épaule : le perso est au SUD du bureau (1,2), pas au nord.
-  assertEq(z.deskChar.tx, 2); assertEq(z.deskChar.ty, 3);
-  assertEq(z.door.tx, 4); assertEq(z.door.ty, 1);
+  assertEq(z.deskChar.tx, 1); assertEq(z.deskChar.ty, 2);
+  assertEq(z.door.tx, 3); assertEq(z.door.ty, 1);
   assertEq(z.coffee.tx, 1); assertEq(z.coffee.ty, 4);
   assertEq(z.sideSeats.length, 2);
 });
@@ -101,10 +101,9 @@ test('statics : desk avec screen, machine café, porte', () => {
   assert(typeof coffeeMachineStatic.dy === 'number' && coffeeMachineStatic.dy < 0, 'tasse pas décalée sur le comptoir');
   assert(st.some(x => x.frame === 'sideDesk' && x.tx === coffeeMachineStatic.tx && x.ty === coffeeMachineStatic.ty),
     'pas de comptoir sous la tasse');
-  // La chaise du bureau principal ne doit pas être dans la même colonne que
-  // le point café (1,4) ni que la machine à café : sinon le perso debout là
-  // recouvre la chaise vide (v23 : régression corrigée en décalant la colonne).
-  assert(room.zones.deskChar.tx !== room.zones.coffee.tx, 'chaise alignée avec le point café');
+  // v2.7 : chaise et point café partagent la colonne 1 — accepté, car le
+  // fauteuil n'est en overlay QUE quand le perso y est assis (office.js,
+  // overlay conditionnel) : personne n'est jamais recouvert par le dossier.
   assert(room.zones.deskChar.tx !== coffeeMachineStatic.tx, 'chaise alignée avec la machine à café');
 });
 test('densité cubicle : tableau blanc au mur, lampe et papiers sur le bureau (toujours présents)', () => {
@@ -117,10 +116,8 @@ test('densité cubicle : tableau blanc au mur, lampe et papiers sur le bureau (t
   assert(lamp, 'pas de lampe');
   assertEq(lamp.tx, OL.DESK.tx);
   assertEq(lamp.ty, OL.DESK.ty);
-  const frame = st.find(x => x.frame === 'wallFrame');
-  assert(frame, 'pas de diplôme encadré');
-  assertEq(frame.ty, 0); // au MUR (retour Paul : un cadre ne se pose pas sur un bureau)
-  assertEq(frame.tx, 3); // entre le tableau blanc (cols 1-2) et la porte (col 4)
+  assert(!st.some(x => x.frame === 'wallFrame'), 'le diplôme a été retiré (retour Paul v2.7)');
+  assertEq(whiteboard.tx, 4); // tout à droite (retour Paul v2.7)
   // la lampe est posée SUR le bureau (offset dy pour "flotter" au-dessus)
   assert(typeof lamp.dy === 'number' && lamp.dy !== 0, 'lampe pas décalée sur le bureau');
 });
@@ -190,19 +187,19 @@ test('nouvelle session → acteur spawn à la porte, path vers la chaise', () =>
   OL.syncSession(st, s);
   const a = st.actors.get('a');
   assert(a, 'pas d\'acteur');
-  assertEq(a.tx, 4); assertEq(a.ty, 1);
+  assertEq(a.tx, 3); assertEq(a.ty, 1); // porte décalée en (3,1) — v2.7
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 2); assertEq(dest.ty, 3);
+  assertEq(dest.tx, 1); assertEq(dest.ty, 2);
 });
-test('spawn (porte→chaise) contourne le bureau : le path ne traverse pas (1,2)/(2,2)', () => {
+test('spawn (porte→chaise) contourne le bureau : le path ne traverse pas (0,1)/(1,1)', () => {
   const st = OL.createState();
   const s = sess('a', 'running');
   OL.syncSession(st, s);
   const a = st.actors.get('a');
-  const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
+  const onDesk = (p) => (p.tx === 0 && p.ty === 1) || (p.tx === 1 && p.ty === 1);
   assert(!a.path.some(onDesk), 'le path de spawn traverse le bureau');
 });
-test('leave (chaise→porte) contourne le bureau : le path ne traverse pas (1,2)/(2,2)', () => {
+test('leave (chaise→porte) contourne le bureau : le path ne traverse pas (0,1)/(1,1)', () => {
   const st = OL.createState();
   const s = sess('a', 'running');
   OL.syncSession(st, s);
@@ -210,10 +207,10 @@ test('leave (chaise→porte) contourne le bureau : le path ne traverse pas (1,2)
   const zones = OL.roomFor(s).zones;
   while (a.path.length > 0) OL.tickActor(a, zones);   // atteint la chaise (1,3)
   OL.purge(st, new Set());                             // déclenche le leave → porte
-  const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
+  const onDesk = (p) => (p.tx === 0 && p.ty === 1) || (p.tx === 1 && p.ty === 1);
   assert(!a.path.some(onDesk), 'le path de leave traverse le bureau');
 });
-test('leave depuis le café (1,4) évite la plante (4,4) et le bureau (1,2)/(2,2)', () => {
+test('leave depuis le café (1,4) évite la plante (4,4) et le bureau (0,1)/(1,1)', () => {
   const st = OL.createState();
   const s = sess('a', 'waiting');
   OL.syncSession(st, s);
@@ -222,7 +219,7 @@ test('leave depuis le café (1,4) évite la plante (4,4) et le bureau (1,2)/(2,2
   while (a.path.length > 0) OL.tickActor(a, zones);   // atteint le café (1,4)
   assertEq(a.tx, 1); assertEq(a.ty, 4);
   OL.purge(st, new Set());                             // déclenche le leave → porte
-  const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
+  const onDesk = (p) => (p.tx === 0 && p.ty === 1) || (p.tx === 1 && p.ty === 1);
   const onPlant = (p) => p.tx === 4 && p.ty === 4;
   assert(!a.path.some(onDesk), 'le path de leave depuis le café traverse le bureau');
   assert(!a.path.some(onPlant), 'le path de leave depuis le café traverse la plante');
@@ -234,7 +231,7 @@ test('l\'acteur atteint sa chaise en marchant', () => {
   const a = st.actors.get('a');
   const zones = OL.roomFor(s).zones;
   for (let i = 0; i < 100 && a.path.length > 0; i++) OL.tickActor(a, zones);
-  assertEq(a.tx, 2); assertEq(a.ty, 3);
+  assertEq(a.tx, 1); assertEq(a.ty, 2);
 });
 test('waiting → path vers le café ; retour running en route → demi-tour vers la chaise', () => {
   const st = OL.createState();
@@ -248,7 +245,7 @@ test('waiting → path vers le café ; retour running en route → demi-tour ver
   OL.tickActor(a, zones); OL.tickActor(a, zones);
   OL.syncSession(st, sess('a', 'running'));
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 2); assertEq(dest.ty, 3);
+  assertEq(dest.tx, 1); assertEq(dest.ty, 2);
 });
 test('un acteur en erreur ne marche pas', () => {
   const st = OL.createState();
@@ -285,7 +282,7 @@ test('session ressuscitée après un leave abouti → done repasse à false, pat
   OL.syncSession(st, sess('a', 'running'));
   assertEq(a.done, false);
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 2); assertEq(dest.ty, 3);
+  assertEq(dest.tx, 1); assertEq(dest.ty, 2);
 });
 test('subagents → 2 acteurs max, aux sièges latéraux', () => {
   const st = OL.createState();

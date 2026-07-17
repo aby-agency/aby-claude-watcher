@@ -594,14 +594,41 @@
     for (const s of background) syncHeadlessActor(state, s);
     syncResearchEntities(state, all);
 
-    // Purge : sessions absentes du snapshot. Perso principal → part pour de
-    // bon (leave, marche vers la sortie de sa salle physique actuelle).
-    // Headless → suppression immédiate (pas de marche, comme subs/meeting).
+    // Classification COURANTE de chaque session vivante (background ou non)
+    // — sert à détecter un flip `isBackground` (I3, revue reviewer) : une
+    // session qui bascule interactive↔headless reste dans `liveSessionIds`
+    // (elle n'a pas disparu), donc l'ancien `continue` sur ce seul test
+    // laissait l'ancien acteur (mauvais kind, id différent de celui que
+    // syncMainActor/syncHeadlessActor vient de créer/créera pour le nouveau
+    // classement) orphelin À VIE — jamais purgé, jamais réutilisé.
+    const isBgNow = new Map();
+    for (const s of interactive) isBgNow.set(s.sessionId, false);
+    for (const s of background) isBgNow.set(s.sessionId, true);
+
+    // Purge : sessions absentes du snapshot, OU acteur dont le kind ne
+    // correspond plus à la classification ACTUELLE de sa session (flip).
+    // Perso principal → part pour de bon (leave, marche vers la sortie de
+    // sa salle physique actuelle) — même traitement qu'une disparition
+    // normale, choisi pour qu'un flip interactif→headless ne "téléporte"
+    // jamais visuellement le perso (il quitte proprement par la porte,
+    // pendant que syncHeadlessActor fait déjà apparaître son double
+    // headless — id distinct — en salle recherche).
+    // Headless → suppression immédiate (pas de marche, comme subs/meeting/
+    // disparition normale) — un flip headless→interactif n'a pas de sortie
+    // visuelle côté headless, seulement l'apparition du nouvel acteur
+    // 'session' via syncMainActor ci-dessus.
     for (const [aid, a] of state.actors) {
-      if (liveSessionIds.has(a.sessionId)) continue;
-      if (a.kind === 'headless') { freeSlot(state, 'research', aid); state.actors.delete(aid); continue; }
+      const stillLive = liveSessionIds.has(a.sessionId);
+      const currentlyBg = isBgNow.get(a.sessionId); // undefined si plus vivante
+
+      if (a.kind === 'headless') {
+        if (!stillLive || currentlyBg === false) { freeSlot(state, 'research', aid); state.actors.delete(aid); }
+        continue;
+      }
       if (a.kind !== 'session') continue; // subs/meeting déjà nettoyés par syncResearchEntities
-      if (a.activity !== 'leave' || a.migratingTo !== null) {
+
+      const shouldLeave = !stillLive || currentlyBg === true;
+      if (shouldLeave && (a.activity !== 'leave' || a.migratingTo !== null)) {
         a.activity = 'leave';
         a.migratingTo = null;
         retarget(a, { ...SPAWN_TILE }, sizing[a.roomKey], state);

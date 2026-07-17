@@ -74,19 +74,34 @@ const Office = (() => {
     c2d.fillText(txt, x, y);
   }
 
+  // Boîte d'une étiquette (texte + padding) — mesurée à part de son dessin
+  // pour permettre à la passe anti-collision (I2) de tester une position
+  // AVANT de décider si elle sera effectivement dessinée.
+  function measureLabelBox(c2d, txt, scale) {
+    c2d.font = `${7 * scale}px monospace`;
+    const textW = c2d.measureText(txt).width;
+    const padX = 2 * scale, padY = 1 * scale;
+    return { w: textW + padX * 2, h: 7 * scale + padY * 2, padY };
+  }
+
   // Étiquette pixel centrée sous le perso, fond sombre semi-transparent pour
   // rester lisible sur n'importe quel décor (sol clair, voile sombre, …).
-  function labelTextOn(c2d, txt, cx, topY, scale) {
-    c2d.font = `${7 * scale}px monospace`;
-    const w = c2d.measureText(txt).width;
-    const padX = 2 * scale, padY = 1 * scale, h = 7 * scale + padY * 2;
+  // `box` (optionnel) réutilise une mesure déjà calculée par la passe
+  // anti-collision — évite un 2e `measureText` pour le même texte.
+  function labelTextOn(c2d, txt, cx, topY, scale, box) {
+    const b = box || measureLabelBox(c2d, txt, scale);
     c2d.fillStyle = 'rgba(10, 10, 16, 0.55)';
-    c2d.fillRect(cx - w / 2 - padX, topY - padY, w + padX * 2, h);
+    c2d.fillRect(cx - b.w / 2, topY - b.padY, b.w, b.h);
     c2d.fillStyle = '#cfd2da';
+    c2d.font = `${7 * scale}px monospace`;
     c2d.textAlign = 'center';
     c2d.textBaseline = 'top';
     c2d.fillText(txt, cx, topY);
     c2d.textAlign = 'left'; c2d.textBaseline = 'alphabetic';
+  }
+
+  function rectsOverlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
 
   function sessionFor(sessionId) {
@@ -223,11 +238,33 @@ const Office = (() => {
     // canvas — donc hors zone visible, silencieusement clippée (aucune
     // erreur, juste invisible). Constaté en vérif CDP (migration vers un
     // siège de bloc étendu). Fix : ne jamais dépasser le bas du canvas.
-    const labelBoxH = 9 * scale; // 7*scale texte + 2*(1*scale) padding, cf. labelTextOn
-    for (const l of labels) {
+    //
+    // Anti-collision (I2, revue reviewer) : la salle pause n'espace ses
+    // sièges que d'1 tuile — deux étiquettes 8-car. voisines (largeur très
+    // supérieure à une tuile) se chevauchent quasi systématiquement à cette
+    // densité (constaté sur le screenshot de migration, pas un cas rare
+    // "recherche dense" comme initialement classé). Passe dédiée : ordre
+    // stable (ty puis tx), chaque étiquette teste sa position par défaut PUIS
+    // jusqu'à 2 décalages vers le bas (hauteur+1px, clamp bas-de-canvas
+    // toujours appliqué) contre les étiquettes déjà POSÉES ; si les 3
+    // positions chevauchent toujours, elle n'est PAS dessinée — le tooltip
+    // au survol reste le filet de sécurité pour l'identifier.
+    const labelBoxH = 9 * scale; // 7*scale texte + 2*(1*scale) padding, cf. measureLabelBox
+    const sortedLabels = [...labels].sort((a, b) => (a.ty - b.ty) || (a.tx - b.tx));
+    const placedLabelRects = [];
+    for (const l of sortedLabels) {
       const cx = (l.tx * 16 + 8) * scale;
-      const topY = Math.min((l.ty * 16 + 17) * scale, h - labelBoxH);
-      labelTextOn(c2d, l.text, cx, topY, scale);
+      const box = measureLabelBox(c2d, l.text, scale);
+      let topY = Math.min((l.ty * 16 + 17) * scale, h - labelBoxH);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const rect = { x: cx - box.w / 2, y: topY - box.padY, w: box.w, h: box.h };
+        if (!placedLabelRects.some(r => rectsOverlap(r, rect))) {
+          labelTextOn(c2d, l.text, cx, topY, scale, box);
+          placedLabelRects.push(rect);
+          break;
+        }
+        topY = Math.min(topY + labelBoxH + 1, h - labelBoxH);
+      }
     }
 
     // Bulles émotes : dessinées en tout dernier (voile + étiquettes déjà
@@ -289,12 +326,41 @@ const Office = (() => {
     return { interactive, background };
   }
 
+  // I1 (revue reviewer) : `lastKnown` ne se vidait que via le chemin `done`
+  // de tick() — qui ne concerne QUE les acteurs `kind:'session'` (seuls à
+  // avoir un `done`, cf. tickActor). Un acteur `headless` disparaît, lui,
+  // IMMÉDIATEMENT et SYNCHRONEMENT dans syncActors (pas de marche, pas de
+  // `done`) : sa session ne passait donc jamais par le nettoyage de tick(),
+  // et chaque session background qui a existé un jour laissait sa donnée
+  // complète dans `lastKnown` POUR TOUJOURS (fuite mémoire non bornée sur la
+  // durée de vie de l'app). Idem pour tout futur type d'acteur qui
+  // disparaîtrait sans jamais passer par `done`.
+  //
+  // Fix générique : un balayage dédié, appelé après CHAQUE sync (donc after
+  // syncActors dans syncAll — couvre le cas headless/synchrone — ET après
+  // le nettoyage des `done` dans tick() — couvre le cas session/asynchrone).
+  // Une entrée `lastKnown` ne survit que si sa session est encore vivante
+  // OU si un acteur (n'importe quel kind) référence encore ce sessionId
+  // (ex. l'acteur session en train de marcher vers la sortie, ou un
+  // subagent/meeting dont la session parente vient de disparaître mais dont
+  // l'acteur research n'a pas encore été nettoyé ce tick).
+  function pruneLastKnown() {
+    if (lastKnown.size === 0) return;
+    const referenced = new Set();
+    if (state) for (const a of state.actors.values()) referenced.add(a.sessionId);
+    for (const id of lastKnown.keys()) {
+      if (sessions.has(id) || referenced.has(id)) continue;
+      lastKnown.delete(id);
+    }
+  }
+
   function syncAll() {
     if (!state) state = OfficeLayout.createState();
     const snap = snapshotSessions();
     for (const s of snap.interactive) lastKnown.set(s.sessionId, s);
     for (const s of snap.background) lastKnown.set(s.sessionId, s);
     OfficeLayout.syncActors(state, snap);
+    pruneLastKnown();
   }
 
   function tick() {
@@ -308,10 +374,8 @@ const Office = (() => {
       // au moment même où ils atteignent physiquement la porte de sortie).
       if (a.done) doneAids.push(a);
     }
-    for (const a of doneAids) {
-      state.actors.delete(a.id);
-      if (!sessions.has(a.sessionId)) lastKnown.delete(a.sessionId);
-    }
+    for (const a of doneAids) state.actors.delete(a.id);
+    pruneLastKnown();
     // Dernière session partie ET dernier acteur sorti : bascule vers l'état
     // vide réel (render() affichera emptyState au lieu des 3 salles) — pas de
     // fantôme figé à la porte, timer coupé par le render() qui suit (vue

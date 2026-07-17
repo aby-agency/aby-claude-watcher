@@ -682,6 +682,59 @@ test('actorsIn trie par ty, ne renvoie que les acteurs de la salle', () => {
   for (let i = 1; i < list.length; i++) assert(list[i].ty >= list[i - 1].ty, 'pas trié par ty');
 });
 
+// I3 (revue reviewer) — flip isBackground : la session reste VIVANTE
+// (toujours dans liveSessionIds) mais change de classement interactive⇄
+// background d'un appel à l'autre. Avant fix, la purge ne testait que
+// « sessionId disparu » — un flip laissait l'ancien acteur (mauvais kind,
+// id différent de celui créé pour le nouveau classement) orphelin à vie.
+test('I3 : flip interactif → headless (isBackground true) — l\'ancien acteur session part (leave), un acteur headless apparaît aussitôt', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  assert(st.actors.has('a'), 'acteur session absent après création');
+  assertEq(st.actors.get('a').kind, 'session');
+
+  // Flip : 'a' bascule en background au snapshot suivant (session TOUJOURS
+  // vivante, juste reclassée — ce n'est PAS une disparition).
+  OL.syncActors(st, snap([], [sess('a', 'running', { isBackground: true })]));
+
+  // Choix documenté : l'ancien acteur 'session' ne disparaît PAS
+  // instantanément — il part comme une disparition normale (leave, marche
+  // vers la sortie), pour ne jamais téléporter visuellement le perso.
+  const old = st.actors.get('a');
+  assert(old, 'l\'ancien acteur session a disparu trop tôt (avant même la marche de sortie)');
+  assertEq(old.kind, 'session');
+  assertEq(old.activity, 'leave');
+  assertEq(old.migratingTo, null);
+
+  // Le nouvel acteur headless, lui, apparaît immédiatement (pas de marche
+  // pour les headless, cf. syncHeadlessActor).
+  assert(st.actors.has('a:headless'), 'acteur headless absent après le flip');
+  assertEq(st.actors.get('a:headless').kind, 'headless');
+  assertEq(st.actors.get('a:headless').roomKey, 'research');
+
+  // L'ancien acteur 'session' finit par atteindre la porte et devenir done
+  // (contrat M5 : l'appelant le supprime alors de state.actors).
+  for (let i = 0; i < 300 && !old.done; i++) OL.tickActor(old, st);
+  assertEq(old.done, true, 'l\'ancien acteur session ne devient jamais done — orphelin à vie');
+});
+
+test('I3 : flip headless → interactif (isBackground false) — l\'ancien acteur headless est purgé immédiatement, un acteur session apparaît', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([], [sess('h', 'running')]));
+  assert(st.actors.has('h:headless'), 'acteur headless absent après création');
+
+  // Flip : 'h' bascule en interactive au snapshot suivant (session TOUJOURS
+  // vivante — pas une disparition).
+  OL.syncActors(st, snap([sess('h', 'running')]));
+
+  // Choix documenté : contrairement au perso principal (qui part par la
+  // porte), le headless n'a pas de représentation "en train de sortir" —
+  // suppression immédiate, symétrique de sa disparition normale.
+  assert(!st.actors.has('h:headless'), 'l\'ancien acteur headless est resté orphelin après le flip');
+  assert(st.actors.has('h'), 'nouvel acteur session absent après le flip');
+  assertEq(st.actors.get('h').kind, 'session');
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 console.log('\nanimFor:');
 test('en mouvement → walk.<dir>', () => {

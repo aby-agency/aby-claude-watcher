@@ -45,6 +45,30 @@ La taille devient fonction de l'activité :
   4 sièges (2,5), (4,5), (2,6), (4,6).
 - Conséquence assumée : les vignettes ont des hauteurs différentes (la grille
   CSS absorbe) — **la taille de la pièce raconte l'activité de la session**.
+
+### Amendement 2 — 2026-07-17 — cubicle dense + bulles émotes (validé avec Paul)
+
+Trois axes (inspiration : scène d'open-space dense LimeZu fournie par Paul) :
+
+**A. Pièce 6×4 densifiée.** Base réduite à 6×4 ; le bureau devient un vrai
+poste habité : lampe de bureau, paperasse sur le bureau, élément mural
+(tableau blanc) ; coin café resserré (machine + tasse sur comptoir, col 0).
+Extensions inchangées dans l'esprit : +1 col subagents, +2 rangées réunion.
+
+**B. Bulles émotes = action en cours.** Les `pixelText` sont remplacés par
+les émotes-bulles LimeZu animées (2 frames, pack Modern Interiors
+`UI_thinking_emotes` + icônes Modern UI compositées au bake dans une bulle
+vide). En **running**, la bulle au-dessus du perso montre l'outil en cours
+(`session.lastTool`) mappé sur ~6 pictos : terminal (Bash), loupe
+(Read/Grep/Glob), crayon (Edit/Write), globe (Web*), agents (Task), prise/
+engrenage (MCP et défaut). Mapping = fonction pure testée.
+
+**C. Notifs en scène.** Cloche « needs-you » active → bulle enveloppe animée
+(comble la dette « bell-flash absent en office ») ; error → émote colère ;
+waiting sans cloche depuis longtemps (état « Inactif » existant) → zzz ;
+thinking → bulle « … » du pack ; pending → bulle « ! » du pack.
+Priorité d'affichage (une seule bulle) : enveloppe (bell) > !/… /colère/zzz
+(état) > outil (running).
 - **Un canvas par vignette, un seul timer 8 fps** qui redessine les canvases
   dont une frame a changé. Vue inactive = timer stoppé (inchangé).
 

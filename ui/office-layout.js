@@ -119,6 +119,7 @@
     } else if (actor.activity !== activity) {
       actor.activity = activity;
       actor.animFrame = 0;
+      actor.done = false;   // session ressuscitée avant suppression : annule un `leave` en cours
       if (activity === 'down') actor.path = [];   // un perso en erreur ne marche pas
       else retarget(actor, targetFor(activity, zones));
     }
@@ -136,7 +137,7 @@
       }
     });
     // Meeting : min(workflowRunning, 4) sitters.
-    const nSeats = Math.min(workflowRunning(session), zones.meetingSeats.length || MEETING_SEATS.length);
+    const nSeats = Math.min(workflowRunning(session), MEETING_SEATS.length);
     for (let i = 0; i < nSeats; i++) {
       const aid = `${sid}:wf:${i}`;
       wanted.add(aid);

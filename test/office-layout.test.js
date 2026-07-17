@@ -128,6 +128,21 @@ test('purge → leave, done à la porte', () => {
   for (let i = 0; i < 100 && !a.done; i++) OL.tickActor(a, zones);
   assert(a.done, 'jamais done');
 });
+test('session ressuscitée après un leave abouti → done repasse à false, path vers la chaise', () => {
+  const st = OL.createState();
+  const s = sess('a', 'running');
+  OL.syncSession(st, s);
+  const a = st.actors.get('a');
+  const zones = OL.roomFor(s).zones;
+  while (a.path.length > 0) OL.tickActor(a, zones);
+  OL.purge(st, new Set());
+  for (let i = 0; i < 100 && !a.done; i++) OL.tickActor(a, zones);
+  assert(a.done, 'jamais done');
+  OL.syncSession(st, sess('a', 'running'));
+  assertEq(a.done, false);
+  const dest = a.path[a.path.length - 1];
+  assertEq(dest.tx, 3); assertEq(dest.ty, 2);
+});
 test('subagents → 2 acteurs max, aux sièges latéraux', () => {
   const st = OL.createState();
   const s = sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }, { agentId: 'g3' }] });

@@ -90,7 +90,7 @@ const EMOTES = {
   zzz:   { src: EMOTE_SHEET, frames: [{ x: 96, y: 80 }, { x: 112, y: 80 }] }, // "Z" bleu
 };
 
-// Encre des 3 points « … » de emote.think, synthétisés au bake (compositeThinkDots
+// Encre des 3 points « … » de emote.think, synthétisés au bake (stampThinkDots
 // dans bake-assets.js) — même teinte que le contour bleu-nuit des médaillons, pour
 // que la bulle reste cohérente avec alert/angry/zzz/mail malgré l'absence de
 // picto source.
@@ -105,7 +105,7 @@ const TOOL_EMOTES = {
   terminal: { icon: { src: UI_ICONS_SHEET, x: 304, y: 48, w: 16, h: 16 } },  // écran/moniteur (Bash)
   search:   { icon: { src: UI_ICONS_SHEET, x: 224, y: 144, w: 16, h: 16 } }, // loupe (Read/Grep/Glob)
   write:    { icon: { src: UI_ICONS_SHEET, x: 448, y: 160, w: 16, h: 16 } }, // crayon (Edit/Write/NotebookEdit)
-  web:      { icon: { src: UI_ICONS_SHEET, x: 384, y: 128, w: 16, h: 16 } }, // flèches de rechargement circulaires (pas de globe dans le pack — WebFetch/WebSearch) ; distinct de MAIL_EMOTE (v24.1 : était pixel-identique à l'enveloppe, confondu avec le signal needs-you)
+  web:      { icon: { src: UI_ICONS_SHEET, x: 384, y: 128, w: 16, h: 16 } }, // flèches de rechargement circulaires (pas de globe dans le pack — WebFetch/WebSearch) ; distinct de MAIL_EMOTE (v2.4.1 : était pixel-identique à l'enveloppe, confondu avec le signal needs-you)
   gear:     { icon: { src: UI_ICONS_SHEET, x: 240, y: 0, w: 16, h: 16 } },   // engrenage (mcp__*/inconnu)
   agents:   { src: EMOTE_SHEET, frames: [{ x: 0, y: 112 }, { x: 16, y: 112 }] }, // médaillon natif (Task)
 };
@@ -113,7 +113,7 @@ const TOOL_EMOTES = {
 // Enveloppe compositée dans EMOTE_BUBBLE_EMPTY — notif (bell active), priorité
 // maximale dans emoteFor (Task 2). Icône dédiée (ne PAS réutiliser pour un autre
 // TOOL_EMOTE) : c'est LE signal needs-you de la vue office, aucune bulle outil ne
-// doit lui ressembler (v24.1 : était pixel-identique à TOOL_EMOTES.web, confusion
+// doit lui ressembler (v2.4.1 : était pixel-identique à TOOL_EMOTES.web, confusion
 // WebFetch / notif).
 const MAIL_EMOTE = { icon: { src: UI_ICONS_SHEET, x: 432, y: 128, w: 16, h: 16 } };
 

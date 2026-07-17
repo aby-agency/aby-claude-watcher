@@ -117,7 +117,7 @@
       }
     }
     statics.push({ frame: 'door', tx: DOOR.tx, ty: 0 });   // marqueur programmatique
-    statics.push({ frame: 'whiteboard', tx: WHITEBOARD.tx, ty: WHITEBOARD.ty });
+    statics.push({ frame: 'whiteboard', tx: WHITEBOARD.tx, ty: WHITEBOARD.ty, dy: 7 });
     statics.push({ frame: 'desk', tx: DESK.tx, ty: DESK.ty });
     statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
     statics.push({ frame: 'deskLamp', tx: DESK.tx, ty: DESK.ty, dy: DESK_LAMP_DY });

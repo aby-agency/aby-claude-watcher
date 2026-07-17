@@ -112,7 +112,7 @@ test('densité cubicle : tableau blanc au mur, lampe et papiers sur le bureau (t
   assertEq(whiteboard.ty, 0); // au mur, rangée 0
   const lamp = st.find(x => x.frame === 'deskLamp');
   assert(lamp, 'pas de lampe');
-  assertEq(lamp.tx, room.zones ? OL.DESK.tx : lamp.tx);
+  assertEq(lamp.tx, OL.DESK.tx);
   assertEq(lamp.ty, OL.DESK.ty);
   const papers = st.find(x => x.frame === 'papersDesk');
   assert(papers, 'pas de papiers sur le bureau');

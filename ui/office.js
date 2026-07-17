@@ -135,10 +135,11 @@ const Office = (() => {
       }
     }
     if (room.zones.subOverflow > 0) {
-      // Coin mur haut-droit (rangée 0, dernière colonne = celle des subagents,
-      // toujours présente si subOverflow > 0) : seul angle garanti vide, quel
-      // que soit le nombre de subagents assis. Calculé depuis room.cols —
-      // l'ancien `7.5 * 16 * scale` en dur débordait de la pièce (cols=7 max).
+      // Coin mur haut-droit (rangée 0, dernière colonne = la colonne ajoutée
+      // quand il y a des subagents (leurs tables sont en tx=5) : toujours
+      // vide en rangée 0) : seul angle garanti vide, quel que soit le nombre
+      // de subagents assis. Calculé depuis room.cols — l'ancien
+      // `7.5 * 16 * scale` en dur débordait de la pièce (cols=7 max).
       pixelTextOn(c2d, `+${room.zones.subOverflow}`, (room.cols - 0.9) * 16 * scale, 0.9 * 16 * scale, '#9ca3af', scale);
     }
 

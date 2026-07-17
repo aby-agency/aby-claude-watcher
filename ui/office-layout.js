@@ -41,14 +41,17 @@
   // vers le haut) et la chaise (poussée vers le bas) se chevauchent en pixels.
   const COFFEE_MACHINE = { tx: 0, ty: 4 };
   // Colonne 4 (pas 5) : la colonne 5 est celle des sièges subagents
-  // (SIDE_SEATS[1] = (5,4)) — sinon la plante et le 2e subagent assis
+  // (SIDE_SEATS[1] = (6,4)) — sinon la plante et le 2e subagent assis
   // occupent la même tuile quand 2 subagents sont actifs.
   const PLANT = { tx: 4, ty: 4 };
   const PAPERS = [{ tx: 3, ty: 3 }, { tx: 2, ty: 2 }];
   const FLOOR_WOOD = [{ tx: 0, ty: 3 }, { tx: 1, ty: 3 }, { tx: 2, ty: 3 },
                        { tx: 0, ty: 4 }, { tx: 1, ty: 4 }, { tx: 2, ty: 4 }];
-  // Sièges subagents = position du perso (SUD de sa table, cf. push table ty-1 plus bas).
-  const SIDE_SEATS = [{ tx: 5, ty: 2 }, { tx: 5, ty: 4 }];
+  // Sièges subagents = position du perso (SUD de sa table, cf. push table ty-1
+  // plus bas). Colonne 6 = LA colonne annexe ajoutée quand il y a des
+  // subagents (cols passe à 7) — les postes vivent dedans, sinon elle reste
+  // vide et déséquilibre le cadrage (retour Paul v2.7).
+  const SIDE_SEATS = [{ tx: 6, ty: 2 }, { tx: 6, ty: 4 }];
   // Fauteuil VU DE DOS (#101, dossier plein face caméra) : posé en passe
   // `z:'over'` — office.js dessine statics normaux → acteurs → statics
   // `z:'over'` → voile → bulle, pour que le dossier chevauche visuellement

@@ -159,6 +159,20 @@ test('leave (chaise→porte) contourne le bureau : le path ne traverse pas (1,2)
   const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
   assert(!a.path.some(onDesk), 'le path de leave traverse le bureau');
 });
+test('leave depuis le café (2,4) évite la plante (5,4) et le bureau (1,2)/(2,2)', () => {
+  const st = OL.createState();
+  const s = sess('a', 'waiting');
+  OL.syncSession(st, s);
+  const a = st.actors.get('a');
+  const zones = OL.roomFor(s).zones;
+  while (a.path.length > 0) OL.tickActor(a, zones);   // atteint le café (2,4)
+  assertEq(a.tx, 2); assertEq(a.ty, 4);
+  OL.purge(st, new Set());                             // déclenche le leave → porte
+  const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
+  const onPlant = (p) => p.tx === 5 && p.ty === 4;
+  assert(!a.path.some(onDesk), 'le path de leave depuis le café traverse le bureau');
+  assert(!a.path.some(onPlant), 'le path de leave depuis le café traverse la plante');
+});
 test('l\'acteur atteint sa chaise en marchant', () => {
   const st = OL.createState();
   const s = sess('a', 'running');

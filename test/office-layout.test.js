@@ -45,20 +45,21 @@ test('subagents → +1 colonne (8 de large)', () => {
   assertEq(r.cols, 8); assertEq(r.rows, 5);
   assert(r.statics.some(x => x.frame === 'sideDesk'));
 });
-test('chaque subagent a une chaise et un laptop sur sa table', () => {
+test('chaque subagent a une chaise et un laptop sur sa table (perso au SUD de sa table)', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }] }));
   const seats = r.zones.sideSeats;
   for (const seat of seats) {
-    assert(r.statics.some(x => x.frame === 'chairBack' && x.tx === seat.tx && x.ty === seat.ty),
+    assert(r.statics.some(x => (x.frame === 'chairBack' || x.frame === 'chairFront') && x.tx === seat.tx && x.ty === seat.ty),
       `pas de chaise au siège (${seat.tx},${seat.ty})`);
-    assert(r.statics.some(x => x.frame === 'laptop' && x.tx === seat.tx && x.ty === seat.ty + 1),
-      `pas de laptop à la table (${seat.tx},${seat.ty + 1})`);
+    // La table/laptop est au NORD du perso (dos au spectateur, face à l'écran).
+    assert(r.statics.some(x => x.frame === 'laptop' && x.tx === seat.tx && x.ty === seat.ty - 1),
+      `pas de laptop à la table (${seat.tx},${seat.ty - 1})`);
   }
 });
 test('un seul subagent → chaise/laptop uniquement au 1er siège', () => {
   const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
   assertEq(r.statics.filter(x => x.frame === 'laptop').length, 1);
-  assertEq(r.statics.filter(x => x.frame === 'chairBack' && x.tx === r.zones.sideSeats[1].tx && x.ty === r.zones.sideSeats[1].ty).length, 0);
+  assertEq(r.statics.filter(x => (x.frame === 'chairBack' || x.frame === 'chairFront') && x.tx === r.zones.sideSeats[1].tx && x.ty === r.zones.sideSeats[1].ty).length, 0);
 });
 test('workflow actif → +2 rangées (7 de haut)', () => {
   const r = OL.roomFor(sess('a', 'running', { workflows: [{ runId: 'w', running: 2 }] }));
@@ -77,7 +78,8 @@ test('le mur et le sol couvrent les dimensions effectives', () => {
 });
 test('zones aux positions spécifiées', () => {
   const z = OL.roomFor(sess('a', 'running')).zones;
-  assertEq(z.deskChar.tx, 2); assertEq(z.deskChar.ty, 1);
+  // Vue par-dessus l'épaule : le perso est au SUD du bureau (1,2), pas au nord.
+  assertEq(z.deskChar.tx, 1); assertEq(z.deskChar.ty, 3);
   assertEq(z.door.tx, 5); assertEq(z.door.ty, 1);
   assertEq(z.coffee.tx, 2); assertEq(z.coffee.ty, 4);
   assertEq(z.sideSeats.length, 2);
@@ -88,12 +90,17 @@ test('statics : desk avec screen, machine café, porte', () => {
   assert(st.some(x => x.frame === 'deskSetup' && x.screen === 'a'), 'pas de screen');
   assert(st.some(x => x.frame === 'coffeeMachine'), 'pas de machine');
   assert(st.some(x => x.frame === 'door'), 'pas de porte');
-  assert(st.some(x => x.frame === 'chairBack' && x.tx === room.zones.deskChar.tx && x.ty === room.zones.deskChar.ty),
+  assert(st.some(x => (x.frame === 'chairBack' || x.frame === 'chairFront') && x.tx === room.zones.deskChar.tx && x.ty === room.zones.deskChar.ty),
     'pas de chaise au bureau principal');
   const coffeeMachineStatic = st.find(x => x.frame === 'coffeeMachine');
   assert(typeof coffeeMachineStatic.dy === 'number' && coffeeMachineStatic.dy < 0, 'tasse pas décalée sur le comptoir');
   assert(st.some(x => x.frame === 'sideDesk' && x.tx === coffeeMachineStatic.tx && x.ty === coffeeMachineStatic.ty),
     'pas de comptoir sous la tasse');
+  // La chaise du bureau principal ne doit pas être dans la même colonne que
+  // le point café (2,4) ni que la machine à café : sinon le perso debout là
+  // recouvre la chaise vide (v23 : régression corrigée en décalant la colonne).
+  assert(room.zones.deskChar.tx !== room.zones.coffee.tx, 'chaise alignée avec le point café');
+  assert(room.zones.deskChar.tx !== coffeeMachineStatic.tx, 'chaise alignée avec la machine à café');
 });
 test('papiers uniquement en erreur', () => {
   const err = OL.roomFor(sess('a', 'error')).statics.filter(x => x.frame === '_papers');
@@ -131,7 +138,7 @@ test('nouvelle session → acteur spawn à la porte, path vers la chaise', () =>
   assert(a, 'pas d\'acteur');
   assertEq(a.tx, 5); assertEq(a.ty, 1);
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 2); assertEq(dest.ty, 1);
+  assertEq(dest.tx, 1); assertEq(dest.ty, 3);
 });
 test('l\'acteur atteint sa chaise en marchant', () => {
   const st = OL.createState();
@@ -140,7 +147,7 @@ test('l\'acteur atteint sa chaise en marchant', () => {
   const a = st.actors.get('a');
   const zones = OL.roomFor(s).zones;
   for (let i = 0; i < 100 && a.path.length > 0; i++) OL.tickActor(a, zones);
-  assertEq(a.tx, 2); assertEq(a.ty, 1);
+  assertEq(a.tx, 1); assertEq(a.ty, 3);
 });
 test('waiting → path vers le café ; retour running en route → demi-tour vers la chaise', () => {
   const st = OL.createState();
@@ -154,7 +161,7 @@ test('waiting → path vers le café ; retour running en route → demi-tour ver
   OL.tickActor(a, zones); OL.tickActor(a, zones);
   OL.syncSession(st, sess('a', 'running'));
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 2); assertEq(dest.ty, 1);
+  assertEq(dest.tx, 1); assertEq(dest.ty, 3);
 });
 test('un acteur en erreur ne marche pas', () => {
   const st = OL.createState();
@@ -191,7 +198,7 @@ test('session ressuscitée après un leave abouti → done repasse à false, pat
   OL.syncSession(st, sess('a', 'running'));
   assertEq(a.done, false);
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 2); assertEq(dest.ty, 1);
+  assertEq(dest.tx, 1); assertEq(dest.ty, 3);
 });
 test('subagents → 2 acteurs max, aux sièges latéraux', () => {
   const st = OL.createState();
@@ -241,10 +248,14 @@ console.log('\nanimFor:');
 test('en mouvement → walk.<dir>', () => {
   assertEq(OL.animFor({ charIdx: 3, activity: 'coffee', path: [{ tx: 5, ty: 2 }], dir: 'left' }), 'char3.walk.left');
 });
-test('work → idle.down, call → phone.right, down → hurt', () => {
-  assertEq(OL.animFor({ charIdx: 0, activity: 'work', path: [], dir: 'down' }), 'char0.idle.down');
+test('work/think au bureau → idle.up (dos au spectateur), call → phone.right, down → hurt', () => {
+  assertEq(OL.animFor({ charIdx: 0, activity: 'work', path: [], dir: 'down' }), 'char0.idle.up');
+  assertEq(OL.animFor({ charIdx: 0, activity: 'think', path: [], dir: 'down' }), 'char0.idle.up');
   assertEq(OL.animFor({ charIdx: 1, activity: 'call', path: [], dir: 'down' }), 'char1.phone.right');
   assertEq(OL.animFor({ charIdx: 1, activity: 'down', path: [], dir: 'down' }), 'char1.hurt');
+});
+test('work en réunion (kind meeting) → idle.down, pas idle.up', () => {
+  assertEq(OL.animFor({ charIdx: 2, activity: 'work', kind: 'meeting', path: [], dir: 'up' }), 'char2.idle.down');
 });
 test('coffee arrivé → idle.left (machine à gauche du point café)', () => {
   assertEq(OL.animFor({ charIdx: 1, activity: 'coffee', path: [], dir: 'left' }), 'char1.idle.left');

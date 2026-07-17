@@ -9,17 +9,25 @@
 
   // Pièce adaptative : base 7×5, +1 colonne si subagents, +2 rangées si workflow actif.
   const BASE_COLS = 7, BASE_ROWS = 5;
-  const DESK_CHAR = { tx: 2, ty: 1 };
+  // Vue par-dessus l'épaule : le perso est au SUD de son bureau (1,2), dos au
+  // spectateur, face à l'écran qui lui fait face plein sud. Colonne 1 (pas 2)
+  // pour ne pas s'aligner avec le café (2,4) : sinon le perso debout au café
+  // (tx2, 1 rangée sous ty3) recouvre la chaise vide en visuel.
+  const DESK_CHAR = { tx: 1, ty: 3 };
   const DOOR = { tx: 5, ty: 1 };
   const COFFEE = { tx: 2, ty: 4 };
   const POSTER = { tx: 2, ty: 0 };
   const DESK = { tx: 1, ty: 2 };
-  const COFFEE_MACHINE = { tx: 1, ty: 4 };
+  // Décalée en colonne 0 (pas 1, sous le siège) : sinon la machine (poussée
+  // vers le haut) et la chaise (poussée vers le bas) se chevauchent en pixels.
+  const COFFEE_MACHINE = { tx: 0, ty: 4 };
   const PLANT = { tx: 5, ty: 4 };
   const PAPERS = [{ tx: 3, ty: 3 }, { tx: 2, ty: 2 }];
   const FLOOR_WOOD = [{ tx: 1, ty: 3 }, { tx: 2, ty: 3 }, { tx: 1, ty: 4 }, { tx: 2, ty: 4 }];
-  const SIDE_SEATS = [{ tx: 6, ty: 1 }, { tx: 6, ty: 3 }];
-  const CHAIR_DY = -8;    // décale le dossier vers le haut pour qu'il dépasse au-dessus de la tête
+  // Sièges subagents = position du perso (SUD de sa table, cf. push table ty-1 plus bas).
+  const SIDE_SEATS = [{ tx: 6, ty: 2 }, { tx: 6, ty: 4 }];
+  const CHAIR_FRAME = 'chairFront';   // dossier au sud du perso dos-au-spectateur : chairFront lit mieux ici
+  const CHAIR_DY = 3;    // décale la chaise vers le bas pour que le dossier dépasse sous le perso (côté spectateur)
   const COFFEE_DY = -3;   // pose la tasse sur le comptoir sans qu'elle déborde de sa tuile
   const MEETING_SEATS = [{ tx: 2, ty: 5 }, { tx: 4, ty: 5 }, { tx: 2, ty: 6 }, { tx: 4, ty: 6 }];
   const MEETING_TABLE = { tx: 3, ty: 5 };
@@ -81,16 +89,17 @@
     }
     statics.push({ frame: 'door', tx: DOOR.tx, ty: 0 });   // marqueur programmatique
     statics.push({ frame: 'poster', tx: POSTER.tx, ty: POSTER.ty });
-    statics.push({ frame: 'chairBack', tx: DESK_CHAR.tx, ty: DESK_CHAR.ty, dy: CHAIR_DY });
     statics.push({ frame: 'desk', tx: DESK.tx, ty: DESK.ty });
     statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
+    statics.push({ frame: CHAIR_FRAME, tx: DESK_CHAR.tx, ty: DESK_CHAR.ty, dy: CHAIR_DY });
     statics.push({ frame: 'sideDesk', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty });   // comptoir sous la tasse
     statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty, dy: COFFEE_DY });
     statics.push({ frame: 'plant', tx: PLANT.tx, ty: PLANT.ty });
     for (let i = 0; i < Math.min(subs, MAX_SUBS); i++) {
-      statics.push({ frame: 'chairBack', tx: SIDE_SEATS[i].tx, ty: SIDE_SEATS[i].ty, dy: CHAIR_DY });
-      statics.push({ frame: 'sideDesk', tx: SIDE_SEATS[i].tx, ty: SIDE_SEATS[i].ty + 1 });
-      statics.push({ frame: 'laptop', tx: SIDE_SEATS[i].tx, ty: SIDE_SEATS[i].ty + 1 });
+      const seat = SIDE_SEATS[i];
+      statics.push({ frame: 'sideDesk', tx: seat.tx, ty: seat.ty - 1 });
+      statics.push({ frame: 'laptop', tx: seat.tx, ty: seat.ty - 1 });
+      statics.push({ frame: CHAIR_FRAME, tx: seat.tx, ty: seat.ty, dy: CHAIR_DY });
     }
     if (hasMeeting) statics.push({ frame: 'meetingTable', tx: MEETING_TABLE.tx, ty: MEETING_TABLE.ty });
     if (session.state && session.state.name === 'error') {
@@ -215,11 +224,16 @@
       case 'call': return `${c}.phone.right`;
       case 'down': return `${c}.hurt`;
       case 'coffee': return `${c}.idle.left`;  // machine à gauche du point café
+      case 'work':
+      case 'think':
+        // Au bureau (perso principal / subagent) : dos au spectateur, face à l'écran.
+        // Les assis en réunion (kind 'meeting') gardent idle.down (autour de la table).
+        return actor.kind === 'meeting' ? `${c}.idle.down` : `${c}.idle.up`;
       default: return `${c}.idle.down`;
     }
   }
 
   return { createState, roomFor, syncSession, purge, actorsFor, tickActor,
            animFor, activityFor, charIndexFor, pathTo, workflowRunning,
-           BASE_COLS, BASE_ROWS };
+           BASE_COLS, BASE_ROWS, DESK };
 });

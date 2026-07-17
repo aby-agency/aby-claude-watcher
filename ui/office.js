@@ -104,9 +104,13 @@ const Office = (() => {
       if (st.screen) {
         const color = STATE_COLORS[stateName];
         if (color && stateName !== 'waiting') {
+          // Ancrée sur le moniteur droit (plat, pas le secondaire pivoté) —
+          // fixe par rapport au bureau, indépendante de la colonne où le
+          // perso est assis (le siège peut être décalé pour éviter le café).
+          const screenTx = OfficeLayout.DESK.tx + 1;
           c2d.fillStyle = color;
           c2d.globalAlpha = (stateName === 'running' && (tickCount & 4)) ? 0.4 : 0.9;
-          c2d.fillRect((room.zones.deskChar.tx * 16 + 4) * scale, (st.ty * 16 - 6) * scale, 6 * scale, 4 * scale);
+          c2d.fillRect((screenTx * 16 + 4) * scale, (st.ty * 16 - 6) * scale, 6 * scale, 4 * scale);
           c2d.globalAlpha = 1;
         }
       }

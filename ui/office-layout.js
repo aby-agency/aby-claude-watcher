@@ -94,6 +94,29 @@
     return max;
   }
 
+  // Plancher GÉNÉRIQUE de dimensionnement (fix reviewer C3) : la plus haute
+  // rangée (ty) physiquement occupée par un acteur DANS la salle — marcheur
+  // OU gelé (activité 'down') —, +1 (0 si personne). Complète maxHeldSlotIdx
+  // (C2, basé sur les INDEX de slots) pour une 3e variante de la même
+  // famille de bug : un acteur gelé en erreur (I2) reste à sa tuile COURANTE,
+  // potentiellement en plein couloir (loin de la position de son slot) si
+  // l'erreur survient en pleine migration. Le dimensionnement par index de
+  // slot ne voit pas ça (le slot logique de l'acteur peut être bas, sa tuile
+  // réelle peut être basse dans la salle si figée à mi-couloir d'une grande
+  // salle qui a depuis rétréci). Repro reviewer : 6 running, s0 migre, erreur
+  // à mi-couloir (3,8), les 5 autres sortent complètement → sans ce plancher,
+  // la salle rétrécirait à 5 rangées alors que s0 est toujours assis en
+  // ty=8, hors sol, DÉFINITIVEMENT tant que l'erreur dure (pas transitoire).
+  // Principe : une salle ne rétrécit JAMAIS sous la position réelle de ses
+  // occupants, quelle que soit la raison de leur présence à cette position
+  // (slot normal, marche en cours, gel en erreur mid-couloir).
+  function maxActorTyInRoom(state, roomKey) {
+    if (!state) return -1;
+    let max = -1;
+    for (const a of state.actors.values()) if (a.roomKey === roomKey && a.ty > max) max = a.ty;
+    return max;
+  }
+
   // Compte de DIMENSIONNEMENT réconcilié (fix reviewer C1 + C2) : pendant
   // qu'un perso migre, `logicalRoomCounts` (snapshot) le retire IMMÉDIATEMENT
   // de sa salle d'origine dès que l'état change, alors que physiquement
@@ -157,13 +180,18 @@
     while (ty !== to.ty) { ty += Math.sign(to.ty - ty); path.push({ tx, ty }); }
     return path;
   }
-  function routeWork(from, to, occupantCount) {
-    return routeInRoom(from, to, workRoomRows(occupantCount) - 1);
+  // `floorRows` (fix C3, optionnel) : plancher supplémentaire — jamais
+  // en-dessous, quelle que soit la formule occupantCount → workRoomRows. Voir
+  // `maxActorTyInRoom` : garantit qu'aucun acteur PHYSIQUEMENT présent dans
+  // la salle (marcheur ou gelé) ne se retrouve hors sol après un recalcul.
+  function routeWork(from, to, occupantCount, floorRows) {
+    const rows = Math.max(workRoomRows(occupantCount), floorRows || 0);
+    return routeInRoom(from, to, rows - 1);
   }
 
-  function workRoomStatics(occupantCount) {
+  function workRoomStatics(occupantCount, floorRows) {
     const pairsToRender = workPairs(occupantCount);
-    const rows = workRoomRows(occupantCount);
+    const rows = Math.max(workRoomRows(occupantCount), floorRows || 0);
     const statics = [];
     for (let x = 0; x < WORK_COLS; x++) statics.push({ frame: 'wall', tx: x, ty: 0 });
     for (let y = 1; y < rows; y++) for (let x = 0; x < WORK_COLS; x++) statics.push({ frame: 'floor', tx: x, ty: y });
@@ -217,8 +245,14 @@
     return routeInRoom(from, to, BREAK_CORRIDOR_TY);
   }
 
-  function breakRoomStatics(occupantCount) {
-    const rows = breakRoomRows(occupantCount);
+  // `floorRows` (fix C3, optionnel) : même plancher que workRoomStatics — un
+  // acteur gelé en erreur dans la salle Pause (migration break→work
+  // interrompue mid-couloir) doit garder du sol sous lui même si la salle se
+  // recalcule plus petite entre-temps. Le ROUTAGE pause n'a pas besoin de cet
+  // ajustement (pivot fixe row2, cf. routeBreak, valable quelle que soit la
+  // taille de la salle) — seul le RENDU (statics) en a besoin.
+  function breakRoomStatics(occupantCount, floorRows) {
+    const rows = Math.max(breakRoomRows(occupantCount), floorRows || 0);
     const statics = [];
     for (let x = 0; x < BREAK_COLS; x++) statics.push({ frame: 'wall', tx: x, ty: 0 });
     for (let y = 1; y < rows; y++) for (let x = 0; x < BREAK_COLS; x++) statics.push({ frame: 'floor', tx: x, ty: y });
@@ -303,12 +337,18 @@
 
     const logical = logicalRoomCounts(interactive);
     const sizing = sizingCounts(interactive, state);
+    // Fix C3 : plancher supplémentaire — une salle ne rétrécit jamais sous
+    // la position réelle de ses occupants (marcheurs OU gelés en erreur mid-
+    // couloir, cf. maxActorTyInRoom). `+1` : `ty` est un index de rangée
+    // 0-based, il faut `rows > ty` pour que la tuile existe.
+    const workFloor = maxActorTyInRoom(state, 'work') + 1;
+    const breakFloor = maxActorTyInRoom(state, 'break') + 1;
     const subCount = all.reduce((n, s) => n + ((s.subagents || []).length), 0);
     const wfCount = all.reduce((n, s) => n + workflowRunning(s), 0);
     const headlessCount = background.length;
 
-    const work = workRoomStatics(sizing.work);
-    const brk = breakRoomStatics(sizing.break);
+    const work = workRoomStatics(sizing.work, workFloor);
+    const brk = breakRoomStatics(sizing.break, breakFloor);
     const research = researchRoomStatics(subCount, wfCount, headlessCount);
 
     return [
@@ -354,14 +394,23 @@
     return { tx: SPAWN_TILE.tx, ty: SPAWN_TILE.ty };
   }
 
-  function retarget(actor, target, occupantCountForRoute) {
+  // `state` (fix C3, optionnel) : permet de calculer le plancher
+  // `maxActorTyInRoom` pour le routage EN SALLE TRAVAIL (seule salle dont le
+  // pivot de routage dépend de `rows` — la Pause route sur un pivot fixe,
+  // row2, non affecté). Garantit que le pivot utilisé ICI pour router un
+  // AUTRE acteur reste cohérent avec la salle que `roomsFor(snapshot, state)`
+  // rendra (même floor des deux côtés).
+  function retarget(actor, target, occupantCountForRoute, state) {
     if (!target) return;
     const last = actor.path.length ? actor.path[actor.path.length - 1] : { tx: actor.tx, ty: actor.ty };
     if (last.tx === target.tx && last.ty === target.ty) return;
     const from = { tx: actor.tx, ty: actor.ty };
-    actor.path = actor.roomKey === 'break'
-      ? routeBreak(from, target)
-      : routeWork(from, target, occupantCountForRoute);
+    if (actor.roomKey === 'break') {
+      actor.path = routeBreak(from, target);
+    } else {
+      const floorRows = state ? maxActorTyInRoom(state, 'work') + 1 : 0;
+      actor.path = routeWork(from, target, occupantCountForRoute, floorRows);
+    }
   }
 
   // ─── syncActors : diff global (sessions → acteurs) ───────────────────────
@@ -384,7 +433,7 @@
         tx: SPAWN_TILE.tx, ty: SPAWN_TILE.ty, path: [], dir: 'down', animFrame: 0, done: false,
       };
       state.actors.set(sid, actor);
-      retarget(actor, slotPositionFor(desiredRoom, 'session', idx), sizing[desiredRoom]);
+      retarget(actor, slotPositionFor(desiredRoom, 'session', idx), sizing[desiredRoom], state);
       return;
     }
 
@@ -410,13 +459,13 @@
         actor.migratingTo = desiredRoom;
         actor.activity = activity;
         actor.done = false; // annule un `leave` définitif en cours (résurrection avant sortie complète)
-        retarget(actor, { ...SPAWN_TILE }, sizing[actor.roomKey]);
+        retarget(actor, { ...SPAWN_TILE }, sizing[actor.roomKey], state);
       } else {
         actor.activity = activity;
         // Retarget inconditionnel (no-op si le path est déjà bon, cf.
         // `retarget`) : nécessaire pour REPRENDRE la marche si elle a été
         // gelée par un passage en erreur entre-temps (path vidé ci-dessus).
-        retarget(actor, { ...SPAWN_TILE }, sizing[actor.roomKey]);
+        retarget(actor, { ...SPAWN_TILE }, sizing[actor.roomKey], state);
       }
       return;
     }
@@ -428,7 +477,7 @@
       actor.migratingTo = null;
       actor.activity = activity;
       actor.done = false;
-      retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), sizing[actor.roomKey]);
+      retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), sizing[actor.roomKey], state);
       return;
     }
 
@@ -449,11 +498,11 @@
       actor.activity = activity;
       actor.done = false;
       if (stillHeld) {
-        retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), sizing[actor.roomKey]);
+        retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), sizing[actor.roomKey], state);
       } else {
         const idx = allocateSlot(state, desiredRoom, 'session', sid);
         actor.slotIdx = idx;
-        retarget(actor, slotPositionFor(desiredRoom, 'session', idx), sizing[desiredRoom]);
+        retarget(actor, slotPositionFor(desiredRoom, 'session', idx), sizing[desiredRoom], state);
       }
       return;
     }
@@ -461,7 +510,7 @@
     if (actor.activity !== activity) {
       actor.activity = activity;
       actor.animFrame = 0;
-      retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), sizing[actor.roomKey]);
+      retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), sizing[actor.roomKey], state);
     }
   }
 
@@ -555,7 +604,7 @@
       if (a.activity !== 'leave' || a.migratingTo !== null) {
         a.activity = 'leave';
         a.migratingTo = null;
-        retarget(a, { ...SPAWN_TILE }, sizing[a.roomKey]);
+        retarget(a, { ...SPAWN_TILE }, sizing[a.roomKey], state);
       }
     }
   }
@@ -591,7 +640,10 @@
         // migrations simultanées vers la MÊME salle pourraient transitoirement
         // sous-dimensionner l'entrée d'un des arrivants — non repro par le
         // reviewer, hors scope de ce fix (C1 ne portait que sur la sortie).
-        retarget(actor, slotPositionFor(targetRoom, 'session', idx), slotCount(state, targetRoom, 'session'));
+        // `state` en 4e argument (fix C3) : applique quand même le plancher
+        // « aucun acteur physiquement présent hors sol » à ce nouvel arrivant
+        // si la salle cible contient déjà un acteur gelé loin dans les rangées.
+        retarget(actor, slotPositionFor(targetRoom, 'session', idx), slotCount(state, targetRoom, 'session'), state);
         return false;
       }
       if (actor.kind === 'session' && actor.activity === 'leave' && actor.migratingTo === null && isAtSpawn(actor)) {

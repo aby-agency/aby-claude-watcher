@@ -542,6 +542,83 @@ test('C2 : cas plus sévère en salle Pause — 8 waiting (slot 7, bloc étendu)
   assertEq(brk.rows, 7, 'la salle doit rester assez grande pour (4,5) — un dimensionnement par `size` (1) retomberait à rows=5 et laisserait q7 hors sol');
 });
 
+console.log('\nC3 (reviewer) — perso gelé en erreur hors-sol (3e variante de la même famille):');
+test('C3 : 6 running, s0 migre et erreure à mi-couloir, les 5 autres sortent complètement → s0 (gelé, ty=8) reste dans les bornes rendues', () => {
+  const st = OL.createState();
+  const six = Array.from({ length: 6 }, (_, i) => sess('s' + i, 'running'));
+  OL.syncActors(st, snap(six));
+  for (const s of six) walkToRest(st.actors.get(s.sessionId), st);
+  assertEq(OL.roomsFor(snap(six), st).find(r => r.key === 'work').rows, 9); // 6 occupants → 3 paires → rows=9
+
+  const s0 = st.actors.get('s0');
+  assertEq(s0.tx, 1); assertEq(s0.ty, 2); // slot 0
+
+  // s0 se met à migrer (running → waiting) : marche vers la sortie via le
+  // couloir bas (pivot = rows-1 = 8, cf. routeWork).
+  const snapAfterWaiting = snap([sess('s0', 'waiting'), sess('s1', 'running'), sess('s2', 'running'), sess('s3', 'running'), sess('s4', 'running'), sess('s5', 'running')]);
+  OL.syncActors(st, snapAfterWaiting);
+  assertEq(s0.migratingTo, 'break');
+  // 8 pas de chemin (2 ticks/pas) pour atteindre (3,8) : 6 pas verticaux
+  // ty2→ty8 le long de tx=1, puis 2 pas horizontaux tx1→tx3 le long de ty=8
+  // (couloir bas) — mi-couloir, exactement la tuile du repro reviewer.
+  for (let i = 0; i < 16; i++) OL.tickActor(s0, st);
+  assertEq(s0.tx, 3); assertEq(s0.ty, 8);
+  assert(s0.path.length > 0, 's0 doit être encore en marche (mi-couloir), pas arrivé');
+
+  // Erreur en plein couloir : s0 se fige SUR PLACE (fix I2), à (3,8).
+  const snapWithError = snap([sess('s0', 'error'), sess('s1', 'running'), sess('s2', 'running'), sess('s3', 'running'), sess('s4', 'running'), sess('s5', 'running')]);
+  OL.syncActors(st, snapWithError);
+  assertEq(s0.path.length, 0);
+  assertEq(s0.tx, 3); assertEq(s0.ty, 8);
+
+  // Les 5 autres sortent COMPLÈTEMENT (running → snapshot vide pour eux, ou
+  // simplement absents — sortie + suppression par l'appelant, contrat M5).
+  const snapOnlyError = snap([sess('s0', 'error')]);
+  OL.syncActors(st, snapOnlyError);
+  for (const s of six) if (s.sessionId !== 's0') fullyExit(s.sessionId, st);
+
+  // Repro reviewer : sans le plancher par position réelle (maxActorTyInRoom),
+  // sizingCounts (index de slot, C2) donnerait sizing.work=1 (seul le slot 0
+  // de s0 reste tenu) → workRoomRows(1)=5 → s0 (ty=8) serait hors sol,
+  // DÉFINITIVEMENT (l'erreur ne se résout pas toute seule).
+  assertEq(st.slots.work.size, 1); // confirme que C2 seul ne suffirait pas ici (fragmentation aussi présente)
+  const work = OL.roomsFor(snapOnlyError, st).find(r => r.key === 'work');
+  assert(s0.tx >= 0 && s0.tx < work.cols && s0.ty >= 0 && s0.ty < work.rows,
+    `s0 gelé en (${s0.tx},${s0.ty}) hors bornes de la salle travail rendue (rows=${work.rows})`);
+  assertEq(work.rows, 9, 'la salle doit rester assez grande pour couvrir ty=8 (s0 gelé), peu importe le compte/index de slot');
+});
+test('C3 : une fois l\'erreur résolue (s0 reprend sa migration et sort), la salle travail peut enfin rétrécir', () => {
+  const st = OL.createState();
+  const six = Array.from({ length: 6 }, (_, i) => sess('s' + i, 'running'));
+  OL.syncActors(st, snap(six));
+  for (const s of six) walkToRest(st.actors.get(s.sessionId), st);
+  const s0 = st.actors.get('s0');
+
+  OL.syncActors(st, snap([sess('s0', 'waiting'), sess('s1', 'running'), sess('s2', 'running'), sess('s3', 'running'), sess('s4', 'running'), sess('s5', 'running')]));
+  for (let i = 0; i < 16; i++) OL.tickActor(s0, st); // mi-couloir, (3,8)
+  OL.syncActors(st, snap([sess('s0', 'error'), sess('s1', 'running'), sess('s2', 'running'), sess('s3', 'running'), sess('s4', 'running'), sess('s5', 'running')]));
+  assertEq(s0.path.length, 0);
+
+  const snapOnlyError = snap([sess('s0', 'error')]);
+  OL.syncActors(st, snapOnlyError);
+  for (const s of six) if (s.sessionId !== 's0') fullyExit(s.sessionId, st);
+  assertEq(OL.roomsFor(snapOnlyError, st).find(r => r.key === 'work').rows, 9); // toujours 9 tant que s0 est figé en ty=8
+
+  // Erreur résolue : s0 reprend sa migration interrompue vers la pause (le
+  // guard 'down' n'avait touché ni roomKey ni migratingTo), puis sort.
+  OL.syncActors(st, snap([sess('s0', 'waiting')]));
+  assertEq(s0.migratingTo, 'break');
+  assert(s0.path.length > 0, 'la marche doit reprendre depuis (3,8), pas rester figée');
+  let ticks = 0;
+  while (s0.roomKey === 'work' && ticks < 300) { OL.tickActor(s0, st); ticks++; }
+  assertEq(s0.roomKey, 'break');
+
+  // s0 n'est plus dans la salle travail : plus aucun acteur là-bas, la
+  // salle peut retomber à sa taille minimale.
+  const workAfter = OL.roomsFor(snap([], []), st).find(r => r.key === 'work');
+  assertEq(workAfter.rows, 5);
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 console.log('\nrecherche : subagents/workflow/headless, dédup, purge:');
 test('subagents (max 6) → acteurs en salle recherche, aux postes latéraux', () => {

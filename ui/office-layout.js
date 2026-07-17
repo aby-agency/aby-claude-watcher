@@ -32,7 +32,6 @@
   // (le dossier overlay du fauteuil recouvrirait la tête du perso au café).
   const DESK_CHAR = { tx: 1, ty: 2 };
   const DOOR = { tx: 3, ty: 1 };
-  const COFFEE = { tx: 1, ty: 4 }; // collé à la machine (0,4), toujours sur le parquet
   // Tableau blanc mural (densité v2.4, remplace l'ancien poster) : sprite
   // 30×23 (~2 tuiles de large), ancré tx=1 pour déborder visuellement sur
   // tx=2, au-dessus du bureau.
@@ -98,7 +97,9 @@
     switch (stateName) {
       case 'thinking': return 'think';
       case 'running': return 'work';
-      case 'waiting': return 'coffee';
+      // waiting : le perso RESTE au PC (retour Paul v2.7) — la bulle zzz
+      // porte l'attente ; le coin café est du décor.
+      case 'waiting': return 'work';
       case 'pending': return 'call';
       case 'error': return 'down';
       default: return 'work';
@@ -125,7 +126,7 @@
     const zones = {
       door: { ...DOOR },
       deskChar: { ...DESK_CHAR },
-      coffee: { ...COFFEE },
+
       sideSeats: SIDE_SEATS.map(p => ({ ...p })),
       meetingSeats: hasMeeting ? MEETING_SEATS.map(p => ({ ...p })) : [],
       subOverflow: Math.max(0, subs - MAX_SUBS),
@@ -204,7 +205,6 @@
   }
 
   function targetFor(activity, zones) {
-    if (activity === 'coffee') return zones.coffee;
     if (activity === 'leave') return zones.door;
     return zones.deskChar;
   }
@@ -309,7 +309,6 @@
     switch (actor.activity) {
       case 'call': return `${c}.phone.right`;
       case 'down': return `${c}.hurt`;
-      case 'coffee': return `${c}.idle.left`;  // machine à gauche du point café
       case 'work':
       case 'think':
         // Au bureau (perso principal / subagent) : dos au spectateur, face à l'écran.

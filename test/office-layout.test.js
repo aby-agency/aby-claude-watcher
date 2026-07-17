@@ -22,7 +22,7 @@ test('charIndexFor stable et borné [0,9]', () => {
 test('mapping complet des activités', () => {
   assertEq(OL.activityFor('thinking'), 'think');
   assertEq(OL.activityFor('running'), 'work');
-  assertEq(OL.activityFor('waiting'), 'coffee');
+  assertEq(OL.activityFor('waiting'), 'work'); // v2.7 : waiting reste au PC, la bulle zzz porte l'attente
   assertEq(OL.activityFor('pending'), 'call');
   assertEq(OL.activityFor('error'), 'down');
 });
@@ -86,7 +86,6 @@ test('zones aux positions spécifiées', () => {
   // Vue par-dessus l'épaule : le perso est au SUD du bureau (1,2), pas au nord.
   assertEq(z.deskChar.tx, 1); assertEq(z.deskChar.ty, 2);
   assertEq(z.door.tx, 3); assertEq(z.door.ty, 1);
-  assertEq(z.coffee.tx, 1); assertEq(z.coffee.ty, 4);
   assertEq(z.sideSeats.length, 2);
 });
 test('statics : desk avec screen, machine café, porte', () => {
@@ -184,19 +183,19 @@ test('leave (chaise→porte) contourne le bureau : le path ne traverse pas (0,1)
   const onDesk = (p) => (p.tx === 0 && p.ty === 1) || (p.tx === 1 && p.ty === 1);
   assert(!a.path.some(onDesk), 'le path de leave traverse le bureau');
 });
-test('leave depuis le café (1,4) évite la plante (4,4) et le bureau (0,1)/(1,1)', () => {
+test('leave depuis le poste évite la plante (4,4) et le bureau (0,1)/(1,1)', () => {
   const st = OL.createState();
   const s = sess('a', 'waiting');
   OL.syncSession(st, s);
   const a = st.actors.get('a');
   const zones = OL.roomFor(s).zones;
-  while (a.path.length > 0) OL.tickActor(a, zones);   // atteint le café (1,4)
-  assertEq(a.tx, 1); assertEq(a.ty, 4);
+  while (a.path.length > 0) OL.tickActor(a, zones);   // s'installe au poste
+  assertEq(a.tx, 1); assertEq(a.ty, 2);
   OL.purge(st, new Set());                             // déclenche le leave → porte
   const onDesk = (p) => (p.tx === 0 && p.ty === 1) || (p.tx === 1 && p.ty === 1);
   const onPlant = (p) => p.tx === 4 && p.ty === 4;
-  assert(!a.path.some(onDesk), 'le path de leave depuis le café traverse le bureau');
-  assert(!a.path.some(onPlant), 'le path de leave depuis le café traverse la plante');
+  assert(!a.path.some(onDesk), 'le path de leave traverse le bureau');
+  assert(!a.path.some(onPlant), 'le path de leave traverse la plante');
 });
 test('l\'acteur atteint sa chaise en marchant', () => {
   const st = OL.createState();
@@ -207,19 +206,17 @@ test('l\'acteur atteint sa chaise en marchant', () => {
   for (let i = 0; i < 100 && a.path.length > 0; i++) OL.tickActor(a, zones);
   assertEq(a.tx, 1); assertEq(a.ty, 2);
 });
-test('waiting → path vers le café ; retour running en route → demi-tour vers la chaise', () => {
+test('waiting → le perso RESTE au PC (pas de départ, retour Paul v2.7)', () => {
   const st = OL.createState();
-  let s = sess('a', 'running');
-  OL.syncSession(st, s);
+  OL.syncSession(st, sess('a', 'running'));
   const a = st.actors.get('a');
-  const zones = OL.roomFor(s).zones;
+  const zones = OL.roomFor(sess('a', 'running')).zones;
   while (a.path.length > 0) OL.tickActor(a, zones);
   OL.syncSession(st, sess('a', 'waiting'));
-  assert(a.path.length > 0, 'pas de départ café');
-  OL.tickActor(a, zones); OL.tickActor(a, zones);
-  OL.syncSession(st, sess('a', 'running'));
-  const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 1); assertEq(dest.ty, 2);
+  assertEq(a.path.length, 0);                          // aucun déplacement
+  assertEq(a.tx, 1); assertEq(a.ty, 2);                // toujours à sa chaise
+  OL.syncSession(st, sess('a', 'running'));            // retour running : idem
+  assertEq(a.path.length, 0);
 });
 test('un acteur en erreur ne marche pas', () => {
   const st = OL.createState();
@@ -314,9 +311,6 @@ test('work/think au bureau → idle.up (dos au spectateur), call → phone.right
 });
 test('work en réunion (kind meeting) → idle.down, pas idle.up', () => {
   assertEq(OL.animFor({ charIdx: 2, activity: 'work', kind: 'meeting', path: [], dir: 'up' }), 'char2.idle.down');
-});
-test('coffee arrivé → idle.left (machine à gauche du point café)', () => {
-  assertEq(OL.animFor({ charIdx: 1, activity: 'coffee', path: [], dir: 'left' }), 'char1.idle.left');
 });
 
 console.log('\nemoteFor (fonction pure, priorité bell > état > outil):');

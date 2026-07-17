@@ -27,9 +27,12 @@
   // spectateur, face à l'écran qui lui fait face plein sud. Colonne 1 (pas 2)
   // pour ne pas s'aligner avec le café (2,4) : sinon le perso debout au café
   // (tx2, 1 rangée sous ty3) recouvre la chaise vide en visuel.
-  const DESK_CHAR = { tx: 1, ty: 3 };
+  // (2,3) : sous le GRAND écran du setup (colonne DESK.tx+1, celle de la LED)
+  // — retour Paul. Le point café est passé en (1,4) pour libérer la colonne 2
+  // (le dossier overlay du fauteuil recouvrirait la tête du perso au café).
+  const DESK_CHAR = { tx: 2, ty: 3 };
   const DOOR = { tx: 4, ty: 1 };
-  const COFFEE = { tx: 2, ty: 4 };
+  const COFFEE = { tx: 1, ty: 4 }; // collé à la machine (0,4), toujours sur le parquet
   // Tableau blanc mural (densité v2.4, remplace l'ancien poster) : sprite
   // 30×23 (~2 tuiles de large), ancré tx=1 pour déborder visuellement sur
   // tx=2, au-dessus du bureau.

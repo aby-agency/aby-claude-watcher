@@ -84,9 +84,9 @@ test('le mur et le sol couvrent les dimensions effectives', () => {
 test('zones aux positions spécifiées', () => {
   const z = OL.roomFor(sess('a', 'running')).zones;
   // Vue par-dessus l'épaule : le perso est au SUD du bureau (1,2), pas au nord.
-  assertEq(z.deskChar.tx, 1); assertEq(z.deskChar.ty, 3);
+  assertEq(z.deskChar.tx, 2); assertEq(z.deskChar.ty, 3);
   assertEq(z.door.tx, 4); assertEq(z.door.ty, 1);
-  assertEq(z.coffee.tx, 2); assertEq(z.coffee.ty, 4);
+  assertEq(z.coffee.tx, 1); assertEq(z.coffee.ty, 4);
   assertEq(z.sideSeats.length, 2);
 });
 test('statics : desk avec screen, machine café, porte', () => {
@@ -102,7 +102,7 @@ test('statics : desk avec screen, machine café, porte', () => {
   assert(st.some(x => x.frame === 'sideDesk' && x.tx === coffeeMachineStatic.tx && x.ty === coffeeMachineStatic.ty),
     'pas de comptoir sous la tasse');
   // La chaise du bureau principal ne doit pas être dans la même colonne que
-  // le point café (2,4) ni que la machine à café : sinon le perso debout là
+  // le point café (1,4) ni que la machine à café : sinon le perso debout là
   // recouvre la chaise vide (v23 : régression corrigée en décalant la colonne).
   assert(room.zones.deskChar.tx !== room.zones.coffee.tx, 'chaise alignée avec le point café');
   assert(room.zones.deskChar.tx !== coffeeMachineStatic.tx, 'chaise alignée avec la machine à café');
@@ -192,7 +192,7 @@ test('nouvelle session → acteur spawn à la porte, path vers la chaise', () =>
   assert(a, 'pas d\'acteur');
   assertEq(a.tx, 4); assertEq(a.ty, 1);
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 1); assertEq(dest.ty, 3);
+  assertEq(dest.tx, 2); assertEq(dest.ty, 3);
 });
 test('spawn (porte→chaise) contourne le bureau : le path ne traverse pas (1,2)/(2,2)', () => {
   const st = OL.createState();
@@ -213,14 +213,14 @@ test('leave (chaise→porte) contourne le bureau : le path ne traverse pas (1,2)
   const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
   assert(!a.path.some(onDesk), 'le path de leave traverse le bureau');
 });
-test('leave depuis le café (2,4) évite la plante (4,4) et le bureau (1,2)/(2,2)', () => {
+test('leave depuis le café (1,4) évite la plante (4,4) et le bureau (1,2)/(2,2)', () => {
   const st = OL.createState();
   const s = sess('a', 'waiting');
   OL.syncSession(st, s);
   const a = st.actors.get('a');
   const zones = OL.roomFor(s).zones;
-  while (a.path.length > 0) OL.tickActor(a, zones);   // atteint le café (2,4)
-  assertEq(a.tx, 2); assertEq(a.ty, 4);
+  while (a.path.length > 0) OL.tickActor(a, zones);   // atteint le café (1,4)
+  assertEq(a.tx, 1); assertEq(a.ty, 4);
   OL.purge(st, new Set());                             // déclenche le leave → porte
   const onDesk = (p) => (p.tx === 1 && p.ty === 2) || (p.tx === 2 && p.ty === 2);
   const onPlant = (p) => p.tx === 4 && p.ty === 4;
@@ -234,7 +234,7 @@ test('l\'acteur atteint sa chaise en marchant', () => {
   const a = st.actors.get('a');
   const zones = OL.roomFor(s).zones;
   for (let i = 0; i < 100 && a.path.length > 0; i++) OL.tickActor(a, zones);
-  assertEq(a.tx, 1); assertEq(a.ty, 3);
+  assertEq(a.tx, 2); assertEq(a.ty, 3);
 });
 test('waiting → path vers le café ; retour running en route → demi-tour vers la chaise', () => {
   const st = OL.createState();
@@ -248,7 +248,7 @@ test('waiting → path vers le café ; retour running en route → demi-tour ver
   OL.tickActor(a, zones); OL.tickActor(a, zones);
   OL.syncSession(st, sess('a', 'running'));
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 1); assertEq(dest.ty, 3);
+  assertEq(dest.tx, 2); assertEq(dest.ty, 3);
 });
 test('un acteur en erreur ne marche pas', () => {
   const st = OL.createState();
@@ -285,7 +285,7 @@ test('session ressuscitée après un leave abouti → done repasse à false, pat
   OL.syncSession(st, sess('a', 'running'));
   assertEq(a.done, false);
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 1); assertEq(dest.ty, 3);
+  assertEq(dest.tx, 2); assertEq(dest.ty, 3);
 });
 test('subagents → 2 acteurs max, aux sièges latéraux', () => {
   const st = OL.createState();

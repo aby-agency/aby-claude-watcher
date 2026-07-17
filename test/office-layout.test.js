@@ -1,5 +1,7 @@
 // test/office-layout.test.js — Run: node test/office-layout.test.js
-// v2 : une pièce par session (pièces-cartes).
+// v3 : 3 salles par fonction (Travail/Pause/Recherche), persos migrent selon
+// l'état de leur session. Slots stables PAR SALLE. Voir docs/superpowers/
+// specs/2026-07-17-office-salles-design.md (fait foi) et le plan associé.
 const OL = require('../ui/office-layout.js');
 
 let passed = 0, failed = 0;
@@ -13,137 +15,116 @@ function assert(c, m) { if (!c) throw new Error(m || 'assertion failed'); }
 function sess(id, state, extra) {
   return Object.assign({ sessionId: id, projectName: `proj-${id}`, state: { name: state }, subagents: [], workflows: [] }, extra);
 }
+function snap(interactive, background) { return { interactive: interactive || [], background: background || [] }; }
 
-console.log('\ncharIndexFor / activityFor (inchangés):');
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\ncharIndexFor / activityFor / roomKeyForState:');
 test('charIndexFor stable et borné [0,9]', () => {
   assertEq(OL.charIndexFor('aby-claude-watcher'), OL.charIndexFor('aby-claude-watcher'));
   for (const n of ['a', 'x/y', '']) { const i = OL.charIndexFor(n); assert(i >= 0 && i <= 9); }
 });
-test('mapping complet des activités', () => {
+test('mapping des activités — waiting devient relax (v3 : quitte le PC pour la pause)', () => {
   assertEq(OL.activityFor('thinking'), 'think');
   assertEq(OL.activityFor('running'), 'work');
-  assertEq(OL.activityFor('waiting'), 'work'); // v2.7 : waiting reste au PC, la bulle zzz porte l'attente
+  assertEq(OL.activityFor('waiting'), 'relax'); // v3 : supersède v2.7 (waiting migre en salle pause)
   assertEq(OL.activityFor('pending'), 'call');
   assertEq(OL.activityFor('error'), 'down');
 });
+test('roomKeyForState : travail = thinking/running/pending/error, pause = waiting', () => {
+  assertEq(OL.roomKeyForState('thinking'), 'work');
+  assertEq(OL.roomKeyForState('running'), 'work');
+  assertEq(OL.roomKeyForState('pending'), 'work');
+  assertEq(OL.roomKeyForState('error'), 'work');
+  assertEq(OL.roomKeyForState('waiting'), 'break');
+  assertEq(OL.roomKeyForState(undefined), 'work'); // défaut
+});
 
-console.log('\nroomFor (géométrie):');
-test('exporte BASE_COLS/BASE_ROWS (plus ROOM_COLS/ROOM_ROWS)', () => {
-  // v2.4 : 6×5 (cubicle dense — tentative 6×4 documentée dans le rapport,
-  // abandonnée à cause d'une collision géométrique table/siège subagent).
-  assertEq(OL.BASE_COLS, 6); assertEq(OL.BASE_ROWS, 4); // v2.8 : caméra remontée
-  assertEq(OL.ROOM_COLS, undefined); assertEq(OL.ROOM_ROWS, undefined);
-});
-test('pièce de base 6×4, sans sièges latéraux ni réunion', () => {
-  const r = OL.roomFor(sess('a', 'running'));
-  assertEq(r.cols, 6); assertEq(r.rows, 4);
-  // le seul sideDesk de la pièce de base est le comptoir sous la tasse de café
-  assertEq(r.statics.filter(x => x.frame === 'sideDesk').length, 1);
-  assert(!r.statics.some(x => x.frame === 'laptop'), 'pas de laptop sans subagent');
-  assert(!r.statics.some(x => x.frame === 'meetingTable'));
-});
-test('subagents → +2 rangées en bas, largeur fixe (v2.9)', () => {
-  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
-  assertEq(r.cols, 6); assertEq(r.rows, 6); // 4 base + 2 rangées stations
-  assertEq(OL.roomFor(sess('a', 'running')).cols, 6); // largeur identique sans subs
-});
-test('chaque subagent a une chaise (vue de dos, z:over) et un laptop sur sa table (perso au SUD de sa table)', () => {
-  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }] }));
-  const seats = r.zones.sideSeats.slice(0, 2); // 2 subs → 2 stations occupées
-  for (const seat of seats) {
-    assert(r.statics.some(x => x.frame === 'chairOver' && x.tx === seat.tx && x.ty === seat.ty),
-      `pas de chaise au siège (${seat.tx},${seat.ty})`);
-    // Le fauteuil vu de dos se pose PAR-DESSUS le perso (dossier face caméra).
-    assert(r.statics.some(x => x.frame === 'chairOver' && x.z === 'over' && x.tx === seat.tx && x.ty === seat.ty),
-      `chaise du siège (${seat.tx},${seat.ty}) pas en passe z:over`);
-    // La table/laptop est au NORD du perso (dos au spectateur, face à l'écran).
-    assert(r.statics.some(x => x.frame === 'laptop' && x.tx === seat.tx && x.ty === seat.ty - 1),
-      `pas de laptop à la table (${seat.tx},${seat.ty - 1})`);
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\nroomsFor (3 salles, ordre fixe, géométrie):');
+test('3 salles, ordre travail/pause/recherche, clés attendues', () => {
+  const rooms = OL.roomsFor(snap([]));
+  assertEq(rooms.length, 3);
+  assertEq(rooms[0].key, 'work'); assertEq(rooms[1].key, 'break'); assertEq(rooms[2].key, 'research');
+  for (const r of rooms) {
+    assert(typeof r.cols === 'number' && typeof r.rows === 'number');
+    assert(Array.isArray(r.statics));
+    assert(r.doorSpawn && typeof r.doorSpawn.tx === 'number' && typeof r.doorSpawn.ty === 'number');
+    assert(typeof r.counter === 'number');
   }
 });
-test('un seul subagent → chaise/laptop uniquement au 1er siège', () => {
-  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
-  assertEq(r.statics.filter(x => x.frame === 'laptop').length, 1);
-  assertEq(r.statics.filter(x => x.frame === 'chairOver' && x.tx === r.zones.sideSeats[1].tx && x.ty === r.zones.sideSeats[1].ty).length, 0);
+test('salle vide = taille minimale, décor visible (desk pair travail, décor pause/recherche)', () => {
+  const rooms = OL.roomsFor(snap([]));
+  const work = rooms.find(r => r.key === 'work');
+  assertEq(work.rows, 5); // 3 + 2*1 (min 1 paire de bureaux même vide)
+  assert(work.statics.some(s => s.frame === 'desk'), 'pas de bureau décor en salle vide');
+  const brk = rooms.find(r => r.key === 'break');
+  assertEq(brk.rows, 5);
+  assert(brk.statics.some(s => s.frame === 'coffeeMachine'), 'pas de machine à café décor');
+  const research = rooms.find(r => r.key === 'research');
+  assertEq(research.rows, 4);
+  assert(research.statics.some(s => s.frame === 'meetingTable'), 'pas de table de réunion décor');
+  assert(research.statics.some(s => s.frame === 'whiteboard'), 'pas de tableau blanc décor');
 });
-test('workflow actif → +2 rangées (6 de haut)', () => {
-  const r = OL.roomFor(sess('a', 'running', { workflows: [{ runId: 'w', running: 2 }] }));
-  assertEq(r.cols, 6); assertEq(r.rows, 6);
-  assert(r.statics.some(x => x.frame === 'meetingTable'));
+test('footer : counter = occupants de la salle', () => {
+  const rooms = OL.roomsFor(snap([sess('a', 'running'), sess('b', 'waiting'), sess('c', 'thinking')]));
+  assertEq(rooms.find(r => r.key === 'work').counter, 2); // a (running) + c (thinking)
+  assertEq(rooms.find(r => r.key === 'break').counter, 1); // b (waiting)
 });
-test('subagents + workflow → 6×8 (stations puis réunion, empilées)', () => {
-  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
-  assertEq(r.cols, 6); assertEq(r.rows, 8);
-  // la réunion est SOUS les stations subagents
-  assert(r.zones.meetingTable.ty > r.zones.sideSeats[0].ty, 'réunion pas sous les stations');
+test('salle travail : rows grandit par paires de postes occupés (min 5)', () => {
+  const rows = n => OL.roomsFor(snap(Array.from({ length: n }, (_, i) => sess('s' + i, 'running')))).find(r => r.key === 'work').rows;
+  assertEq(rows(0), 5); assertEq(rows(1), 5); assertEq(rows(2), 5);
+  assertEq(rows(3), 7); assertEq(rows(4), 7);
+  assertEq(rows(5), 9);
 });
-test('le mur et le sol couvrent les dimensions effectives', () => {
-  const r = OL.roomFor(sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
-  assertEq(r.statics.filter(x => x.frame === 'wall').length, r.cols);
-  const floor = r.statics.filter(x => x.frame === 'floor' || x.frame === 'floorWood');
-  assertEq(floor.length, r.cols * (r.rows - 1));
+test('salle pause : rows fixes à 5 tant que ≤ 6 occupants, extensible ensuite', () => {
+  const rows = n => OL.roomsFor(snap(Array.from({ length: n }, (_, i) => sess('s' + i, 'waiting')))).find(r => r.key === 'break').rows;
+  assertEq(rows(0), 5); assertEq(rows(6), 5);
+  assertEq(rows(7), 7); assertEq(rows(12), 7); assertEq(rows(13), 9);
 });
-test('zones aux positions spécifiées', () => {
-  const z = OL.roomFor(sess('a', 'running')).zones;
-  // Vue par-dessus l'épaule : le perso est au SUD du bureau (1,2), pas au nord.
-  assertEq(z.deskChar.tx, 1); assertEq(z.deskChar.ty, 2);
-  assertEq(z.door.tx, 3); assertEq(z.door.ty, 1);
-  assertEq(z.sideSeats.length, 4); // 4 stations possibles (v2.9)
+test('salle recherche : rows grandit avec les subagents au-delà de la base (rangées 3+)', () => {
+  const withSubs = n => OL.roomsFor(snap([sess('a', 'running', { subagents: Array.from({ length: n }, (_, i) => ({ agentId: 'g' + i })) })])).find(r => r.key === 'research').rows;
+  assertEq(withSubs(0), 4);
+  assertEq(withSubs(2), 4); // 1 rangée (ty=3) tient dans rows=4
+  assertEq(withSubs(3), 5); // 2 rangées (ty=3,4) → rows = 3+2
 });
-test('statics : desk avec screen, machine café, porte', () => {
-  const room = OL.roomFor(sess('a', 'running'));
-  const st = room.statics;
-  assert(st.some(x => x.frame === 'deskSetup' && x.screen === 'a'), 'pas de screen');
-  assert(st.some(x => x.frame === 'coffeeMachine'), 'pas de machine');
-  assert(st.some(x => x.frame === 'door'), 'pas de porte');
-  assert(st.some(x => x.frame === 'chairOver' && x.z === 'over' && x.tx === room.zones.deskChar.tx && x.ty === room.zones.deskChar.ty),
-    'pas de chaise (vue de dos, z:over) au bureau principal');
-  const coffeeMachineStatic = st.find(x => x.frame === 'coffeeMachine');
-  assert(typeof coffeeMachineStatic.dy === 'number' && coffeeMachineStatic.dy < 0, 'tasse pas décalée sur le comptoir');
-  assert(st.some(x => x.frame === 'sideDesk' && x.tx === coffeeMachineStatic.tx && x.ty === coffeeMachineStatic.ty),
-    'pas de comptoir sous la tasse');
-  // v2.7 : chaise et point café partagent la colonne 1 — accepté, car le
-  // fauteuil n'est en overlay QUE quand le perso y est assis (office.js,
-  // overlay conditionnel) : personne n'est jamais recouvert par le dossier.
-  assert(room.zones.deskChar.tx !== coffeeMachineStatic.tx, 'chaise alignée avec la machine à café');
+test('salle recherche : le coin headless (cap 4, 2 rangées ty=2..3) tient toujours dans la base 4 rangées', () => {
+  const withHeadless = n => OL.roomsFor(snap([], Array.from({ length: n }, (_, i) => sess('h' + i, 'running')))).find(r => r.key === 'research').rows;
+  assertEq(withHeadless(0), 4);
+  assertEq(withHeadless(2), 4);
+  assertEq(withHeadless(4), 4); // cap atteint (4), les rangées 2+3 suffisent, jamais de croissance pour le seul headless
 });
-test('densité cubicle : lampe sur le bureau, ni tableau ni diplôme', () => {
-  const room = OL.roomFor(sess('a', 'running'));
-  const st = room.statics;
-  assert(!st.some(x => x.frame === 'whiteboard'), 'le tableau blanc a été retiré (retour Paul v2.8)');
-  const lamp = st.find(x => x.frame === 'deskLamp');
-  assert(lamp, 'pas de lampe');
-  assertEq(lamp.tx, OL.DESK.tx);
-  assertEq(lamp.ty, OL.DESK.ty);
-  assert(!st.some(x => x.frame === 'wallFrame'), 'le diplôme a été retiré (retour Paul v2.7)');
-  // la lampe est posée SUR le bureau (offset dy pour "flotter" au-dessus)
-  assert(typeof lamp.dy === 'number' && lamp.dy !== 0, 'lampe pas décalée sur le bureau');
-});
-test('papiers uniquement en erreur', () => {
-  const err = OL.roomFor(sess('a', 'error')).statics.filter(x => x.frame === '_papers');
-  const run = OL.roomFor(sess('a', 'running')).statics.filter(x => x.frame === '_papers');
-  assert(err.length >= 2, 'pas de papiers en erreur');
-  assertEq(run.length, 0);
-});
-test('fontaine et distributeur retirés (retour Paul v2.7)', () => {
-  const st = OL.roomFor(sess('a', 'running')).statics;
-  assert(!st.some(x => x.frame === 'waterCooler'), 'fontaine encore présente');
-  assert(!st.some(x => x.frame === 'vending'), 'distributeur encore présent');
+test('le mur (rangée 0) et le sol couvrent les dimensions effectives, dans chaque salle', () => {
+  const rooms = OL.roomsFor(snap([sess('a', 'running'), sess('b', 'waiting')]));
+  for (const r of rooms) {
+    assertEq(r.statics.filter(s => s.frame === 'wall').length, r.cols);
+    const floor = r.statics.filter(s => s.frame === 'floor' || s.frame === 'floorWood');
+    assertEq(floor.length, r.cols * (r.rows - 1));
+  }
 });
 
-test('coin réunion présent seulement si workflow actif', () => {
-  const w = sess('a', 'running', { workflows: [{ runId: 'wf1', name: 'r', running: 3 }] });
-  assert(OL.roomFor(w).statics.some(x => x.frame === 'meetingTable'));
-  assertEq(OL.roomFor(w).zones.meetingSeats.length, 4);
-  assert(!OL.roomFor(sess('a', 'running')).statics.some(x => x.frame === 'meetingTable'));
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\nrecherche : caps subagents/workflow/headless + overflow:');
+test('subagents : cap 6, overflow au-delà', () => {
+  const eight = Array.from({ length: 8 }, (_, i) => ({ agentId: 'g' + i }));
+  const research = OL.roomsFor(snap([sess('a', 'running', { subagents: eight })])).find(r => r.key === 'research');
+  assertEq(research.overflow.subagents, 2);
 });
-test('subOverflow compte les subagents au-delà de 4 (v2.9)', () => {
-  const six = Array.from({ length: 6 }, (_, i) => ({ agentId: 'g' + i }));
-  assertEq(OL.roomFor(sess('a', 'running', { subagents: six })).zones.subOverflow, 2);
-  assertEq(OL.roomFor(sess('a', 'running', { subagents: six.slice(0, 4) })).zones.subOverflow, 0);
+test('workflow : cap 4 sièges de table, overflow au-delà (dédup runId)', () => {
+  const research = OL.roomsFor(snap([sess('a', 'running', { workflows: [{ runId: 'w', running: 7 }] })])).find(r => r.key === 'research');
+  assertEq(research.overflow.workflow, 3);
+});
+test('headless : cap 4, overflow au-delà', () => {
+  const seven = Array.from({ length: 7 }, (_, i) => sess('h' + i, 'running'));
+  const research = OL.roomsFor(snap([], seven)).find(r => r.key === 'research');
+  assertEq(research.overflow.headless, 3);
+});
+test('pas d\'overflow pour travail/pause (extensibles)', () => {
+  const rooms = OL.roomsFor(snap(Array.from({ length: 20 }, (_, i) => sess('s' + i, 'running'))));
+  assertEq(rooms.find(r => r.key === 'work').overflow, 0);
 });
 
-console.log('\nworkflowRunning (dédup runId):');
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\nworkflowRunning (dédup runId, inchangé):');
 test('somme des running, dédup par runId', () => {
   const wf = { runId: 'dup', name: 'r', running: 3 };
   const s = sess('a', 'running', { workflows: [wf, { runId: 'dup', name: 'r', running: 3 }, { runId: 'w2', name: 'x', running: 2 }] });
@@ -153,156 +134,262 @@ test('workflows terminés (running 0) ignorés', () => {
   assertEq(OL.workflowRunning(sess('a', 'running', { workflows: [{ runId: 'w', running: 0 }] })), 0);
 });
 
-console.log('\nsyncSession / purge / tickActor:');
-test('nouvelle session → acteur spawn à la porte, path vers la chaise', () => {
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\nsyncActors : spawn, slots stables, non-traversée:');
+function walkToRest(a, state) { for (let i = 0; i < 300 && a.path.length > 0; i++) OL.tickActor(a, state); }
+function onWorkDesk(p) { return (p.tx === 0 && p.ty % 2 === 1) || (p.tx === 4 && p.ty % 2 === 1); }
+
+test('nouvelle session running → acteur spawn en salle travail, poste (1,2)', () => {
   const st = OL.createState();
-  const s = sess('a', 'running');
-  OL.syncSession(st, s);
+  OL.syncActors(st, snap([sess('a', 'running')]));
   const a = st.actors.get('a');
   assert(a, 'pas d\'acteur');
-  assertEq(a.tx, 3); assertEq(a.ty, 1); // porte décalée en (3,1) — v2.7
+  assertEq(a.roomKey, 'work');
+  assertEq(a.tx, 6); assertEq(a.ty, 1); // spawn (6,1)
   const dest = a.path[a.path.length - 1];
   assertEq(dest.tx, 1); assertEq(dest.ty, 2);
 });
-test('spawn (porte→chaise) contourne le bureau : le path ne traverse pas (0,1)/(1,1)', () => {
+test('nouvelle session waiting → acteur spawn directement en salle pause', () => {
   const st = OL.createState();
-  const s = sess('a', 'running');
-  OL.syncSession(st, s);
+  OL.syncActors(st, snap([sess('a', 'waiting')]));
   const a = st.actors.get('a');
-  const onDesk = (p) => (p.tx === 0 && p.ty === 1) || (p.tx === 1 && p.ty === 1);
-  assert(!a.path.some(onDesk), 'le path de spawn traverse le bureau');
+  assertEq(a.roomKey, 'break');
 });
-test('leave (chaise→porte) contourne le bureau : le path ne traverse pas (0,1)/(1,1)', () => {
+test('spawn/leave en salle travail ne traverse jamais un bureau (0,impair)/(4,impair)', () => {
   const st = OL.createState();
-  const s = sess('a', 'running');
-  OL.syncSession(st, s);
+  OL.syncActors(st, snap([sess('a', 'running')]));
   const a = st.actors.get('a');
-  const zones = OL.roomFor(s).zones;
-  while (a.path.length > 0) OL.tickActor(a, zones);   // atteint la chaise (1,3)
-  OL.purge(st, new Set());                             // déclenche le leave → porte
-  const onDesk = (p) => (p.tx === 0 && p.ty === 1) || (p.tx === 1 && p.ty === 1);
-  assert(!a.path.some(onDesk), 'le path de leave traverse le bureau');
-});
-test('leave depuis le poste évite la plante (4,4) et le bureau (0,1)/(1,1)', () => {
-  const st = OL.createState();
-  const s = sess('a', 'waiting');
-  OL.syncSession(st, s);
-  const a = st.actors.get('a');
-  const zones = OL.roomFor(s).zones;
-  while (a.path.length > 0) OL.tickActor(a, zones);   // s'installe au poste
+  assert(!a.path.some(onWorkDesk), 'le path de spawn traverse un bureau');
+  walkToRest(a, st);
   assertEq(a.tx, 1); assertEq(a.ty, 2);
-  OL.purge(st, new Set());                             // déclenche le leave → porte
-  const onDesk = (p) => (p.tx === 0 && p.ty === 1) || (p.tx === 1 && p.ty === 1);
-  const onPlant = (p) => p.tx === 4 && p.ty === 4;
-  assert(!a.path.some(onDesk), 'le path de leave traverse le bureau');
-  assert(!a.path.some(onPlant), 'le path de leave traverse la plante');
+  OL.syncActors(st, snap([])); // purge → leave
+  assert(!a.path.some(onWorkDesk), 'le path de leave traverse un bureau');
 });
-test('l\'acteur atteint sa chaise en marchant', () => {
+test('2 postes occupés → 2e slot en (5,2), stable tant que la session reste', () => {
   const st = OL.createState();
-  const s = sess('a', 'running');
-  OL.syncSession(st, s);
-  const a = st.actors.get('a');
-  const zones = OL.roomFor(s).zones;
-  for (let i = 0; i < 100 && a.path.length > 0; i++) OL.tickActor(a, zones);
-  assertEq(a.tx, 1); assertEq(a.ty, 2);
+  OL.syncActors(st, snap([sess('a', 'running'), sess('b', 'running')]));
+  const a = st.actors.get('a'), b = st.actors.get('b');
+  walkToRest(a, st); walkToRest(b, st);
+  const pos = id => { const x = st.actors.get(id); return { tx: x.tx, ty: x.ty }; };
+  const slots = [pos('a'), pos('b')].sort((p, q) => p.tx - q.tx);
+  assertEq(slots[0].tx, 1); assertEq(slots[0].ty, 2);
+  assertEq(slots[1].tx, 5); assertEq(slots[1].ty, 2);
+  // resync plusieurs fois : positions inchangées
+  OL.syncActors(st, snap([sess('a', 'thinking'), sess('b', 'running')]));
+  assertEq(a.tx, pos('a').tx); assertEq(a.ty, pos('a').ty);
 });
-test('waiting → le perso RESTE au PC (pas de départ, retour Paul v2.7)', () => {
+test('un 3e occupant après le départ du 1er réutilise le plus petit slot libre', () => {
   const st = OL.createState();
-  OL.syncSession(st, sess('a', 'running'));
+  OL.syncActors(st, snap([sess('a', 'running')]));
   const a = st.actors.get('a');
-  const zones = OL.roomFor(sess('a', 'running')).zones;
-  while (a.path.length > 0) OL.tickActor(a, zones);
-  OL.syncSession(st, sess('a', 'waiting'));
-  assertEq(a.path.length, 0);                          // aucun déplacement
-  assertEq(a.tx, 1); assertEq(a.ty, 2);                // toujours à sa chaise
-  OL.syncSession(st, sess('a', 'running'));            // retour running : idem
+  walkToRest(a, st);
+  OL.syncActors(st, snap([])); // a part
+  walkToRest(a, st);
+  for (let i = 0; i < 10 && !a.done; i++) OL.tickActor(a, st);
+  assert(a.done, 'a jamais done');
+  OL.syncActors(st, snap([sess('c', 'running')]));
+  const c = st.actors.get('c');
+  walkToRest(c, st);
+  assertEq(c.tx, 1); assertEq(c.ty, 2); // réutilise le slot 0 libéré
+});
+test('l\'acteur atteint son poste en marchant (path se vide)', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  const a = st.actors.get('a');
+  walkToRest(a, st);
   assertEq(a.path.length, 0);
+  assertEq(a.tx, 1); assertEq(a.ty, 2);
 });
-test('un acteur en erreur ne marche pas', () => {
+test('purge → activity leave, done une fois à la porte', () => {
   const st = OL.createState();
-  OL.syncSession(st, sess('a', 'running'));
+  OL.syncActors(st, snap([sess('a', 'running')]));
   const a = st.actors.get('a');
-  const zones = OL.roomFor(sess('a', 'error')).zones;
-  while (a.path.length > 0) OL.tickActor(a, zones);
-  OL.syncSession(st, sess('a', 'error'));
+  walkToRest(a, st);
+  OL.syncActors(st, snap([]));
+  assertEq(a.activity, 'leave');
+  walkToRest(a, st);
+  for (let i = 0; i < 10 && !a.done; i++) OL.tickActor(a, st);
+  assert(a.done, 'jamais done');
+});
+test('un acteur en erreur ne marche pas (path vidé)', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  const a = st.actors.get('a');
+  walkToRest(a, st);
+  OL.syncActors(st, snap([sess('a', 'error')]));
   assertEq(a.path.length, 0);
   assertEq(a.activity, 'down');
+  assertEq(a.roomKey, 'work'); // error reste en salle travail
 });
-test('purge → leave, done à la porte', () => {
+
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\nrésurrection:');
+test('résurrection AVANT la sortie effective (slot encore tenu) → même poste exact', () => {
   const st = OL.createState();
-  const s = sess('a', 'running');
-  OL.syncSession(st, s);
+  OL.syncActors(st, snap([sess('a', 'running')]));
   const a = st.actors.get('a');
-  const zones = OL.roomFor(s).zones;
-  while (a.path.length > 0) OL.tickActor(a, zones);
-  OL.purge(st, new Set());
+  walkToRest(a, st);
+  const originalPos = { tx: a.tx, ty: a.ty };
+  OL.syncActors(st, snap([])); // déclenche le leave, a se met à marcher vers la sortie
   assertEq(a.activity, 'leave');
-  for (let i = 0; i < 100 && !a.done; i++) OL.tickActor(a, zones);
-  assert(a.done, 'jamais done');
-});
-test('session ressuscitée après un leave abouti → done repasse à false, path vers la chaise', () => {
-  const st = OL.createState();
-  const s = sess('a', 'running');
-  OL.syncSession(st, s);
-  const a = st.actors.get('a');
-  const zones = OL.roomFor(s).zones;
-  while (a.path.length > 0) OL.tickActor(a, zones);
-  OL.purge(st, new Set());
-  for (let i = 0; i < 100 && !a.done; i++) OL.tickActor(a, zones);
-  assert(a.done, 'jamais done');
-  OL.syncSession(st, sess('a', 'running'));
+  OL.syncActors(st, snap([sess('a', 'running')])); // ressuscite avant d'avoir atteint la porte
   assertEq(a.done, false);
+  const dest = a.path.length ? a.path[a.path.length - 1] : { tx: a.tx, ty: a.ty };
+  assertEq(dest.tx, originalPos.tx); assertEq(dest.ty, originalPos.ty);
+});
+test('résurrection APRÈS la sortie effective (slot libéré) → nouvelle allocation valide', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  const a = st.actors.get('a');
+  walkToRest(a, st);
+  OL.syncActors(st, snap([]));
+  walkToRest(a, st);
+  for (let i = 0; i < 10 && !a.done; i++) OL.tickActor(a, st);
+  assert(a.done, 'jamais done');
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  assertEq(a.done, false);
+  assertEq(a.roomKey, 'work');
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 1); assertEq(dest.ty, 2);
+  assert((dest.tx === 1 || dest.tx === 5) && dest.ty >= 2, 'poste invalide après résurrection tardive');
 });
-test('subagents → 4 acteurs max, aux stations du bas (v2.9)', () => {
+
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\nmigration travail <-> pause:');
+test('running → waiting : l\'acteur MIGRE de la salle travail vers la salle pause', () => {
   const st = OL.createState();
-  const five = Array.from({ length: 5 }, (_, i) => ({ agentId: 'g' + i }));
-  const s = sess('a', 'running', { subagents: five });
-  OL.syncSession(st, s);
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  const a = st.actors.get('a');
+  walkToRest(a, st);
+  assertEq(a.roomKey, 'work');
+  OL.syncActors(st, snap([sess('a', 'waiting')]));
+  assertEq(a.migratingTo, 'break');
+  assertEq(a.roomKey, 'work'); // toujours physiquement en salle travail, en train de sortir
+  walkToRest(a, st); // atteint la porte travail → tick suivant déclenche le téléport
+  OL.tickActor(a, st);
+  assertEq(a.roomKey, 'break');
+  assertEq(a.migratingTo, null);
+  walkToRest(a, st);
+  // position finale en salle pause = un slot pause valide
+  const seatOk = (a.tx === 2 || a.tx === 4 || a.tx === 6 || a.tx === 1) && a.ty >= 2;
+  assert(seatOk, `poste pause invalide (${a.tx},${a.ty})`);
+});
+test('waiting → running : migration retour pause → travail', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'waiting')]));
+  const a = st.actors.get('a');
+  assertEq(a.roomKey, 'break');
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  assertEq(a.migratingTo, 'work');
+  walkToRest(a, st);
+  OL.tickActor(a, st);
+  assertEq(a.roomKey, 'work');
+  walkToRest(a, st);
+  assertEq(a.tx, 1); assertEq(a.ty, 2);
+});
+test('migration en cours qui re-change d\'état AVANT d\'avoir quitté la salle → annulée, retour au même poste, aucun téléport', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  const a = st.actors.get('a');
+  walkToRest(a, st);
+  const originalPos = { tx: a.tx, ty: a.ty };
+  OL.syncActors(st, snap([sess('a', 'waiting')])); // commence à migrer vers pause
+  assertEq(a.migratingTo, 'break');
+  assert(a.path.length > 0, 'devrait marcher vers la sortie');
+  OL.syncActors(st, snap([sess('a', 'running')])); // repasse running avant d'avoir atteint la porte
+  assertEq(a.migratingTo, null, 'migration annulée');
+  assertEq(a.roomKey, 'work', 'jamais changé de salle : pas de téléportation visible');
+  walkToRest(a, st);
+  assertEq(a.tx, originalPos.tx); assertEq(a.ty, originalPos.ty); // même poste exact
+});
+test('migration : le trajet en salle travail (sortie) ne traverse pas les bureaux', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  const a = st.actors.get('a');
+  walkToRest(a, st);
+  OL.syncActors(st, snap([sess('a', 'waiting')]));
+  assert(!a.path.some(onWorkDesk), 'le trajet de migration traverse un bureau');
+});
+test('migration : plusieurs sessions en parallèle basculent chacune dans son propre slot pause', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running'), sess('b', 'running')]));
+  const a = st.actors.get('a'), b = st.actors.get('b');
+  walkToRest(a, st); walkToRest(b, st);
+  OL.syncActors(st, snap([sess('a', 'waiting'), sess('b', 'waiting')]));
+  for (let i = 0; i < 400; i++) {
+    OL.tickActor(a, st); OL.tickActor(b, st);
+    if (a.roomKey === 'break' && b.roomKey === 'break' && a.path.length === 0 && b.path.length === 0) break;
+  }
+  assertEq(a.roomKey, 'break'); assertEq(b.roomKey, 'break');
+  assert(!(a.tx === b.tx && a.ty === b.ty), 'a et b partagent le même poste pause');
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\nrecherche : subagents/workflow/headless, dédup, purge:');
+test('subagents (max 6) → acteurs en salle recherche, aux postes latéraux', () => {
+  const st = OL.createState();
+  const seven = Array.from({ length: 7 }, (_, i) => ({ agentId: 'g' + i }));
+  OL.syncActors(st, snap([sess('a', 'running', { subagents: seven })]));
   const subs = [...st.actors.values()].filter(x => x.kind === 'subagent');
-  assertEq(subs.length, 4);
-  const seats = OL.roomFor(s).zones.sideSeats;
-  assertEq(subs[0].tx, seats[0].tx);
+  assertEq(subs.length, 6);
+  assert(subs.every(x => x.roomKey === 'research'));
 });
-test('subagent disparu → acteur supprimé au syncSession suivant', () => {
+test('subagent disparu → acteur supprimé au sync suivant', () => {
   const st = OL.createState();
-  OL.syncSession(st, sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
+  OL.syncActors(st, snap([sess('a', 'running', { subagents: [{ agentId: 'g1' }] })]));
   assert(st.actors.has('a:sub:g1'));
-  OL.syncSession(st, sess('a', 'running'));
+  OL.syncActors(st, snap([sess('a', 'running')]));
   assert(!st.actors.has('a:sub:g1'));
 });
-test('workflow → min(running, 4) acteurs meeting', () => {
+test('workflow → min(running dédup, 4) acteurs meeting en recherche', () => {
   const st = OL.createState();
-  OL.syncSession(st, sess('a', 'running', { workflows: [{ runId: 'w', running: 6 }] }));
-  assertEq([...st.actors.values()].filter(x => x.kind === 'meeting').length, 4);
+  OL.syncActors(st, snap([sess('a', 'running', { workflows: [{ runId: 'w', running: 6 }] })]));
+  const wf = [...st.actors.values()].filter(x => x.kind === 'meeting');
+  assertEq(wf.length, 4);
+  assert(wf.every(x => x.roomKey === 'research'));
 });
 test('workflow terminé → acteurs meeting supprimés', () => {
   const st = OL.createState();
-  OL.syncSession(st, sess('a', 'running', { workflows: [{ runId: 'w', running: 3 }] }));
-  OL.syncSession(st, sess('a', 'running', { workflows: [{ runId: 'w', running: 0 }] }));
+  OL.syncActors(st, snap([sess('a', 'running', { workflows: [{ runId: 'w', running: 3 }] })]));
+  OL.syncActors(st, snap([sess('a', 'running', { workflows: [{ runId: 'w', running: 0 }] })]));
   assertEq([...st.actors.values()].filter(x => x.kind === 'meeting').length, 0);
 });
-test('purge supprime immédiatement subs/meeting de la session partie', () => {
+test('session background (headless) → acteur direct en recherche, jamais en travail/pause', () => {
   const st = OL.createState();
-  OL.syncSession(st, sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] }));
-  OL.purge(st, new Set());
+  OL.syncActors(st, snap([], [sess('h', 'running', { isBackground: true })]));
+  const h = [...st.actors.values()].find(x => x.kind === 'headless');
+  assert(h, 'pas d\'acteur headless');
+  assertEq(h.roomKey, 'research');
+  OL.syncActors(st, snap([], [sess('h', 'waiting', { isBackground: true })])); // même en waiting, reste en recherche
+  assertEq(h.roomKey, 'research');
+});
+test('headless disparu → acteur supprimé', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([], [sess('h', 'running')]));
+  assert(st.actors.has('h:headless'));
+  OL.syncActors(st, snap([], []));
+  assert(!st.actors.has('h:headless'));
+});
+test('purge supprime immédiatement subs/meeting de la session partie (pas de marche de sortie)', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running', { subagents: [{ agentId: 'g1' }], workflows: [{ runId: 'w', running: 2 }] })]));
+  OL.syncActors(st, snap([]));
   assert(!st.actors.has('a:sub:g1'));
   assertEq([...st.actors.values()].filter(x => x.kind === 'meeting').length, 0);
   assertEq(st.actors.get('a').activity, 'leave');
 });
-test('actorsFor trie par ty et ne renvoie que la session', () => {
+test('actorsIn trie par ty, ne renvoie que les acteurs de la salle', () => {
   const st = OL.createState();
-  OL.syncSession(st, sess('a', 'running', { subagents: [{ agentId: 'g1' }] }));
-  OL.syncSession(st, sess('b', 'running'));
-  const list = OL.actorsFor(st, 'a');
-  assert(list.every(x => x.sessionId === 'a'));
-  for (let i = 1; i < list.length; i++) assert(list[i].ty >= list[i - 1].ty, 'pas trié');
+  OL.syncActors(st, snap([sess('a', 'running'), sess('b', 'running')]));
+  walkToRest(st.actors.get('a'), st); walkToRest(st.actors.get('b'), st);
+  const list = OL.actorsIn(st, 'work');
+  assert(list.every(x => x.roomKey === 'work'));
+  for (let i = 1; i < list.length; i++) assert(list[i].ty >= list[i - 1].ty, 'pas trié par ty');
 });
 
+// ─────────────────────────────────────────────────────────────────────────
 console.log('\nanimFor:');
 test('en mouvement → walk.<dir>', () => {
-  assertEq(OL.animFor({ charIdx: 3, activity: 'coffee', path: [{ tx: 5, ty: 2 }], dir: 'left' }), 'char3.walk.left');
+  assertEq(OL.animFor({ charIdx: 3, activity: 'work', path: [{ tx: 5, ty: 2 }], dir: 'left' }), 'char3.walk.left');
 });
 test('work/think au bureau → idle.up (dos au spectateur), call → phone.right, down → hurt', () => {
   assertEq(OL.animFor({ charIdx: 0, activity: 'work', path: [], dir: 'down' }), 'char0.idle.up');
@@ -310,11 +397,15 @@ test('work/think au bureau → idle.up (dos au spectateur), call → phone.right
   assertEq(OL.animFor({ charIdx: 1, activity: 'call', path: [], dir: 'down' }), 'char1.phone.right');
   assertEq(OL.animFor({ charIdx: 1, activity: 'down', path: [], dir: 'down' }), 'char1.hurt');
 });
+test('relax (salle pause) → idle.down, face caméra (pas de bureau à regarder)', () => {
+  assertEq(OL.animFor({ charIdx: 4, activity: 'relax', path: [], dir: 'down' }), 'char4.idle.down');
+});
 test('work en réunion (kind meeting) → idle.down, pas idle.up', () => {
   assertEq(OL.animFor({ charIdx: 2, activity: 'work', kind: 'meeting', path: [], dir: 'up' }), 'char2.idle.down');
 });
 
-console.log('\nemoteFor (fonction pure, priorité bell > état > outil):');
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\nemoteFor (fonction pure, priorité bell > état > outil, inchangé):');
 test('priorité 1 : enveloppe (bell active) prime sur tout état', () => {
   assertEq(OL.emoteFor(sess('a', 'thinking'), true), 'emote.mail');
   assertEq(OL.emoteFor(sess('a', 'running', { lastTool: 'Bash' }), true), 'emote.mail');
@@ -328,22 +419,30 @@ test('priorité 2 : émote d\'état sans bell (thinking/pending/error/waiting)',
   assertEq(OL.emoteFor(sess('a', 'error'), false), 'emote.angry');
   assertEq(OL.emoteFor(sess('a', 'waiting'), false), 'emote.zzz');
 });
-test('priorité 3 : running → toujours emote.work (marteau), plus de variation par outil (v26)', () => {
-  for (const lastTool of ['Bash', 'BashOutput', 'Read', 'Grep', 'Glob', 'Edit', 'Write',
-                          'NotebookEdit', 'WebFetch', 'WebSearch', 'Task',
-                          'mcp__qonto__list_transactions', 'SomeFutureTool', null, undefined]) {
+test('priorité 3 : running → toujours emote.work (marteau)', () => {
+  for (const lastTool of ['Bash', 'Read', 'Task', 'mcp__qonto__x', null, undefined]) {
     assertEq(OL.emoteFor(sess('a', 'running', { lastTool }), false), 'emote.work');
-  }
-});
-test('bell prime toujours, même en running quel que soit lastTool (verrou anti-régression)', () => {
-  for (const lastTool of ['Bash', 'Task', 'mcp__x__y', null]) {
-    assertEq(OL.emoteFor(sess('a', 'running', { lastTool }), true), 'emote.mail');
   }
 });
 test('null si pas de bulle : état inconnu, ou objet sans state (ex. acteur subagent)', () => {
   assertEq(OL.emoteFor(sess('a', 'some-unknown-state'), false), null);
   assertEq(OL.emoteFor({ kind: 'subagent', activity: 'work' }, false), null);
   assertEq(OL.emoteFor({}, false), null);
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\nlabelFor (étiquette pixel, 8 car. max, projet parent pour recherche):');
+test('acteur session → nom de son propre projet, tronqué à 8', () => {
+  assertEq(OL.labelFor({ kind: 'session' }, sess('a', 'running', { projectName: 'aby-claude-watcher' })), 'aby-clau');
+});
+test('nom court non tronqué', () => {
+  assertEq(OL.labelFor({ kind: 'session' }, sess('a', 'running', { projectName: 'abc' })), 'abc');
+});
+test('customName prioritaire sur projectName si présent', () => {
+  assertEq(OL.labelFor({ kind: 'session' }, sess('a', 'running', { projectName: 'x', customName: 'mon-nom-perso' })), 'mon-nom-');
+});
+test('acteur subagent/meeting/headless → étiquette = projet PARENT (la session passée est celle du parent)', () => {
+  assertEq(OL.labelFor({ kind: 'subagent' }, sess('a', 'running', { projectName: 'parent-project' })), 'parent-p');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

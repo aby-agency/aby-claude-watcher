@@ -30,7 +30,7 @@ const FURNITURE = {
   // au spectateur, pour que le dossier s'intercale visuellement entre lui et
   // la caméra. chairFront/chairBack restent bakés (plus utilisés en room
   // v26, réactivables) mais ne sont plus posés dans roomFor.
-  chairOver:    `${SINGLES_DIR}/Modern_Office_Singles_101.png`,
+  chairOver:    `${SINGLES_DIR}/Modern_Office_Singles_102.png`, // dossier texturé — plus lisible que le 101 quand le siège est vide (retour Paul)
   plant:        `${SINGLES_DIR}/Modern_Office_Singles_98.png`,
   waterCooler:  `${SINGLES_DIR}/Modern_Office_Singles_173.png`,
   vending:      `${SINGLES_DIR}/Modern_Office_Singles_175.png`,
@@ -42,7 +42,7 @@ const FURNITURE = {
   // v2.4 — mobilier de densité cubicle (choisi au preview parmi 141-146 / 170-172 / 113-115).
   deskLamp:     `${SINGLES_DIR}/Modern_Office_Singles_141.png`, // lampe articulée argentée
   whiteboard:   `${SINGLES_DIR}/Modern_Office_Singles_171.png`, // tableau blanc + petit graphe (moins chargé que 172)
-  papersDesk:   `${SINGLES_DIR}/Modern_Office_Singles_113.png`, // pile de documents, liseré bleu
+  wallFrame:    `${SINGLES_DIR}/Modern_Office_Singles_113.png`, // diplôme encadré — accroché au MUR (retour Paul : pas posé sur le bureau)
 };
 
 // Tiles 16×16 découpées dans le Room Builder.

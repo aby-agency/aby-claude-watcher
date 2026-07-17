@@ -36,7 +36,7 @@ test('toutes les anims référencent des frames existantes', () => {
 test('frames obligatoires présentes', () => {
   for (const req of ['floor', 'floorDark', 'floorWood', 'wall', 'desk', 'deskSetup',
                      'chairBack', 'chairFront', 'chairOver', 'plant', 'coffee.0', 'meetingTable', 'sideDesk', 'laptop',
-                     'deskLamp', 'whiteboard', 'papersDesk', 'waterCooler', 'vending']) {
+                     'deskLamp', 'whiteboard', 'wallFrame', 'waterCooler', 'vending']) {
     assert(manifest.frames[req], `frame manquante: ${req}`);
   }
 });

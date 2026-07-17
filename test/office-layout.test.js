@@ -117,13 +117,12 @@ test('densité cubicle : tableau blanc au mur, lampe et papiers sur le bureau (t
   assert(lamp, 'pas de lampe');
   assertEq(lamp.tx, OL.DESK.tx);
   assertEq(lamp.ty, OL.DESK.ty);
-  const papers = st.find(x => x.frame === 'papersDesk');
-  assert(papers, 'pas de papiers sur le bureau');
-  assertEq(papers.tx, OL.DESK.tx);
-  assertEq(papers.ty, OL.DESK.ty);
-  // lampe et papiers sont posés SUR le bureau (offset dy pour "flotter" au-dessus/devant)
+  const frame = st.find(x => x.frame === 'wallFrame');
+  assert(frame, 'pas de diplôme encadré');
+  assertEq(frame.ty, 0); // au MUR (retour Paul : un cadre ne se pose pas sur un bureau)
+  assertEq(frame.tx, 3); // entre le tableau blanc (cols 1-2) et la porte (col 4)
+  // la lampe est posée SUR le bureau (offset dy pour "flotter" au-dessus)
   assert(typeof lamp.dy === 'number' && lamp.dy !== 0, 'lampe pas décalée sur le bureau');
-  assert(typeof papers.dy === 'number' && papers.dy !== 0, 'papiers pas décalés sur le bureau');
 });
 test('papiers uniquement en erreur', () => {
   const err = OL.roomFor(sess('a', 'error')).statics.filter(x => x.frame === '_papers');

@@ -78,7 +78,10 @@
   // l'avant du bureau, côté chaise. Valeurs de départ raisonnables — le
   // réglage pixel-perfect se fait au rendu (Task 3).
   const DESK_LAMP_DY = -4;
-  const PAPERS_DESK_DY = 3;
+  // Diplôme encadré : accroché au MUR (rangée 0), tuile libre entre le
+  // tableau blanc (cols 1-2) et la porte (col 4) — retour Paul : un cadre
+  // ne se pose pas sur un bureau.
+  const WALL_FRAME = { tx: 3, ty: 0 };
   const MEETING_SEATS = [{ tx: 2, ty: 5 }, { tx: 4, ty: 5 }, { tx: 2, ty: 6 }, { tx: 4, ty: 6 }];
   const MEETING_TABLE = { tx: 3, ty: 5 };
   const MAX_SUBS = 2;
@@ -142,7 +145,7 @@
     statics.push({ frame: 'desk', tx: DESK.tx, ty: DESK.ty });
     statics.push({ frame: 'deskSetup', tx: DESK.tx, ty: DESK.ty, screen: session.sessionId });
     statics.push({ frame: 'deskLamp', tx: DESK.tx, ty: DESK.ty, dy: DESK_LAMP_DY });
-    statics.push({ frame: 'papersDesk', tx: DESK.tx, ty: DESK.ty, dy: PAPERS_DESK_DY });
+    statics.push({ frame: 'wallFrame', tx: WALL_FRAME.tx, ty: WALL_FRAME.ty, dy: 2 });
     statics.push({ frame: CHAIR_FRAME, tx: DESK_CHAR.tx, ty: DESK_CHAR.ty, dy: CHAIR_DY, z: 'over' });
     statics.push({ frame: 'sideDesk', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty });   // comptoir sous la tasse
     statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty, dy: COFFEE_DY });

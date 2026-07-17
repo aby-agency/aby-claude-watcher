@@ -127,11 +127,12 @@
     statics.push({ frame: 'coffeeMachine', tx: COFFEE_MACHINE.tx, ty: COFFEE_MACHINE.ty, dy: COFFEE_DY });
     statics.push({ frame: 'plant', tx: PLANT.tx, ty: PLANT.ty });
     // Note géométrie : la table du 2e subagent (SIDE_SEATS[1].ty - 1 = 3)
-    // atterrit sur CORRIDOR_TY (3), colonne 6 — inoffensif aujourd'hui car
-    // routeTo() n'est utilisé que pour le perso principal (kind: 'session'),
-    // dont les cibles restent tx∈{1,2,5} ; les subagents ne marchent jamais
-    // (posés directement à leur siège, jamais de path). À réévaluer si
-    // MAX_SUBS augmente ou si les subagents se mettent à se déplacer.
+    // atterrit sur CORRIDOR_TY (3), colonne 5 (SIDE_SEATS[1].tx) — inoffensif
+    // aujourd'hui car routeTo() n'est utilisé que pour le perso principal
+    // (kind: 'session'), dont les cibles restent tx∈{1,2,4} (DESK_CHAR,
+    // COFFEE, DOOR) ; les subagents ne marchent jamais (posés directement à
+    // leur siège, jamais de path). À réévaluer si MAX_SUBS augmente ou si les
+    // subagents se mettent à se déplacer.
     for (let i = 0; i < Math.min(subs, MAX_SUBS); i++) {
       const seat = SIDE_SEATS[i];
       statics.push({ frame: 'sideDesk', tx: seat.tx, ty: seat.ty - 1 });

@@ -116,18 +116,30 @@ const Office = (() => {
       }
     }
 
+    // Bulle du perso principal : calculée ici (avant la teinte) mais DESSINÉE
+    // après le bloc teinte plus bas — sinon le voile d'état (globalAlpha sur
+    // toute la pièce) la ternirait comme le reste du décor. Un seul perso
+    // 'session' par pièce, donc au plus une bulle à tracer.
+    let bubble = null;
     for (const a of OfficeLayout.actorsFor(state, s.sessionId)) {
       const fi = a.activity === 'think' ? (a.animFrame >> 2) : a.animFrame;
       const fname = animFrameName(OfficeLayout.animFor(a), fi);
       const px = a.tx * 16 * scale, py = a.ty * 16 * scale;
       if (fname) drawFrameOn(c2d, fname, px, py, scale);
       if (a.kind === 'session') {
-        if (stateName === 'thinking') pixelTextOn(c2d, '…', px + 4 * scale, py - 20 * scale, STATE_COLORS.thinking, scale);
-        if (stateName === 'pending') pixelTextOn(c2d, '!', px + 6 * scale, py - 20 * scale, STATE_COLORS.pending, scale);
+        const emote = OfficeLayout.emoteFor(s, activeBells.has(s.sessionId));
+        if (emote) {
+          const eFrame = animFrameName(emote, tickCount >> 2);
+          if (eFrame) bubble = { frame: eFrame, px, py };
+        }
       }
     }
     if (room.zones.subOverflow > 0) {
-      pixelTextOn(c2d, `+${room.zones.subOverflow}`, 7.5 * 16 * scale, 4 * 16 * scale, '#9ca3af', scale);
+      // Coin mur haut-droit (rangée 0, dernière colonne = celle des subagents,
+      // toujours présente si subOverflow > 0) : seul angle garanti vide, quel
+      // que soit le nombre de subagents assis. Calculé depuis room.cols —
+      // l'ancien `7.5 * 16 * scale` en dur débordait de la pièce (cols=7 max).
+      pixelTextOn(c2d, `+${room.zones.subOverflow}`, (room.cols - 0.9) * 16 * scale, 0.9 * 16 * scale, '#9ca3af', scale);
     }
 
     // Teinte d'éclairage : l'état en vision périphérique.
@@ -145,6 +157,10 @@ const Office = (() => {
         c2d.globalAlpha = 1;
       }
     }
+
+    // Bulle émote : dessinée APRÈS la teinte pour rester nette (voir plus
+    // haut) — ancrée au-dessus de la tête (perso 16×32 ancré bas sur sa tuile).
+    if (bubble) drawFrameOn(c2d, bubble.frame, bubble.px, bubble.py - 34 * scale, scale);
   }
 
   function pixelTextOn(c2d, txt, x, y, color, scale) {

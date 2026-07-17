@@ -27,9 +27,24 @@ cartes de la vue grid**. Objectif premier : compréhensible en un coup d'œil.
 - Grille de vignettes calquée sur la vue grid : wrap selon la largeur de
   fenêtre, section « Background » repliable (headless), drag pour réordonner,
   clic = focus terminal (headless : pas de click-focus).
-- Vignette = `.office-card` : canvas de pièce **~10×8 tiles** + nom + cloche.
+- Vignette = `.office-card` : canvas de pièce **adaptative** + nom + cloche.
   Zoom = plus grand entier tel que la pièce tient dans la largeur de la
   carte, clampé à [1..4], pixelated (recalculé au resize, debouncé).
+
+### Amendement 2026-07-17 — pièce adaptative (validé avec Paul)
+
+La pièce 10×8 fixe laissait trop de sol mort (retour visuel de Paul).
+La taille devient fonction de l'activité :
+
+- **Base 7×5** : mur + porte (5,0) + poster (2,0) ; perso (2,1), bureau+écran
+  (1,2) ; machine à café (1,4), point café (2,4) ; plante (5,4) ; spawn porte
+  (5,1).
+- **Subagents présents** → **+1 colonne** (8 de large) : sièges (6,1) et
+  (6,3), petites tables (6,2) et (6,4), « +N » au-delà de 2.
+- **Workflow actif** → **+2 rangées** (7 de haut) : table de réunion (3,5),
+  4 sièges (2,5), (4,5), (2,6), (4,6).
+- Conséquence assumée : les vignettes ont des hauteurs différentes (la grille
+  CSS absorbe) — **la taille de la pièce raconte l'activité de la session**.
 - **Un canvas par vignette, un seul timer 8 fps** qui redessine les canvases
   dont une frame a changé. Vue inactive = timer stoppé (inchangé).
 

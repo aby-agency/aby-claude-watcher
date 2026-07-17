@@ -63,6 +63,39 @@
     return stateName === 'waiting' ? 'break' : 'work';
   }
 
+  // Comptes « logiques » (déduits du snapshot seul, indépendants de tout
+  // acteur) — utilisés pour le footer (counter) ET comme moitié basse du
+  // max() de réconciliation ci-dessous.
+  function logicalRoomCounts(interactive) {
+    let work = 0, brk = 0;
+    for (const s of interactive) {
+      if (roomKeyForState(s.state && s.state.name) === 'work') work++; else brk++;
+    }
+    return { work, break: brk };
+  }
+
+  // Compte de DIMENSIONNEMENT réconcilié (fix reviewer C1) : pendant qu'un
+  // perso migre, `logicalRoomCounts` (snapshot) le retire IMMÉDIATEMENT de sa
+  // salle d'origine dès que l'état change, alors que physiquement (slots) il
+  // continue à l'occuper le temps de marcher jusqu'à la porte. Si `roomsFor`
+  // se dimensionne sur le seul compte logique et que le routage (dans
+  // `syncActors`/`tickActor`) se dimensionne sur le seul compte physique, la
+  // salle RENDUE peut être plus petite que la salle sur laquelle le trajet a
+  // été calculé → le perso marche sur des tuiles jamais dessinées (repro
+  // reviewer : 3→2 occupants franchit un palier de paires, 8/12 tuiles hors
+  // sol rendu). Fix : les DEUX consomment `max(logique, physique)` — la
+  // salle ne rétrécit que lorsque le migrant a fini de sortir (slot libéré
+  // par tickActor à l'arrivée au spawn, cf. tickActor). `state` optionnel :
+  // sans lui (tests de géométrie pure), on retombe sur le compte logique
+  // seul.
+  function sizingCounts(interactive, state) {
+    const logical = logicalRoomCounts(interactive);
+    return {
+      work: state ? Math.max(logical.work, state.slots.work.size) : logical.work,
+      break: state ? Math.max(logical.break, state.slots.break.size) : logical.break,
+    };
+  }
+
   // Total `running` des workflows de la session, dédup par runId (inchangé v2).
   function workflowRunning(session) {
     const seen = new Map();
@@ -197,13 +230,15 @@
     const subRows = Math.ceil(subVisible / 2);
     const headlessRows = Math.ceil(headlessVisible / 2);
     const rows = Math.max(4, 3 + subRows, 2 + headlessRows);
+    const subagents = Math.max(0, subCount - MAX_SUBS);
+    const workflow = Math.max(0, wfCount - MAX_WF);
+    const headless = Math.max(0, headlessCount - MAX_HEADLESS);
     return {
       rows, subVisible, wfVisible, headlessVisible,
-      overflow: {
-        subagents: Math.max(0, subCount - MAX_SUBS),
-        workflow: Math.max(0, wfCount - MAX_WF),
-        headless: Math.max(0, headlessCount - MAX_HEADLESS),
-      },
+      // Forme uniforme (M4, revue reviewer) : { total, ...détail } dans les
+      // 3 salles — Task 2 peut rendre un badge générique sur `overflow.total`
+      // sans savoir si la salle a des sous-familles.
+      overflow: { total: subagents + workflow + headless, subagents, workflow, headless },
     };
   }
 
@@ -224,29 +259,38 @@
     return { cols: RESEARCH_COLS, rows: geo.rows, statics, geo };
   }
 
-  // ─── roomsFor(snapshot) : les 3 salles, ordre fixe ───────────────────────
-  // Pure fonction du snapshot (sessions du renderer) — AUCUNE dépendance à
-  // `state`/aux acteurs : la taille des salles reflète toujours les données
-  // à jour, indépendamment du retard visuel de la marche des persos (accepté
-  // — écart cosmétique mineur documenté, jamais plusieurs ticks).
-  function roomsFor(snapshot) {
+  // ─── roomsFor(snapshot, state?) : les 3 salles, ordre fixe ───────────────
+  // Signature retenue (fix reviewer C1) : `state` est un 2e paramètre
+  // OPTIONNEL. Sans lui, roomsFor reste une fonction pure du snapshot seul
+  // (géométrie de base, utilisée telle quelle par les tests de géométrie).
+  // Avec lui (c'est ce que Task 2 doit toujours passer pour le RENDU réel),
+  // le dimensionnement de Travail/Pause utilise `sizingCounts` — le
+  // max(logique, physique) qui garde la salle à sa taille tant qu'un
+  // migrant ne l'a pas physiquement quittée (cf. commentaire sizingCounts).
+  // `counter` (footer) reste TOUJOURS le compte logique — c'est le nombre
+  // « réel » de sessions actuellement dans cet état, pas un compte gonflé
+  // par une migration en cours. La salle Recherche n'a pas ce problème
+  // (subagents/meeting/headless ne migrent jamais, apparition/suppression
+  // immédiate) : son dimensionnement reste purement snapshot, `state` ne la
+  // concerne pas.
+  function roomsFor(snapshot, state) {
     const interactive = (snapshot && snapshot.interactive) || [];
     const background = (snapshot && snapshot.background) || [];
     const all = [...interactive, ...background];
 
-    const workCount = interactive.filter(s => roomKeyForState(s.state && s.state.name) === 'work').length;
-    const breakCount = interactive.filter(s => roomKeyForState(s.state && s.state.name) === 'break').length;
+    const logical = logicalRoomCounts(interactive);
+    const sizing = sizingCounts(interactive, state);
     const subCount = all.reduce((n, s) => n + ((s.subagents || []).length), 0);
     const wfCount = all.reduce((n, s) => n + workflowRunning(s), 0);
     const headlessCount = background.length;
 
-    const work = workRoomStatics(workCount);
-    const brk = breakRoomStatics(breakCount);
+    const work = workRoomStatics(sizing.work);
+    const brk = breakRoomStatics(sizing.break);
     const research = researchRoomStatics(subCount, wfCount, headlessCount);
 
     return [
-      { key: 'work', cols: work.cols, rows: work.rows, statics: work.statics, doorSpawn: { ...SPAWN_TILE }, counter: workCount, overflow: 0 },
-      { key: 'break', cols: brk.cols, rows: brk.rows, statics: brk.statics, doorSpawn: { ...SPAWN_TILE }, counter: breakCount, overflow: 0 },
+      { key: 'work', cols: work.cols, rows: work.rows, statics: work.statics, doorSpawn: { ...SPAWN_TILE }, counter: logical.work, overflow: { total: 0 } },
+      { key: 'break', cols: brk.cols, rows: brk.rows, statics: brk.statics, doorSpawn: { ...SPAWN_TILE }, counter: logical.break, overflow: { total: 0 } },
       {
         key: 'research', cols: research.cols, rows: research.rows, statics: research.statics, doorSpawn: { ...SPAWN_TILE },
         counter: subCount + wfCount + headlessCount, overflow: research.geo.overflow,
@@ -298,7 +342,11 @@
   }
 
   // ─── syncActors : diff global (sessions → acteurs) ───────────────────────
-  function syncMainActor(state, s) {
+  // `sizing` = sizingCounts(interactive, state), calculé UNE FOIS par appel
+  // de syncActors (cf. plus bas) et transmis à chaque syncMainActor : garantit
+  // que le routage utilise EXACTEMENT le même compte que roomsFor(snapshot,
+  // state) appelé avec le même state (fix C1).
+  function syncMainActor(state, s, sizing) {
     const sid = s.sessionId;
     const stateName = s.state && s.state.name;
     const activity = activityFor(stateName);
@@ -313,7 +361,23 @@
         tx: SPAWN_TILE.tx, ty: SPAWN_TILE.ty, path: [], dir: 'down', animFrame: 0, done: false,
       };
       state.actors.set(sid, actor);
-      retarget(actor, slotPositionFor(desiredRoom, 'session', idx), slotCount(state, desiredRoom, 'session'));
+      retarget(actor, slotPositionFor(desiredRoom, 'session', idx), sizing[desiredRoom]);
+      return;
+    }
+
+    // Erreur (I2, revue reviewer) : le perso s'effondre SUR PLACE, jamais de
+    // marche (transposé de v2 : « un acteur en erreur ne marche pas »),
+    // MÊME en pleine migration ou en pleine annulation de migration — cas
+    // repro reviewer : running → waiting (migration démarrée) → error avant
+    // d'avoir atteint la porte. On NE TOUCHE PAS `roomKey`/`migratingTo` ici
+    // : un futur sync (une fois l'erreur résolue) recalculera `desiredRoom`
+    // et re-routera proprement depuis la position gelée (cf. branches
+    // ci-dessous, qui retargent inconditionnellement même si `path` a été
+    // vidé pendant le gel).
+    if (activity === 'down') {
+      actor.activity = activity;
+      actor.path = [];
+      actor.done = false;
       return;
     }
 
@@ -323,9 +387,13 @@
         actor.migratingTo = desiredRoom;
         actor.activity = activity;
         actor.done = false; // annule un `leave` définitif en cours (résurrection avant sortie complète)
-        retarget(actor, { ...SPAWN_TILE }, slotCount(state, actor.roomKey, 'session'));
+        retarget(actor, { ...SPAWN_TILE }, sizing[actor.roomKey]);
       } else {
-        actor.activity = activity; // même cible déjà en cours de migration : rien à re-router
+        actor.activity = activity;
+        // Retarget inconditionnel (no-op si le path est déjà bon, cf.
+        // `retarget`) : nécessaire pour REPRENDRE la marche si elle a été
+        // gelée par un passage en erreur entre-temps (path vidé ci-dessus).
+        retarget(actor, { ...SPAWN_TILE }, sizing[actor.roomKey]);
       }
       return;
     }
@@ -337,7 +405,7 @@
       actor.migratingTo = null;
       actor.activity = activity;
       actor.done = false;
-      retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), slotCount(state, actor.roomKey, 'session'));
+      retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), sizing[actor.roomKey]);
       return;
     }
 
@@ -358,11 +426,11 @@
       actor.activity = activity;
       actor.done = false;
       if (stillHeld) {
-        retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), slotCount(state, actor.roomKey, 'session'));
+        retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), sizing[actor.roomKey]);
       } else {
         const idx = allocateSlot(state, desiredRoom, 'session', sid);
         actor.slotIdx = idx;
-        retarget(actor, slotPositionFor(desiredRoom, 'session', idx), slotCount(state, desiredRoom, 'session'));
+        retarget(actor, slotPositionFor(desiredRoom, 'session', idx), sizing[desiredRoom]);
       }
       return;
     }
@@ -370,8 +438,7 @@
     if (actor.activity !== activity) {
       actor.activity = activity;
       actor.animFrame = 0;
-      if (activity === 'down') actor.path = []; // un perso en erreur ne marche pas
-      else retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), slotCount(state, actor.roomKey, 'session'));
+      retarget(actor, slotPositionFor(actor.roomKey, 'session', actor.slotIdx), sizing[actor.roomKey]);
     }
   }
 
@@ -433,13 +500,25 @@
     }
   }
 
+  // Contrat (M5, revue reviewer) : les acteurs dont `done === true` doivent
+  // être supprimés par L'APPELANT (`state.actors.delete(id)`) — syncActors
+  // ne le fait jamais lui-même pour les acteurs `kind:'session'` (seul
+  // tickActor sait QUAND `done` bascule à true, à l'arrivée physique au
+  // spawn). Sa libération de slot est déjà faite en interne (par tickActor,
+  // au moment même où `done` passe à true) : l'appelant n'a qu'à retirer
+  // l'entrée de `state.actors`, jamais à toucher `state.slots`. Un appelant
+  // qui oublie cette suppression laisse un acteur fantôme figé à la porte
+  // (inoffensif pour le calcul — `sizingCounts`/`roomsFor` ignorent les
+  // acteurs, seuls les slots comptent — mais visible si Task 2 itère
+  // `actorsIn` sans avoir purgé les `done`).
   function syncActors(state, snapshot) {
     const interactive = (snapshot && snapshot.interactive) || [];
     const background = (snapshot && snapshot.background) || [];
     const all = [...interactive, ...background];
     const liveSessionIds = new Set(all.map(s => s.sessionId));
+    const sizing = sizingCounts(interactive, state);
 
-    for (const s of interactive) syncMainActor(state, s);
+    for (const s of interactive) syncMainActor(state, s, sizing);
     for (const s of background) syncHeadlessActor(state, s);
     syncResearchEntities(state, all);
 
@@ -453,11 +532,14 @@
       if (a.activity !== 'leave' || a.migratingTo !== null) {
         a.activity = 'leave';
         a.migratingTo = null;
-        retarget(a, { ...SPAWN_TILE }, slotCount(state, a.roomKey, 'session'));
+        retarget(a, { ...SPAWN_TILE }, sizing[a.roomKey]);
       }
     }
   }
 
+  // `actorsIn` ne filtre PAS les acteurs `done` (cf. contrat ci-dessus sur
+  // syncActors) : un appelant qui n'a pas supprimé un acteur `done` le
+  // retrouvera ici, figé à la porte de sortie.
   function actorsIn(state, roomKey) {
     return [...state.actors.values()].filter(a => a.roomKey === roomKey).sort((a, b) => a.ty - b.ty);
   }
@@ -479,6 +561,13 @@
         const idx = allocateSlot(state, targetRoom, 'session', actor.id);
         actor.slotIdx = idx;
         actor.tx = SPAWN_TILE.tx; actor.ty = SPAWN_TILE.ty;
+        // Compte physique seul ici (pas de `sizing` — tickActor n'a pas le
+        // snapshot) : sans risque de divergence dans le cas courant (un seul
+        // migrant à la fois), le slot venant d'être alloué se reflète déjà
+        // dans `state.slots[targetRoom].size`. Limite documentée : plusieurs
+        // migrations simultanées vers la MÊME salle pourraient transitoirement
+        // sous-dimensionner l'entrée d'un des arrivants — non repro par le
+        // reviewer, hors scope de ce fix (C1 ne portait que sur la sortie).
         retarget(actor, slotPositionFor(targetRoom, 'session', idx), slotCount(state, targetRoom, 'session'));
         return false;
       }

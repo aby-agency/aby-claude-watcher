@@ -104,23 +104,34 @@ test('le mur (rangée 0) et le sol couvrent les dimensions effectives, dans chaq
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log('\nrecherche : caps subagents/workflow/headless + overflow:');
-test('subagents : cap 6, overflow au-delà', () => {
+test('subagents : cap 6, overflow au-delà (forme uniforme {total, ...détail})', () => {
   const eight = Array.from({ length: 8 }, (_, i) => ({ agentId: 'g' + i }));
   const research = OL.roomsFor(snap([sess('a', 'running', { subagents: eight })])).find(r => r.key === 'research');
   assertEq(research.overflow.subagents, 2);
+  assertEq(research.overflow.total, 2);
 });
 test('workflow : cap 4 sièges de table, overflow au-delà (dédup runId)', () => {
   const research = OL.roomsFor(snap([sess('a', 'running', { workflows: [{ runId: 'w', running: 7 }] })])).find(r => r.key === 'research');
   assertEq(research.overflow.workflow, 3);
+  assertEq(research.overflow.total, 3);
 });
 test('headless : cap 4, overflow au-delà', () => {
   const seven = Array.from({ length: 7 }, (_, i) => sess('h' + i, 'running'));
   const research = OL.roomsFor(snap([], seven)).find(r => r.key === 'research');
   assertEq(research.overflow.headless, 3);
+  assertEq(research.overflow.total, 3);
 });
-test('pas d\'overflow pour travail/pause (extensibles)', () => {
+test('overflow cumulé : total = somme des 3 sous-familles', () => {
+  const research = OL.roomsFor(snap(
+    [sess('a', 'running', { subagents: Array.from({ length: 8 }, (_, i) => ({ agentId: 'g' + i })), workflows: [{ runId: 'w', running: 7 }] })],
+    Array.from({ length: 7 }, (_, i) => sess('h' + i, 'running')),
+  )).find(r => r.key === 'research');
+  assertEq(research.overflow.total, 2 + 3 + 3);
+});
+test('pas d\'overflow pour travail/pause (extensibles) — même forme {total} que recherche (M4)', () => {
   const rooms = OL.roomsFor(snap(Array.from({ length: 20 }, (_, i) => sess('s' + i, 'running'))));
-  assertEq(rooms.find(r => r.key === 'work').overflow, 0);
+  assertEq(rooms.find(r => r.key === 'work').overflow.total, 0);
+  assertEq(rooms.find(r => r.key === 'break').overflow.total, 0);
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -321,6 +332,118 @@ test('migration : plusieurs sessions en parallèle basculent chacune dans son pr
   }
   assertEq(a.roomKey, 'break'); assertEq(b.roomKey, 'break');
   assert(!(a.tx === b.tx && a.ty === b.ty), 'a et b partagent le même poste pause');
+});
+
+console.log('\nC1 (reviewer) — dimensionnement route/salle rendue cohérent pendant la migration:');
+test('C1 : 3 running installés, 1 passe waiting (palier de paires 3→2 franchi) — chaque tuile du trajet de sortie est dans les bornes de la salle travail RENDUE à chaque tick', () => {
+  const st = OL.createState();
+  const snapshot0 = snap([sess('a', 'running'), sess('b', 'running'), sess('c', 'running')]);
+  OL.syncActors(st, snapshot0);
+  walkToRest(st.actors.get('a'), st); walkToRest(st.actors.get('b'), st); walkToRest(st.actors.get('c'), st);
+
+  const snapshot1 = snap([sess('a', 'waiting'), sess('b', 'running'), sess('c', 'running')]);
+  OL.syncActors(st, snapshot1); // a se met à migrer : logique work passe de 3 à 2 (palier de paires 2→1, rows 7→5)
+  const a = st.actors.get('a');
+  assertEq(a.migratingTo, 'break');
+
+  let ticks = 0;
+  while (a.roomKey === 'work' && ticks < 200) {
+    const room = OL.roomsFor(snapshot1, st).find(r => r.key === 'work');
+    assert(a.tx >= 0 && a.tx < room.cols && a.ty >= 0 && a.ty < room.rows,
+      `tuile (${a.tx},${a.ty}) hors bornes de la salle travail rendue (cols=${room.cols}, rows=${room.rows})`);
+    OL.tickActor(a, st);
+    ticks++;
+  }
+  assertEq(a.roomKey, 'break'); // la migration a bien fini par aboutir
+});
+test('C1 : la salle travail ne rétrécit qu\'une fois le migrant physiquement sorti (rows reste à 7 tant que le slot est tenu)', () => {
+  const st = OL.createState();
+  const snapshot0 = snap([sess('a', 'running'), sess('b', 'running'), sess('c', 'running')]);
+  OL.syncActors(st, snapshot0);
+  walkToRest(st.actors.get('a'), st); walkToRest(st.actors.get('b'), st); walkToRest(st.actors.get('c'), st);
+  assertEq(OL.roomsFor(snapshot0, st).find(r => r.key === 'work').rows, 7);
+
+  const snapshot1 = snap([sess('a', 'waiting'), sess('b', 'running'), sess('c', 'running')]);
+  OL.syncActors(st, snapshot1);
+  const a = st.actors.get('a');
+  // Juste après le changement d'état, AVANT que le migrant ait atteint la
+  // porte : la salle rendue doit rester à 7 (sinon C1 se reproduit).
+  assertEq(OL.roomsFor(snapshot1, st).find(r => r.key === 'work').rows, 7);
+  while (a.roomKey === 'work') OL.tickActor(a, st);
+  // Une fois sorti (slot libéré) : la salle peut rétrécir au compte réel (2).
+  assertEq(OL.roomsFor(snapshot1, st).find(r => r.key === 'work').rows, 5);
+});
+test('roomsFor sans state (2e paramètre omis) reste une fonction pure du snapshot — comportement des tests de géométrie inchangé', () => {
+  const rooms = OL.roomsFor(snap([sess('a', 'running'), sess('b', 'running'), sess('c', 'running')]));
+  assertEq(rooms.find(r => r.key === 'work').rows, 7);
+});
+
+console.log('\nI2 (reviewer) — erreur en pleine migration/annulation:');
+test('I2 : running → waiting (migration démarrée) → error avant la porte : le perso s\'effondre sur place, ne marche plus', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  const a = st.actors.get('a');
+  walkToRest(a, st);
+  OL.syncActors(st, snap([sess('a', 'waiting')])); // démarre la migration travail → pause
+  assertEq(a.migratingTo, 'break');
+  OL.tickActor(a, st); OL.tickActor(a, st); // 2 ticks de marche, pas encore à la porte
+  assert(a.path.length > 0, 'devrait être encore en marche pour ce test');
+  OL.syncActors(st, snap([sess('a', 'error')]));
+  assertEq(a.path.length, 0, 'le perso en erreur ne doit plus marcher');
+  assertEq(OL.animFor(a), `char${a.charIdx}.hurt`);
+  assertEq(a.activity, 'down');
+});
+test('I2 : après résolution de l\'erreur, la migration interrompue reprend proprement (pas de blocage figé)', () => {
+  const st = OL.createState();
+  OL.syncActors(st, snap([sess('a', 'running')]));
+  const a = st.actors.get('a');
+  walkToRest(a, st);
+  OL.syncActors(st, snap([sess('a', 'waiting')]));
+  OL.tickActor(a, st); OL.tickActor(a, st);
+  OL.syncActors(st, snap([sess('a', 'error')])); // gèle en 'down', path vidé
+  OL.syncActors(st, snap([sess('a', 'waiting')])); // erreur résolue, repart en pause
+  assertEq(a.migratingTo, 'break');
+  assert(a.path.length > 0, 'la marche doit reprendre après le gel, pas rester figée');
+  let ticks = 0;
+  while (a.roomKey === 'work' && ticks < 200) { OL.tickActor(a, st); ticks++; }
+  walkToRest(a, st);
+  assertEq(a.roomKey, 'break');
+});
+
+console.log('\nI3 (reviewer) — non-traversée en salle Pause (blocs étendus inclus):');
+test('I3 : 9 sessions waiting (blocs étendus) — aucun trajet ne traverse canapés/comptoir/fontaine/distributeur/plantes', () => {
+  const st = OL.createState();
+  const forbidden = [
+    { tx: 2, ty: 3 }, { tx: 5, ty: 3 },   // canapés
+    { tx: 0, ty: 1 }, { tx: 1, ty: 1 }, { tx: 7, ty: 1 }, // comptoir/fontaine/distributeur
+    { tx: 0, ty: 4 }, { tx: 7, ty: 4 },  // plantes
+  ];
+  const isForbidden = p => forbidden.some(f => f.tx === p.tx && f.ty === p.ty);
+  const sessions = Array.from({ length: 9 }, (_, i) => sess('w' + i, 'waiting'));
+  OL.syncActors(st, snap(sessions));
+  for (const s of sessions) {
+    const a = st.actors.get(s.sessionId);
+    assert(!a.path.some(isForbidden), `le trajet de ${s.sessionId} vers (${a.path[a.path.length - 1].tx},${a.path[a.path.length - 1].ty}) traverse un obstacle pause`);
+  }
+});
+test('I3 : les mêmes 9 acteurs atteignent bien leur siège en marchant, sans jamais fouler un obstacle en cours de route', () => {
+  const st = OL.createState();
+  const forbidden = [
+    { tx: 2, ty: 3 }, { tx: 5, ty: 3 },
+    { tx: 0, ty: 1 }, { tx: 1, ty: 1 }, { tx: 7, ty: 1 },
+    { tx: 0, ty: 4 }, { tx: 7, ty: 4 },
+  ];
+  const isForbidden = p => forbidden.some(f => f.tx === p.tx && f.ty === p.ty);
+  const sessions = Array.from({ length: 9 }, (_, i) => sess('w' + i, 'waiting'));
+  OL.syncActors(st, snap(sessions));
+  for (const s of sessions) {
+    const a = st.actors.get(s.sessionId);
+    for (let i = 0; i < 300 && a.path.length > 0; i++) {
+      assert(!isForbidden({ tx: a.tx, ty: a.ty }), `${s.sessionId} se tient sur un obstacle (${a.tx},${a.ty}) en cours de route`);
+      OL.tickActor(a, st);
+    }
+    assert(!isForbidden({ tx: a.tx, ty: a.ty }), `${s.sessionId} termine sur un obstacle (${a.tx},${a.ty})`);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────

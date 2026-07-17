@@ -15,6 +15,9 @@ const Office = (() => {
   let timer = null;
   let tickCount = 0;
   let tooltip = null;
+  // Dernière donnée connue d'une session, gardée le temps de la marche de
+  // sortie (session déjà supprimée de `sessions` mais l'acteur marche encore).
+  const lastKnown = new Map();
 
   function probe() {
     if (available !== null) return Promise.resolve(available);
@@ -152,7 +155,8 @@ const Office = (() => {
     const cont = container();
     if (!cont) return;
     for (const canvas of cont.querySelectorAll('canvas[data-room]')) {
-      const s = sessions.get(canvas.dataset.room);
+      const sid = canvas.dataset.room;
+      const s = sessions.get(sid) || lastKnown.get(sid);
       if (s) drawRoom(canvas, s);
     }
   }
@@ -160,9 +164,9 @@ const Office = (() => {
   // ─── Sync + boucle ───
   function syncAll() {
     if (!state) state = OfficeLayout.createState();
-    const live = getSortedSessions();
-    for (const s of live) OfficeLayout.syncSession(state, s);
-    OfficeLayout.purge(state, new Set(live.map(s => s.sessionId)));
+    const live = [...sessions.values()];
+    for (const s of live) { OfficeLayout.syncSession(state, s); lastKnown.set(s.sessionId, s); }
+    OfficeLayout.purge(state, new Set(sessions.keys()));
   }
 
   function tick() {
@@ -177,7 +181,7 @@ const Office = (() => {
     // Acteur sorti → sa carte (session déjà purgée) se retire du DOM.
     for (const sid of doneSids) {
       const el = container().querySelector(`[data-session="${sid}"]`);
-      if (el && !sessions.has(sid)) el.remove();
+      if (el && !sessions.has(sid)) { el.remove(); lastKnown.delete(sid); }
     }
     if (sessions.size === 0 && state.actors.size === 0) { render(); return; }
     drawAll();

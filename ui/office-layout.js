@@ -106,7 +106,7 @@
   function syncSession(state, session) {
     const sid = session.sessionId;
     const zones = roomFor(session).zones;
-    const activity = activityFor(session.state.name);
+    const activity = activityFor(session.state && session.state.name);
 
     let actor = state.actors.get(sid);
     if (!actor) {

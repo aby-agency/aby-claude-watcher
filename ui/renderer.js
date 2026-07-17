@@ -1556,7 +1556,7 @@ function onDragOver(e) {
   if (!dragged) return;
 
   const rect = target.getBoundingClientRect();
-  const isGrid = viewMode === 'grid';
+  const isGrid = viewMode === 'grid' || viewMode === 'office';
   const mid = isGrid
     ? rect.left + rect.width / 2
     : rect.top + rect.height / 2;

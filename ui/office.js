@@ -5,7 +5,6 @@
 const Office = (() => {
   const TICK_MS = 125;
   const SCALE_MIN = 1, SCALE_MAX = 4;
-  const TINT_ALPHA = 0.12;
   const STATE_COLORS = { thinking: '#a78bfa', running: '#3b82f6', waiting: '#22c55e', pending: '#f59e0b', error: '#ef4444' };
 
   let atlas = null, manifest = null;
@@ -116,10 +115,9 @@ const Office = (() => {
       }
     }
 
-    // Bulle du perso principal : calculée ici (avant la teinte) mais DESSINÉE
-    // après le bloc teinte plus bas — sinon le voile d'état (globalAlpha sur
-    // toute la pièce) la ternirait comme le reste du décor. Un seul perso
-    // 'session' par pièce, donc au plus une bulle à tracer.
+    // Bulle du perso principal : calculée ici mais DESSINÉE en dernier —
+    // sur les cartes background, le voile sombre la ternirait sinon.
+    // Un seul perso 'session' par pièce, donc au plus une bulle à tracer.
     let bubble = null;
     for (const a of OfficeLayout.actorsFor(state, s.sessionId)) {
       const fi = a.activity === 'think' ? (a.animFrame >> 2) : a.animFrame;
@@ -143,20 +141,14 @@ const Office = (() => {
       pixelTextOn(c2d, `+${room.zones.subOverflow}`, (room.cols - 0.9) * 16 * scale, 0.9 * 16 * scale, '#9ca3af', scale);
     }
 
-    // Teinte d'éclairage : l'état en vision périphérique.
+    // Voile sombre des sessions background uniquement (signal « muet »).
+    // Le voile couleur d'état a été retiré (choix Paul 2026-07-17) : les
+    // bulles émotes + la LED d'écran portent l'état, la pièce reste nette.
     if (s.isBackground) {
       c2d.fillStyle = '#000';
       c2d.globalAlpha = 0.35;
       c2d.fillRect(0, 0, w, h);
       c2d.globalAlpha = 1;
-    } else {
-      const color = STATE_COLORS[stateName];
-      if (color) {
-        c2d.fillStyle = color;
-        c2d.globalAlpha = TINT_ALPHA;
-        c2d.fillRect(0, 0, w, h);
-        c2d.globalAlpha = 1;
-      }
     }
 
     // Bulle émote : dessinée APRÈS la teinte pour rester nette (voir plus

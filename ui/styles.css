@@ -2341,6 +2341,10 @@ body.micro-mode .usage-reset-icon {
   gap: 12px;
   padding: 12px;
   align-content: start;
+  /* Sans ça, les cartes s'étirent à la hauteur de la plus grande de la
+     rangée et l'espace excédentaire gonfle le footer (pièces larges =
+     canvas moins haut). Chaque carte garde sa hauteur naturelle. */
+  align-items: start;
 }
 .office-card {
   display: flex;

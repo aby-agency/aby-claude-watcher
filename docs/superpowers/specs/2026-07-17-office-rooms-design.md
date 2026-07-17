@@ -63,6 +63,11 @@ vide). En **running**, la bulle au-dessus du perso montre l'outil en cours
 (Read/Grep/Glob), crayon (Edit/Write), globe (Web*), agents (Task), prise/
 engrenage (MCP et défaut). Mapping = fonction pure testée.
 
+**Post-scriptum 2026-07-17** : le voile couleur d'état (12 %) est RETIRÉ
+après livraison des bulles (retour visuel de Paul — les bulles + LED d'écran
+suffisent, cohérent avec son goût « design sobre »). Le voile sombre 35 %
+des sessions background est conservé (signal « muet », pas une couleur).
+
 **C. Notifs en scène.** Cloche « needs-you » active → bulle enveloppe animée
 (comble la dette « bell-flash absent en office ») ; error → émote colère ;
 waiting sans cloche depuis longtemps (état « Inactif » existant) → zzz ;

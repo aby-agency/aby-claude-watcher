@@ -249,9 +249,26 @@ const Office = (() => {
     // toujours appliqué) contre les étiquettes déjà POSÉES ; si les 3
     // positions chevauchent toujours, elle n'est PAS dessinée — le tooltip
     // au survol reste le filet de sécurité pour l'identifier.
+    //
+    // Addendum I2 (revue reviewer, 2e passe) : les BULLES émotes de la
+    // rangée du dessous recouvraient systématiquement les étiquettes de la
+    // rangée du dessus (densité normale de la salle pause, pas un cas
+    // limite — pixel-inspecté par le reviewer sur le screenshot d'origine).
+    // Les bulles portent l'ÉTAT du perso : elles ont PRIORITÉ sur les
+    // étiquettes (jamais décalées, jamais sautées). Fix : les rects des
+    // bulles sont calculés AVANT la passe étiquettes et servent à SEEDER
+    // `placedLabelRects` — une étiquette qui chevaucherait une bulle suit
+    // exactement la même logique décalage×2-sinon-skip que si elle
+    // chevauchait une autre étiquette.
     const labelBoxH = 9 * scale; // 7*scale texte + 2*(1*scale) padding, cf. measureLabelBox
+    // Rect d'une bulle : `drawFrameOn` la dessine 16×16 (natif, pas de scale
+    // d'atlas — cf. bake-smoke) ancrée à (b.px, b.py - 34*scale), cf. l'appel
+    // de dessin plus bas — même formule, dupliquée ici pour le calcul du rect
+    // AVANT que le dessin lui-même n'ait lieu (les bulles restent dessinées
+    // en tout dernier, après le voile ET les étiquettes, pour rester nettes).
+    const bubbleRects = bubbles.map(b => ({ x: b.px, y: b.py - 34 * scale, w: 16 * scale, h: 16 * scale }));
     const sortedLabels = [...labels].sort((a, b) => (a.ty - b.ty) || (a.tx - b.tx));
-    const placedLabelRects = [];
+    const placedLabelRects = [...bubbleRects];
     for (const l of sortedLabels) {
       const cx = (l.tx * 16 + 8) * scale;
       const box = measureLabelBox(c2d, l.text, scale);

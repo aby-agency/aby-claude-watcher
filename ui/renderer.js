@@ -754,6 +754,22 @@ function toggleBackgroundSection() {
 }
 
 function updateSession(s) {
+  const stateName = s.state.name;
+  const bell = activeBells.get(s.sessionId);
+  const isActiveAgain = stateName === 'running' || stateName === 'thinking';
+  const isInactive = stateName === 'error';
+
+  // Bell + toast handoff (I-1, hissé avant le early-return office) : une
+  // cloche devenue obsolète (session repartie active ou en erreur) doit être
+  // nettoyée dans TOUTES les vues, office compris — sinon la bulle enveloppe
+  // reste affichée jusqu'à 2 min sur un perso qui a repris la main. Cette
+  // partie n'a aucune dépendance DOM (clearBell/dismissToastForSession sont
+  // du nettoyage pur). Le RE-attachement visuel (bell encore pertinente) a
+  // lui besoin du DOM à jour — il reste plus bas, après le patch in-place,
+  // pour cibler le nœud fraîchement rendu en grid/compact/micro.
+  if (bell && (isActiveAgain || isInactive)) clearBell(s.sessionId, { skipRender: true });
+  if (isActiveAgain || isInactive) dismissToastForSession(s.sessionId);
+
   // Vue office (v3) : pas de DOM par session à patcher (3 salles fixes) —
   // Office.notifyUpdate() re-sync/redessine depuis `sessions` directement.
   if (viewMode === 'office') {
@@ -793,7 +809,6 @@ function updateSession(s) {
     return;
   }
 
-  const stateName = s.state.name;
   const oldState = existing.dataset.state;
 
   // Patch in place — replace the element's HTML
@@ -810,17 +825,10 @@ function updateSession(s) {
 
   existing.replaceWith(newEl);
 
-  // Bell + toast handoff: a bell on a session that's now inactive (error)
-  // or actively interacting again (running/thinking) is stale and gets
-  // cleared. Bell otherwise re-attaches to the new DOM indicator.
-  const bell = activeBells.get(s.sessionId);
-  const isActiveAgain = stateName === 'running' || stateName === 'thinking';
-  const isInactive = stateName === 'error';
-  if (bell) {
-    if (isActiveAgain || isInactive) clearBell(s.sessionId, { skipRender: true });
-    else applyBellVisual(s.sessionId, bell.kind);
-  }
-  if (isActiveAgain || isInactive) dismissToastForSession(s.sessionId);
+  // Bell re-attach: session still inactive with an active bell — reapply
+  // the visual on the freshly patched DOM node (clear/dismiss already ran
+  // above, before the office early-return).
+  if (bell && !isActiveAgain && !isInactive) applyBellVisual(s.sessionId, bell.kind);
 
   updateStatusBar();
 }

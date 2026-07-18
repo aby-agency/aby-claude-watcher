@@ -300,7 +300,7 @@ const Office = (() => {
       <div class="office-room-card" data-room="${key}">
         <canvas class="office-room-canvas" data-canvas="${key}"></canvas>
         <div class="office-room-footer">
-          <span class="office-room-name">${t(ROOM_LABEL_KEY[key])}</span>
+          <span class="office-room-name" data-i18n="${ROOM_LABEL_KEY[key]}">${t(ROOM_LABEL_KEY[key])}</span>
           <span class="office-room-meta">
             <span class="office-room-count" data-count></span>
             <span class="office-room-overflow" data-overflow style="display:none;"></span>
@@ -438,6 +438,9 @@ const Office = (() => {
       if (!canvas) { if (tooltip) tooltip.style.display = 'none'; return; }
       const { x, y } = toCanvasXY(canvas, ev.clientX, ev.clientY);
       const hit = hitTest(canvas, x, y);
+      // Curseur pointer uniquement sur un perso cliquable — headless (aucun
+      // terminal, cf. le handler click ci-dessus) reste en curseur par défaut.
+      canvas.style.cursor = (hit && hit.kind !== 'headless') ? 'pointer' : 'default';
       if (!hit) { if (tooltip) tooltip.style.display = 'none'; return; }
       showTooltip(hit, ev.clientX, ev.clientY);
     });

@@ -2334,11 +2334,10 @@ body.micro-mode .usage-reset-icon {
 .compact-card.bg-session,
 .micro-item.bg-session { cursor: default; }
 
-/* ═══ Office view (v3 : 3 salles fixes — Travail/Pause/Recherche) ═══ */
+/* ═══ Office view (v4 : open-space zoné — un seul canvas) ═══ */
 .office-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
   padding: 16px;
   overflow-y: auto;
   align-items: stretch;
@@ -2380,9 +2379,6 @@ body.micro-mode .usage-reset-icon {
   gap: 6px;
   font-size: 11px;
   color: var(--text-secondary);
-}
-.office-room-overflow {
-  color: var(--text-muted);
 }
 .office-tooltip {
   position: fixed;

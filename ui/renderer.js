@@ -667,15 +667,15 @@ function getRenderableSessions() {
 function render() {
   const count = sessions.size;
 
-  // Vue office (v3) : les 3 salles sont GLOBALES, indépendantes du flux
-  // cartes-par-session (pas de filtre recherche, pas de tri — spec
-  // office-salles §Hors périmètre). Early path assumé : on ne passe jamais
-  // par getRenderableSessions()/fullRender() ici, Office possède son propre
-  // container et sa propre boucle de sync. `showOffice` ne dépend que du
-  // nombre TOTAL de sessions (pas de la recherche) : tant qu'il en existe au
-  // moins une, les 3 salles restent affichées (une salle vide reste visible,
-  // taille minimale — seule la disparition de TOUTE session bascule vers
-  // l'état vide générique, cf. Office.tick()).
+  // Vue office (v4, open-space zoné) : LA salle est GLOBALE, indépendante du
+  // flux cartes-par-session (pas de filtre recherche, pas de tri — spec
+  // office-open-space §Hors périmètre). Early path assumé : on ne passe
+  // jamais par getRenderableSessions()/fullRender() ici, Office possède son
+  // propre container et sa propre boucle de sync. `showOffice` ne dépend que
+  // du nombre TOTAL de sessions (pas de la recherche) : tant qu'il en existe
+  // au moins une, la salle reste affichée (salle vide visible, taille
+  // minimale — seule la disparition de TOUTE session bascule vers l'état
+  // vide générique, cf. Office.tick()).
   if (viewMode === 'office') {
     $emptyState.style.display = count === 0 ? 'flex' : 'none';
     $emptyFiltered.style.display = 'none';
@@ -684,7 +684,7 @@ function render() {
     $microView.style.display = 'none';
     const showOffice = count > 0;
     document.getElementById('officeView').style.display = showOffice ? 'flex' : 'none';
-    if (showOffice) Office.renderRooms(); else Office.deactivate();
+    if (showOffice) Office.renderRoom(); else Office.deactivate();
     updateStatusBar();
     return;
   }
@@ -770,7 +770,7 @@ function updateSession(s) {
   if (bell && (isActiveAgain || isInactive)) clearBell(s.sessionId, { skipRender: true });
   if (isActiveAgain || isInactive) dismissToastForSession(s.sessionId);
 
-  // Vue office (v3) : pas de DOM par session à patcher (3 salles fixes) —
+  // Vue office (v4) : pas de DOM par session à patcher (salle unique) —
   // Office.notifyUpdate() re-sync/redessine depuis `sessions` directement.
   if (viewMode === 'office') {
     Office.notifyUpdate();
@@ -1586,7 +1586,7 @@ function onDragOver(e) {
   if (!dragged) return;
 
   const rect = target.getBoundingClientRect();
-  // Vue office (v3) : pas de drag-drop (pas de DOM par session), cette
+  // Vue office (v4) : pas de drag-drop (pas de DOM par session), cette
   // branche n'est jamais atteinte en viewMode 'office'.
   const isGrid = viewMode === 'grid';
   const mid = isGrid

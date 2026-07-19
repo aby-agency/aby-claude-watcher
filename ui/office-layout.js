@@ -318,11 +318,22 @@
   // rapport Task 1) : B (anchor, arm horizontal gauche) + A (rallonge l'arm
   // horizontal) en row 1 ; C + D (rallongent l'arm vertical) en col 0, rows
   // 2-3. Table basse (avec machine à café bakée) en face de l'arm horizontal
-  // (cols 4-5, row 2 — PAS col 3, pour laisser la colonne d'échappée du
-  // siège (3,1) libre, cf. connectorTyFor). Plante en bout d'arm horizontal.
+  // (cols 4-5, row 2). Plante en bout d'arm horizontal.
+  // Fix Task 3 (checkpoint visuel « doit lire comme un canapé ») : A et B
+  // contiennent CHACUN leur propre bras horizontal 2 tuiles + amorce de
+  // virage (constaté au bake-preview zoomé, pas documenté ainsi au Task 1/2)
+  // — les poser côte à côte sans chevauchement (A à tx:2, comme écrit
+  // initialement) affichait deux coins dupliqués séparés par une marche,
+  // pas un canapé continu. A posé à tx:1 (chevauchement d'1 tuile avec B,
+  // A dessiné PAR-DESSUS car plus loin dans le tableau) fusionne les deux
+  // motifs de coussin en un seul bloc — vérifié au CDP (screenshot zoomé),
+  // comparé au mockup (bloc large plutôt qu'un L net, cf. rapport Task 3).
+  // Conséquence acceptée : le siège lounge idx1 (tx:3,ty:1, cf. LOUNGE_SEATS)
+  // n'est plus visuellement SUR un fragment (sol nu) — aucun test ne
+  // vérifie ce détail, priorité donnée à la silhouette d'ensemble.
   function buildLounge(statics) {
     statics.push({ frame: 'sofaCornerB', tx: 0, ty: 1 });
-    statics.push({ frame: 'sofaCornerA', tx: 2, ty: 1 });
+    statics.push({ frame: 'sofaCornerA', tx: 1, ty: 1 });
     statics.push({ frame: 'plant', tx: 5, ty: 1 });
     statics.push({ frame: 'sofaCornerC', tx: 0, ty: 2 });
     statics.push({ frame: 'coffeeTable', tx: 4, ty: 2 });
@@ -340,11 +351,19 @@
     }
   }
 
+  // Fix Task 3 (checkpoint visuel) : le bureau/écran est décalé d'1 tuile à
+  // DROITE de la tuile de l'acteur (pas superposé) — posé sur la MÊME tuile
+  // que l'acteur (comme écrit initialement), le sprite standing 16×32 de
+  // l'acteur (idle.down, face caméra, pas idle.up comme aux postes agents)
+  // recouvre presque entièrement le petit décor 15×15/15×16, invisible au
+  // rendu (constaté au CDP, screenshot zoomé). tx+1 reste dans la boîte dr
+  // (cols 10-15) sans jamais toucher le couloir (cols 6-9, testé ailleurs) —
+  // vérifié pour les 2 colonnes de poste (10→11, 13→14).
   function buildDR(statics, count) {
     for (let i = 0; i < count; i++) {
       const p = drPosition(i);
-      statics.push({ frame: 'sideDesk90', tx: p.tx, ty: p.ty });
-      statics.push({ frame: 'sideSetup90', tx: p.tx, ty: p.ty, dy: -3 });
+      statics.push({ frame: 'sideDesk90', tx: p.tx + 1, ty: p.ty });
+      statics.push({ frame: 'sideSetup90', tx: p.tx + 1, ty: p.ty, dy: -3 });
     }
   }
 

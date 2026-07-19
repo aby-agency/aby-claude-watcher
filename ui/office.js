@@ -1,22 +1,31 @@
-// ui/office.js — moteur de rendu de la vue office v3 : 3 SALLES FIXES
-// (Travail/Pause/Recherche), un canvas par salle, UN SEUL timer 8 fps.
-// Chargé APRÈS office-layout.js, AVANT renderer.js (les globals de renderer
-// — sessions, activeBells, handleFocus, esc, t, … — ne sont touchés qu'à
-// l'exécution, jamais au chargement du module). Vue inactive = timer stoppé.
+// ui/office.js — moteur de rendu de la vue office v4 : UNE seule salle
+// « open-space » zonée (lounge/agents/deep-research/headless), UN canvas, UN
+// SEUL timer 8 fps. Chargé APRÈS office-layout.js, AVANT renderer.js (les
+// globals de renderer.js — sessions, activeBells, handleFocus, esc, t, … —
+// ne sont touchés qu'à l'exécution, jamais au chargement du module). Vue
+// inactive = timer stoppé.
 //
-// v2 → v3 : le container #officeView n'est plus un flux de cartes-par-
-// session (une pièce par session) mais possède 3 containers FIXES construits
-// une fois (ensureDOM). Chaque salle peut héberger PLUSIEURS acteurs
-// 'session' (postes multiples) — tout ce qui était "l'unique acteur
-// principal de la pièce" en v2 (bulle émote, LED d'état, fauteuil overlay
-// conditionnel) devient une opération PAR ACTEUR / PAR TUILE, généralisée via
-// `seatedAt` (tuile occupée → acteur). Voir docs/superpowers/specs/
-// 2026-07-17-office-salles-design.md (fait foi) et le plan associé, Task 2.
+// v3 → v4 : le container #officeView passe de 3 salles fixes (3 canvases) à
+// UNE seule carte/canvas. `roomFor(snapshot, state)` (office-layout.js) ne
+// retourne plus un tableau de salles par fonction mais UN objet unique
+// {cols, rows, statics, zones} — les 4 zones (lounge/agents/dr/headless)
+// cohabitent dans le même espace, reliées par un couloir central. Tout
+// l'acquis du rendu v3 (probe/atlas, drawFrameOn/animFrameName, assise
+// demi-tile -5px, fauteuil overlay conditionnel, LED de poste occupé, bulles
+// émotes + priorités, étiquettes anti-collision, hit-test par acteur,
+// tooltip, lastKnown + prune, timer unique) se transpose à l'identique sur
+// UN SEUL passage de dessin au lieu d'un par salle — plus de `roomKey`
+// (`OfficeLayout.actorsAll(state)` remplace `actorsIn(state, roomKey)`).
+// Nouveau en v4 : les badges « +N » par zone (avant : footer DOM par salle)
+// sont dessinés SUR LE CANVAS, dans la bande mur (row 0, toujours libre de
+// tout mobilier/acteur — cf. buildShell) au-dessus de la boîte de la zone
+// concernée — il n'y a plus qu'un seul footer DOM (nom + compteur global).
+// Voir docs/superpowers/specs/2026-07-19-office-open-space-design.md (fait
+// foi) et le plan associé (Task 3).
 const Office = (() => {
   const TICK_MS = 125;
   const SCALE_MIN = 1, SCALE_MAX = 4;
   const STATE_COLORS = { thinking: '#a78bfa', running: '#3b82f6', waiting: '#22c55e', pending: '#f59e0b', error: '#ef4444' };
-  const ROOM_LABEL_KEY = { work: 'room_work', break: 'room_break', research: 'room_research' };
 
   let atlas = null, manifest = null;
   let available = null;
@@ -25,13 +34,15 @@ const Office = (() => {
   let timer = null;
   let tickCount = 0;
   let tooltip = null;
+  let canvasEl = null;       // le SEUL canvas (v4) — capturé une fois par ensureDOM
   // Dernière donnée connue d'une session, gardée le temps de la marche de
   // sortie (session déjà supprimée de `sessions` mais l'acteur marche encore
   // vers la porte, ou sert de source pour le tooltip/LED d'un acteur
   // recherche dont la session parente vient de disparaître).
   const lastKnown = new Map();
-  // Rects de hit-test (CSS→natif) par canvas, recalculés à chaque drawRoom.
-  const canvasRects = new WeakMap();
+  // Rects de hit-test (CSS→natif), recalculés à chaque drawRoom. Un seul
+  // canvas en v4 : plus besoin d'un WeakMap par canvas (v3 en avait 3).
+  let hitRects = [];
 
   function probe() {
     if (available !== null) return Promise.resolve(available);
@@ -53,7 +64,7 @@ const Office = (() => {
     return probePromise;
   }
 
-  // ─── Frames/anims (inchangé v2) ───
+  // ─── Frames/anims (inchangé v2/v3) ───
   function drawFrameOn(c2d, name, px, py, scale) {
     const f = manifest.frames[name];
     if (!f) return;
@@ -75,8 +86,9 @@ const Office = (() => {
   }
 
   // Boîte d'une étiquette (texte + padding) — mesurée à part de son dessin
-  // pour permettre à la passe anti-collision (I2) de tester une position
-  // AVANT de décider si elle sera effectivement dessinée.
+  // pour permettre à la passe anti-collision de tester une position AVANT de
+  // décider si elle sera effectivement dessinée. Réutilisée aussi par les
+  // badges de zone (v4) : même style pixel, même formule de mesure.
   function measureLabelBox(c2d, txt, scale) {
     c2d.font = `${7 * scale}px monospace`;
     const textW = c2d.measureText(txt).width;
@@ -100,6 +112,26 @@ const Office = (() => {
     c2d.textAlign = 'left'; c2d.textBaseline = 'alphabetic';
   }
 
+  // Badge « +N » d'une zone (v4, remplace le footer-par-salle de v3) : posé
+  // dans la bande mur (row 0), toujours libre de tout mobilier/acteur (cf.
+  // buildShell) — donc aucun risque de collision avec le reste du rendu, pas
+  // besoin de le faire participer à la passe anti-collision des étiquettes.
+  // Centré horizontalement sur la largeur de la boîte de la zone.
+  function drawOverflowBadge(c2d, box, total, scale) {
+    const txt = `+${total}`;
+    const cx = (box.tx + box.cols / 2) * 16 * scale;
+    const b = measureLabelBox(c2d, txt, scale);
+    const rectTop = Math.max(0, (16 * scale - b.h) / 2);
+    const topY = rectTop + b.padY;
+    c2d.fillStyle = '#f59e0b';
+    c2d.fillRect(cx - b.w / 2, rectTop, b.w, b.h);
+    c2d.fillStyle = '#1a1a22';
+    c2d.font = `${7 * scale}px monospace`;
+    c2d.textAlign = 'center'; c2d.textBaseline = 'top';
+    c2d.fillText(txt, cx, topY);
+    c2d.textAlign = 'left'; c2d.textBaseline = 'alphabetic';
+  }
+
   function rectsOverlap(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
@@ -108,9 +140,8 @@ const Office = (() => {
     return sessions.get(sessionId) || lastKnown.get(sessionId);
   }
 
-  // ─── Rendu d'une salle dans son canvas ───
+  // ─── Rendu de LA salle (v4 : un seul canvas, plus de roomKey) ───
   function drawRoom(canvas, room) {
-    const roomKey = room.key;
     const card = canvas.parentElement;
     const cardW = card ? card.clientWidth : canvas.clientWidth;
     const scale = Math.max(SCALE_MIN, Math.min(SCALE_MAX, Math.floor(cardW / (room.cols * 16)) || SCALE_MIN));
@@ -120,43 +151,34 @@ const Office = (() => {
     c2d.imageSmoothingEnabled = false;
     c2d.clearRect(0, 0, w, h);
 
-    const roomActors = OfficeLayout.actorsIn(state, roomKey);
+    const actors = OfficeLayout.actorsAll(state);
 
     // Tuile occupée → acteur (immobile). Sert au LED de poste (travail) ET à
-    // l'overlay fauteuil conditionnel — généralisé PAR TUILE (v2 n'avait
-    // qu'un unique "acteur principal" par pièce ; plusieurs postes cohabitent
-    // maintenant dans la même salle).
+    // l'overlay fauteuil conditionnel — PAR TUILE (plusieurs postes cohabitent
+    // dans la même salle, transposé v2→v3, inchangé v3→v4).
     const seatedAt = new Map();
-    for (const a of roomActors) if (a.path.length === 0) seatedAt.set(`${a.tx},${a.ty}`, a);
+    for (const a of actors) if (a.path.length === 0) seatedAt.set(`${a.tx},${a.ty}`, a);
 
-    // z:'over' visible seulement si occupé — ne concerne QUE `chairOver`
-    // (seul static `z:'over'` produit par office-layout.js, salle travail) ;
-    // tout futur static `z:'over'` sans logique d'occupation dédiée reste
-    // toujours dessiné par-dessus, comme en v2.
+    // z:'over' visible seulement si occupé — v4 : DEUX noms de frame portent
+    // ce contrat (`chairOrange` postes agents, `chairBlack` postes headless),
+    // remplacent `chairOver` seul de v3 (cf. rapport Task 2, layout v4).
     function overVisible(st) {
-      if (st.frame !== 'chairOver') return true;
+      if (st.frame !== 'chairOrange' && st.frame !== 'chairBlack') return true;
       return seatedAt.has(`${st.tx},${st.ty}`);
     }
 
     function drawStatic(st) {
       const px = st.tx * 16 * scale, py = (st.ty * 16 + (st.dy || 0)) * scale;
-      if (st.frame === 'coffeeMachine') {
-        drawFrameOn(c2d, animFrameName('coffee', tickCount >> 1), px, py, scale);
-        return;
-      }
       if (st.frame === 'door') { c2d.fillStyle = '#1a1a22'; c2d.fillRect(px, py, 16 * scale, 16 * scale); return; }
       drawFrameOn(c2d, st.frame, px, py, scale);
-      // LED d'état sur le moniteur secondaire du poste (salle travail
-      // uniquement — seule salle où `deskSetup` apparaît) : ancrée sur le
-      // bureau (colonne gauche du setup, cf. commentaire office-layout.js sur
-      // la géométrie desk/char) ; reflète l'état de LA SESSION assise à CE
-      // poste précis (pas l'ancien "état de la pièce" v2, une salle héberge
-      // maintenant plusieurs postes). Éteinte si personne n'y est
-      // physiquement assis (poste vide, ou perso en train de migrer/marcher).
-      if (st.frame === 'deskSetup') {
-        const seatTx = st.tx === 0 ? 1 : 5;
-        const occ = seatedAt.get(`${seatTx},${st.ty + 1}`);
-        if (occ && occ.kind === 'session') {
+      // LED d'état sur la console d'un poste occupé — `stationConsole` est le
+      // SEUL static à porter cette info (postes agents ET headless, cf.
+      // office-layout.js buildAgents/buildHeadless : le fauteuil est TOUJOURS
+      // à `(tx, ty+1)` de sa console). Éteinte si le poste est vide, ou si le
+      // perso qui l'occupe est en train de migrer/marcher (jamais assis).
+      if (st.frame === 'stationConsole') {
+        const occ = seatedAt.get(`${st.tx},${st.ty + 1}`);
+        if (occ && (occ.kind === 'session' || occ.kind === 'headless')) {
           const occSession = sessionFor(occ.sessionId);
           const stateName = occSession && occSession.state && occSession.state.name;
           const color = STATE_COLORS[stateName];
@@ -171,27 +193,25 @@ const Office = (() => {
     }
 
     // Passe 1 : statics normaux (sol, meubles, bureaux…), sous les acteurs —
-    // plus les fauteuils `chairOver` inoccupés (dossier visible, personne à
-    // protéger visuellement).
+    // plus les fauteuils `chairOrange`/`chairBlack` inoccupés (dossier
+    // visible, personne à protéger visuellement).
     for (const st of room.statics) {
       if (st.z !== 'over' || !overVisible(st)) drawStatic(st);
     }
 
     // Acteurs : sprite + collecte étiquette/bulle/hit-rect. Les bulles sont
-    // calculées ici mais DESSINÉES en dernier (après le voile sombre local de
-    // la salle recherche, pour rester nettes) — un acteur `session` par
-    // salle peut désormais en avoir une CHACUN (v2 n'en traçait qu'une par
-    // pièce, un seul acteur principal possible).
+    // calculées ici mais DESSINÉES en dernier, pour rester nettes par-dessus
+    // le décor et les étiquettes.
     const rects = [];
     const labels = [];
     const bubbles = [];
-    for (const a of roomActors) {
+    for (const a of actors) {
       const fi = a.activity === 'think' ? (a.animFrame >> 2) : a.animFrame;
       const fname = animFrameName(OfficeLayout.animFor(a), fi);
       // Composition « au demi-tile » façon LimeZu (réf du site, conservée
-      // v2→v3) : un perso ASSIS (à son poste/table, `work`/`think`) est
-      // remonté dans son bureau. Debout, en marche, ou en relax (pause) :
-      // alignement plein-tuile normal.
+      // v2→v4) : un perso ASSIS (à son poste, `work`/`think`) est remonté
+      // dans son bureau. Debout, en marche, ou en relax (lounge) : alignement
+      // plein-tuile normal.
       const seated = a.path.length === 0 && (a.activity === 'work' || a.activity === 'think');
       const px = a.tx * 16 * scale, py = (a.ty * 16 + (seated ? -5 : 0)) * scale;
       if (fname) drawFrameOn(c2d, fname, px, py, scale);
@@ -210,7 +230,7 @@ const Office = (() => {
         }
       }
     }
-    canvasRects.set(canvas, rects);
+    hitRects = rects;
 
     // Passe 2 : statics `z:'over'` occupés (fauteuil vu de dos) — PAR-DESSUS
     // l'acteur assis, pour que le dossier s'intercale entre lui (dos au
@@ -219,53 +239,19 @@ const Office = (() => {
       if (st.z === 'over' && overVisible(st)) drawStatic(st);
     }
 
-    // Voile sombre LOCAL (salle recherche uniquement) : seul assombrissement
-    // v3 (remplace le voile plein-canvas des cartes background v2) — couvre
-    // juste la zone headless exposée par la salle (`darkZone`).
-    if (room.darkZone) {
-      c2d.fillStyle = '#000';
-      c2d.globalAlpha = 0.35;
-      c2d.fillRect(room.darkZone.tx * 16 * scale, room.darkZone.ty * 16 * scale,
-                   room.darkZone.cols * 16 * scale, room.darkZone.rows * 16 * scale);
-      c2d.globalAlpha = 1;
-    }
-
-    // Étiquettes : après le voile, pour rester lisibles même dans le coin
-    // headless assombri.
-    // Clamp vertical : un acteur dans la TOUTE DERNIÈRE rangée de la salle
-    // (ex. bloc étendu de la salle pause, dont le dernier siège tombe pile
-    // sur `rows-1`) verrait son étiquette dessinée sous le bord bas du
-    // canvas — donc hors zone visible, silencieusement clippée (aucune
-    // erreur, juste invisible). Constaté en vérif CDP (migration vers un
-    // siège de bloc étendu). Fix : ne jamais dépasser le bas du canvas.
-    //
-    // Anti-collision (I2, revue reviewer) : la salle pause n'espace ses
-    // sièges que d'1 tuile — deux étiquettes 8-car. voisines (largeur très
-    // supérieure à une tuile) se chevauchent quasi systématiquement à cette
-    // densité (constaté sur le screenshot de migration, pas un cas rare
-    // "recherche dense" comme initialement classé). Passe dédiée : ordre
-    // stable (ty puis tx), chaque étiquette teste sa position par défaut PUIS
-    // jusqu'à 2 décalages vers le bas (hauteur+1px, clamp bas-de-canvas
-    // toujours appliqué) contre les étiquettes déjà POSÉES ; si les 3
-    // positions chevauchent toujours, elle n'est PAS dessinée — le tooltip
-    // au survol reste le filet de sécurité pour l'identifier.
-    //
-    // Addendum I2 (revue reviewer, 2e passe) : les BULLES émotes de la
-    // rangée du dessous recouvraient systématiquement les étiquettes de la
-    // rangée du dessus (densité normale de la salle pause, pas un cas
-    // limite — pixel-inspecté par le reviewer sur le screenshot d'origine).
-    // Les bulles portent l'ÉTAT du perso : elles ont PRIORITÉ sur les
-    // étiquettes (jamais décalées, jamais sautées). Fix : les rects des
-    // bulles sont calculés AVANT la passe étiquettes et servent à SEEDER
-    // `placedLabelRects` — une étiquette qui chevaucherait une bulle suit
-    // exactement la même logique décalage×2-sinon-skip que si elle
-    // chevauchait une autre étiquette.
+    // Étiquettes : anti-collision (bulles prioritaires — transposé v3, cf.
+    // fe42a79). Clamp vertical : un acteur dans la toute dernière rangée de
+    // la salle verrait son étiquette dessinée sous le bord bas du canvas —
+    // donc hors zone visible, silencieusement clippée. Ordre stable (ty puis
+    // tx), chaque étiquette teste sa position par défaut PUIS jusqu'à 2
+    // décalages vers le bas contre les étiquettes déjà POSÉES et les bulles ;
+    // si les 3 positions chevauchent toujours, elle n'est PAS dessinée — le
+    // tooltip au survol reste le filet de sécurité pour l'identifier.
     const labelBoxH = 9 * scale; // 7*scale texte + 2*(1*scale) padding, cf. measureLabelBox
     // Rect d'une bulle : `drawFrameOn` la dessine 16×16 (natif, pas de scale
     // d'atlas — cf. bake-smoke) ancrée à (b.px, b.py - 34*scale), cf. l'appel
     // de dessin plus bas — même formule, dupliquée ici pour le calcul du rect
-    // AVANT que le dessin lui-même n'ait lieu (les bulles restent dessinées
-    // en tout dernier, après le voile ET les étiquettes, pour rester nettes).
+    // AVANT que le dessin lui-même n'ait lieu.
     const bubbleRects = bubbles.map(b => ({ x: b.px, y: b.py - 34 * scale, w: 16 * scale, h: 16 * scale }));
     const sortedLabels = [...labels].sort((a, b) => (a.ty - b.ty) || (a.tx - b.tx));
     const placedLabelRects = [...bubbleRects];
@@ -284,56 +270,57 @@ const Office = (() => {
       }
     }
 
-    // Bulles émotes : dessinées en tout dernier (voile + étiquettes déjà
-    // posés), ancrées au-dessus de la tête (perso 16×32 ancré bas de tuile).
+    // Bulles émotes : dessinées en tout dernier (étiquettes déjà posées),
+    // ancrées au-dessus de la tête (perso 16×32 ancré bas de tuile).
     for (const b of bubbles) drawFrameOn(c2d, b.frame, b.px, b.py - 34 * scale, scale);
+
+    // Badges « +N » par zone (v4) : bande mur (row 0), toujours libre —
+    // dessinés en tout dernier, ne participent à aucune passe de collision.
+    for (const key of Object.keys(room.zones)) {
+      const zone = room.zones[key];
+      if (zone.overflow && zone.overflow.total > 0) drawOverflowBadge(c2d, zone.box, zone.overflow.total, scale);
+    }
   }
 
-  // ─── DOM : 3 salles fixes, construites une seule fois ───
+  // ─── DOM : une seule carte/canvas, construite une seule fois ───
   function container() { return document.getElementById('officeView'); }
 
   function ensureDOM() {
     const cont = container();
     if (!cont || cont.dataset.built) return;
     cont.dataset.built = '1';
-    cont.innerHTML = OfficeLayout.ROOM_KEYS.map(key => `
-      <div class="office-room-card" data-room="${key}">
-        <canvas class="office-room-canvas" data-canvas="${key}"></canvas>
+    cont.innerHTML = `
+      <div class="office-room-card" data-room="office">
+        <canvas class="office-room-canvas" data-canvas="office"></canvas>
         <div class="office-room-footer">
-          <span class="office-room-name" data-i18n="${ROOM_LABEL_KEY[key]}">${t(ROOM_LABEL_KEY[key])}</span>
-          <span class="office-room-meta">
-            <span class="office-room-count" data-count></span>
-            <span class="office-room-overflow" data-overflow style="display:none;"></span>
-          </span>
+          <span class="office-room-name" data-i18n="office_title">${t('office_title')}</span>
+          <span class="office-room-meta"><span class="office-room-count" data-count></span></span>
         </div>
       </div>
-    `).join('');
-    wireInteractions(cont);
+    `;
+    canvasEl = cont.querySelector('canvas[data-canvas]');
+    wireInteractions(canvasEl);
     tooltip = document.getElementById('officeTooltip');
   }
 
-  function updateFooter(card, room) {
+  // Footer unique (v4, remplace le footer-par-salle v3) : nom fixe + un seul
+  // compteur global ("Office · N session(s)") — pas de data-i18n sur le
+  // compteur (texte procédural, {n} résolu ici) pour ne pas être écrasé par
+  // le balayage global [data-i18n] d'un changement de langue (cf. renderer.js
+  // applyI18n) ; il s'auto-corrige de toute façon au prochain tick (125 ms).
+  function updateFooter(card, snap) {
     const countEl = card.querySelector('[data-count]');
-    if (countEl) countEl.textContent = room.counter;
-    const overflowEl = card.querySelector('[data-overflow]');
-    if (overflowEl) {
-      const total = room.overflow && room.overflow.total;
-      overflowEl.style.display = total > 0 ? '' : 'none';
-      if (total > 0) overflowEl.textContent = `+${total}`;
-    }
+    if (countEl) countEl.textContent = t('office_count', { n: snap.interactive.length + snap.background.length });
   }
 
   function drawAll() {
     const cont = container();
-    if (!cont) return;
-    const rooms = OfficeLayout.roomsFor(snapshotSessions(), state);
-    for (const room of rooms) {
-      const card = cont.querySelector(`.office-room-card[data-room="${room.key}"]`);
-      if (!card) continue;
-      updateFooter(card, room);
-      const canvas = card.querySelector('canvas');
-      if (canvas) drawRoom(canvas, room);
-    }
+    if (!cont || !canvasEl) return;
+    const snap = snapshotSessions();
+    const room = OfficeLayout.roomFor(snap, state);
+    const card = cont.querySelector('.office-room-card');
+    if (card) updateFooter(card, snap);
+    drawRoom(canvasEl, room);
   }
 
   // ─── Sync + boucle ───
@@ -349,24 +336,22 @@ const Office = (() => {
     return { interactive, background };
   }
 
-  // I1 (revue reviewer) : `lastKnown` ne se vidait que via le chemin `done`
-  // de tick() — qui ne concerne QUE les acteurs `kind:'session'` (seuls à
-  // avoir un `done`, cf. tickActor). Un acteur `headless` disparaît, lui,
-  // IMMÉDIATEMENT et SYNCHRONEMENT dans syncActors (pas de marche, pas de
-  // `done`) : sa session ne passait donc jamais par le nettoyage de tick(),
-  // et chaque session background qui a existé un jour laissait sa donnée
-  // complète dans `lastKnown` POUR TOUJOURS (fuite mémoire non bornée sur la
-  // durée de vie de l'app). Idem pour tout futur type d'acteur qui
+  // I1 (revue reviewer v3) : `lastKnown` ne se vidait que via le chemin
+  // `done` de tick() — qui ne concerne QUE les acteurs `kind:'session'`
+  // (seuls à avoir un `done`, cf. tickActor). Un acteur `headless` disparaît,
+  // lui, IMMÉDIATEMENT et SYNCHRONEMENT dans syncActors (pas de marche, pas
+  // de `done`) : sa session ne passait donc jamais par le nettoyage de
+  // tick(), et chaque session background qui a existé un jour laissait sa
+  // donnée complète dans `lastKnown` POUR TOUJOURS (fuite mémoire non bornée
+  // sur la durée de vie de l'app). Idem pour tout futur type d'acteur qui
   // disparaîtrait sans jamais passer par `done`.
   //
-  // Fix générique : un balayage dédié, appelé après CHAQUE sync (donc after
-  // syncActors dans syncAll — couvre le cas headless/synchrone — ET après
-  // le nettoyage des `done` dans tick() — couvre le cas session/asynchrone).
-  // Une entrée `lastKnown` ne survit que si sa session est encore vivante
-  // OU si un acteur (n'importe quel kind) référence encore ce sessionId
-  // (ex. l'acteur session en train de marcher vers la sortie, ou un
-  // subagent/meeting dont la session parente vient de disparaître mais dont
-  // l'acteur research n'a pas encore été nettoyé ce tick).
+  // Fix générique (inchangé v3→v4) : un balayage dédié, appelé après CHAQUE
+  // sync (donc after syncActors dans syncAll — couvre le cas headless/
+  // synchrone — ET après le nettoyage des `done` dans tick() — couvre le cas
+  // session/asynchrone). Une entrée `lastKnown` ne survit que si sa session
+  // est encore vivante OU si un acteur (n'importe quel kind) référence encore
+  // ce sessionId.
   function pruneLastKnown() {
     if (lastKnown.size === 0) return;
     const referenced = new Set();
@@ -400,7 +385,7 @@ const Office = (() => {
     for (const a of doneAids) state.actors.delete(a.id);
     pruneLastKnown();
     // Dernière session partie ET dernier acteur sorti : bascule vers l'état
-    // vide réel (render() affichera emptyState au lieu des 3 salles) — pas de
+    // vide réel (render() affichera emptyState au lieu de la salle) — pas de
     // fantôme figé à la porte, timer coupé par le render() qui suit (vue
     // quittée par retombée à 0 session).
     if (sessions.size === 0 && state.actors.size === 0) { render(); return; }
@@ -417,40 +402,34 @@ const Office = (() => {
     };
   }
 
-  function hitTest(canvas, x, y) {
-    const rects = canvasRects.get(canvas);
-    if (!rects) return null;
-    for (let i = rects.length - 1; i >= 0; i--) {
-      const r = rects[i];
+  function hitTest(x, y) {
+    for (let i = hitRects.length - 1; i >= 0; i--) {
+      const r = hitRects[i];
       if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return r;
     }
     return null;
   }
 
-  function wireInteractions(cont) {
-    cont.addEventListener('click', (ev) => {
-      const canvas = ev.target.closest && ev.target.closest('canvas[data-canvas]');
-      if (!canvas) return;
+  function wireInteractions(canvas) {
+    canvas.addEventListener('click', (ev) => {
       const { x, y } = toCanvasXY(canvas, ev.clientX, ev.clientY);
-      const hit = hitTest(canvas, x, y);
+      const hit = hitTest(x, y);
       // Clic = uniquement sur un PERSO (hit-test par acteur). Headless =
-      // aucun focus (pas de terminal à ouvrir) — subagent/meeting focalisent
+      // aucun focus (pas de terminal à ouvrir) — subagent/workflow focalisent
       // leur session PARENTE (hit.sessionId y pointe déjà, cf. office-layout.js).
       if (!hit || hit.kind === 'headless') return;
       handleFocus(hit.sessionId);
     });
-    cont.addEventListener('mousemove', (ev) => {
-      const canvas = ev.target.closest && ev.target.closest('canvas[data-canvas]');
-      if (!canvas) { if (tooltip) tooltip.style.display = 'none'; return; }
+    canvas.addEventListener('mousemove', (ev) => {
       const { x, y } = toCanvasXY(canvas, ev.clientX, ev.clientY);
-      const hit = hitTest(canvas, x, y);
+      const hit = hitTest(x, y);
       // Curseur pointer uniquement sur un perso cliquable — headless (aucun
       // terminal, cf. le handler click ci-dessus) reste en curseur par défaut.
       canvas.style.cursor = (hit && hit.kind !== 'headless') ? 'pointer' : 'default';
       if (!hit) { if (tooltip) tooltip.style.display = 'none'; return; }
       showTooltip(hit, ev.clientX, ev.clientY);
     });
-    cont.addEventListener('mouseleave', () => { if (tooltip) tooltip.style.display = 'none'; });
+    canvas.addEventListener('mouseleave', () => { if (tooltip) tooltip.style.display = 'none'; });
   }
 
   function showTooltip(hit, clientX, clientY) {
@@ -469,7 +448,9 @@ const Office = (() => {
   // ─── Hooks appelés par renderer.js ───
   // render() (viewMode office) : construit le container (idempotent), sync +
   // redraw immédiat (pas de canvas blanc pendant 125 ms), garantit le timer.
-  function renderRooms() {
+  // Renommé `renderRooms` → `renderRoom` (v4, UNE salle) — appelant à jour
+  // dans renderer.js.
+  function renderRoom() {
     if (available !== true) return;
     ensureDOM();
     syncAll();
@@ -478,7 +459,7 @@ const Office = (() => {
   }
 
   // updateSession/removeSessionFromDOM (viewMode office) : sync + redraw
-  // léger, le container est déjà construit par renderRooms().
+  // léger, le container est déjà construit par renderRoom().
   function notifyUpdate() {
     if (!state) return;
     syncAll();
@@ -490,5 +471,5 @@ const Office = (() => {
     if (tooltip) tooltip.style.display = 'none';
   }
 
-  return { probe, renderRooms, notifyUpdate, deactivate, isAvailable: () => available === true };
+  return { probe, renderRoom, notifyUpdate, deactivate, isAvailable: () => available === true };
 })();

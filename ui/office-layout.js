@@ -165,6 +165,29 @@
     for (const v of state.slots[zone].values()) if (v.kind === kind && v.idx > max) max = v.idx;
     return max;
   }
+  // Indices de slot RÉELLEMENT tenus (occupés) pour un `kind` donné —
+  // fix F1 (revue Task 3, mobilier de stations vides) : la pose du MOBILIER
+  // (console+fauteuil) d'une station doit suivre les slots effectivement
+  // tenus, jamais l'arrondi par groupes de 3 (`agentsGroups`/`headlessGroups`
+  // — qui plancher à 1 même à 0 occupant, et arrondit tout groupe PARTIEL au
+  // complet) : sinon on meuble des stations vides, voisines d'un occupant
+  // isolé (fragmentation C2) ou carrément seules dans la salle (0 occupant).
+  // Le DIMENSIONNEMENT (rows, C1/C2/C3) reste inchangé — lui seul a besoin
+  // de l'arrondi par groupes pour garantir assez de place ; le mobilier, non.
+  // Sans `state` (roomFor pure du snapshot, cf. tests) : aucun bookkeeping
+  // de slot n'existe encore — on retombe sur un remplissage contigu
+  // [0..fallbackCount-1], la meilleure approximation possible (pas de
+  // fragmentation connue à ce stade).
+  function heldSlotIndices(state, zone, kind, fallbackCount) {
+    if (!state) {
+      const idxs = [];
+      for (let i = 0; i < fallbackCount; i++) idxs.push(i);
+      return idxs;
+    }
+    const idxs = [];
+    for (const v of state.slots[zone].values()) if (v.kind === kind) idxs.push(v.idx);
+    return idxs;
+  }
   // Plus haute tuile (ty) physiquement occupée dans la zone par un acteur du
   // `kind` donné (marcheur OU gelé en erreur), transposé de v3 (fix C3) :
   // couvre le cas d'un acteur gelé EN PLEIN COULOIR (loin de son slot
@@ -187,6 +210,21 @@
   // col c+1 si subagents) ; rangées de 3 postes ; groupes séparés par 1
   // rangée de circulation (gap) — transpose la géométrie « bureau+fauteuil »
   // v3 en 1-poste-par-cellule au lieu de paires.
+  //
+  // Fix F2 (revue Task 3, 2e portable flottant) : le 2e subagent posait à
+  // (c+1, consoleTy) — la rangée du BUREAU, sans fauteuil ni support visuel
+  // (constaté au CDP : le perso se dessine par-dessus la console, se
+  // superpose au 1er portable dans la même colonne, aucun repère de sol).
+  // Le 1er portable (c+1, chairTy) a lui un ancrage cohérent : même rangée
+  // que le fauteuil du parent, sous la moitié droite du même bureau (large
+  // de 2 tuiles). Le 2e portable est décalé d'UNE rangée EN DESSOUS
+  // (chairTy+1) plutôt qu'au-dessus : c'est la rangée de circulation du
+  // groupe (jamais de mobilier dessus, cf. tête de fichier) — sol nu, jamais
+  // traversée par une marche (les postes agents n'ont pas d'échappée
+  // verticale, cf. `connectorTyFor`), donc un perso debout avec son portable
+  // y est visuellement ancré (pieds au sol) sans jamais chevaucher ni la
+  // console ni la station voisine (même colonne c+1 que le 1er portable,
+  // toujours dans l'empreinte du bureau du parent).
   function agentStationPosition(idx) {
     const group = Math.floor(idx / 3), within = idx % 3;
     const c = within * 2;
@@ -194,7 +232,7 @@
     const chairTy = consoleTy + 1;
     return {
       consoleTx: c, consoleTy, chairTx: c, chairTy,
-      laptop: [{ tx: c + 1, ty: chairTy }, { tx: c + 1, ty: consoleTy }],
+      laptop: [{ tx: c + 1, ty: chairTy }, { tx: c + 1, ty: chairTy + 1 }],
     };
   }
   function agentsGroups(n) { return Math.max(1, Math.ceil(n / 3)); }
@@ -340,14 +378,14 @@
     statics.push({ frame: 'sofaCornerD', tx: 0, ty: 3 });
   }
 
-  function buildAgents(statics, groups) {
-    for (let g = 0; g < groups; g++) {
-      for (let within = 0; within < 3; within++) {
-        const c = within * 2;
-        const consoleTy = AGENTS_TOP + g * 3;
-        statics.push({ frame: 'stationConsole', tx: c, ty: consoleTy });
-        statics.push({ frame: 'chairOrange', tx: c, ty: consoleTy + 1, dy: 2, z: 'over' });
-      }
+  // Fix F1 : `indices` = slots RÉELLEMENT tenus (cf. `heldSlotIndices`), pas
+  // un compte de groupes arrondi — une zone/un groupe sans occupant reste
+  // sol nu, jamais de console/fauteuil orphelins.
+  function buildAgents(statics, indices) {
+    for (const idx of indices) {
+      const p = agentStationPosition(idx);
+      statics.push({ frame: 'stationConsole', tx: p.consoleTx, ty: p.consoleTy });
+      statics.push({ frame: 'chairOrange', tx: p.chairTx, ty: p.chairTy, dy: 2, z: 'over' });
     }
   }
 
@@ -367,14 +405,12 @@
     }
   }
 
-  function buildHeadless(statics, groups) {
-    for (let g = 0; g < groups; g++) {
-      for (let within = 0; within < 3; within++) {
-        const c = HEADLESS_COLS[within];
-        const consoleTy = HEADLESS_TOP + g * 3;
-        statics.push({ frame: 'stationConsole', tx: c, ty: consoleTy });
-        statics.push({ frame: 'chairBlack', tx: c, ty: consoleTy + 1, dy: 2, z: 'over' });
-      }
+  // Fix F1 (idem buildAgents) : `indices` = slots headless réellement tenus.
+  function buildHeadless(statics, indices) {
+    for (const idx of indices) {
+      const p = headlessPosition(idx);
+      statics.push({ frame: 'stationConsole', tx: p.consoleTx, ty: p.consoleTy });
+      statics.push({ frame: 'chairBlack', tx: p.chairTx, ty: p.chairTy, dy: 2, z: 'over' });
     }
   }
 
@@ -426,10 +462,10 @@
     const statics = [];
     buildShell(statics, cols, rows);
     buildLounge(statics);
-    buildAgents(statics, agentsGroups(agentsSizing));
+    buildAgents(statics, heldSlotIndices(state, 'agents', 'session', agentsLogical));
     const drVisible = Math.min(wfTotal, MAX_DR);
     buildDR(statics, Math.max(1, drVisible));
-    buildHeadless(statics, headlessGroups(headlessSizing));
+    buildHeadless(statics, heldSlotIndices(state, 'headless', 'headless', headlessCapped));
     // Portables (subagents) : dérivés des acteurs `subagent` DÉJÀ positionnés
     // par syncActors (nécessite `state` — l'adjacence au poste du parent est
     // par construction une donnée d'état, pas une géométrie pure de snapshot).

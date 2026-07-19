@@ -115,16 +115,49 @@ test('roomFor sans state (2e paramètre omis) reste une fonction pure du snapsho
   assertEq(room.zones.agents.counter, 3);
   assertEq(room.zones.agents.box.rows, 2); // 3 sessions = 1 groupe plein → rows = 1*3-1 = 2
 });
-test('salle vide : décor visible dans chaque zone (jamais 0 mobilier même sans occupant)', () => {
+test('salle vide : décor des boîtes FIXES visible (jamais 0 mobilier lounge/dr, quel que soit l\'occupant)', () => {
   const room = OL.roomFor(snap([]));
   assert(room.statics.some(s => s.frame === 'sofaCornerB'), 'pas de canapé lounge');
   assert(room.statics.some(s => s.frame === 'coffeeTable'), 'pas de table basse');
-  assert(room.statics.some(s => s.frame === 'stationConsole'), 'pas de poste agents/headless décor');
-  assert(room.statics.some(s => s.frame === 'chairOrange'), 'pas de fauteuil orange décor');
-  assert(room.statics.some(s => s.frame === 'chairBlack'), 'pas de fauteuil noir décor');
   assert(room.statics.some(s => s.frame === 'sideDesk90'), 'pas de poste deep-research décor');
   assert(room.statics.some(s => s.frame === 'tv'), 'pas de TV');
   assert(room.statics.some(s => s.frame === 'door'), 'pas de porte');
+});
+// Fix F1 (revue Task 3) : agents/headless sont des zones DYNAMIQUES
+// (« slots créés en fonction du besoin ») — contrairement au lounge/dr
+// (boîtes fixes ci-dessus), leur mobilier ne doit JAMAIS apparaître sans
+// occupant réel. Avant le fix, `headlessGroups(0)`/`agentsGroups(0)`
+// planchaient à 1 groupe plein (3 consoles + 3 fauteuils) même à 0 session.
+test('salle sans agents/headless : AUCUN poste/fauteuil orange ou noir (sol nu, pas de mobilier orphelin)', () => {
+  const room = OL.roomFor(snap([]));
+  assert(!room.statics.some(s => s.frame === 'stationConsole'), 'un poste décor est apparu sans occupant');
+  assert(!room.statics.some(s => s.frame === 'chairOrange'), 'un fauteuil orange est apparu sans occupant');
+  assert(!room.statics.some(s => s.frame === 'chairBlack'), 'un fauteuil noir est apparu sans occupant');
+});
+test('agents : le mobilier suit exactement les slots tenus (pas d\'arrondi par groupe de 3)', () => {
+  const room = OL.roomFor(snap([sess('a', 'running')]));
+  const consoles = room.statics.filter(s => s.frame === 'stationConsole');
+  const chairs = room.statics.filter(s => s.frame === 'chairOrange');
+  assertEq(consoles.length, 1, '1 session → 1 seul poste meublé, pas le groupe de 3 entier');
+  assertEq(chairs.length, 1);
+  assertEq(consoles[0].tx, 0); assertEq(chairs[0].tx, 0);
+});
+test('C2 (mobilier) : fragmentation — seul le slot le plus haut encore tenu reste meublé, pas ses voisins vides', () => {
+  const st = OL.createState();
+  const five = many('r', 5, 'running');
+  OL.syncActors(st, snap(five));
+  for (const s of five) walkToRest(st.actors.get(s.sessionId), st);
+  OL.syncActors(st, snap([sess('r4', 'running')]));
+  for (const s of five) if (s.sessionId !== 'r4') fullyExit(s.sessionId, st);
+  assertEq(st.slots.agents.size, 1); // fragmentation confirmée
+  const room = OL.roomFor(snap([sess('r4', 'running')]), st);
+  const consoles = room.statics.filter(s => s.frame === 'stationConsole');
+  // r4 tient le slot 4 (groupe1, within1, c=2) : SEUL ce poste est meublé,
+  // même si le dimensionnement (rows=5, cf. test C2 existant) réserve la
+  // place pour 2 groupes entiers.
+  assertEq(consoles.length, 1, 'des postes vides sont restés meublés après le départ des voisins');
+  assertEq(consoles[0].tx, 2);
+  assertEq(room.zones.agents.box.rows, 5, 'le dimensionnement (C2) ne doit pas changer');
 });
 test('le mur (rangée 0) et le sol couvrent les dimensions effectives', () => {
   const room = OL.roomFor(snap([sess('a', 'running'), sess('b', 'waiting')]));
@@ -700,7 +733,14 @@ test('subagents : positionnés à la colonne réservée (c+1) du poste du parent
   assert(g1 && g2, 'subagents manquants');
   assert(!st.actors.has('a:sub:g3'), 'un 3e subagent ne doit pas apparaître (cap 2 par parent)');
   assertEq(g1.tx, parent.tx + 1); assertEq(g1.ty, parent.ty); // colonne réservée, même rangée que le fauteuil
-  assertEq(g2.tx, parent.tx + 1); assertEq(g2.ty, parent.ty - 1); // 2e portable : rangée du poste (au-dessus)
+  // Fix F2 (revue Task 3, 2e portable flottant) : l'ancien poste (rangée du
+  // BUREAU, au-dessus) n'avait aucun support visuel (ni fauteuil, ni sol —
+  // le perso se dessinait par-dessus la console). Le 2e portable est
+  // maintenant décalé d'UNE rangée SOUS le fauteuil (circulation du groupe,
+  // jamais de mobilier dessus, jamais traversée par une marche) : ancrage
+  // au sol, dans l'empreinte de la même colonne que le 1er (même bureau),
+  // sans jamais toucher la station voisine.
+  assertEq(g2.tx, parent.tx + 1); assertEq(g2.ty, parent.ty + 1); // 2e portable : rangée SOUS le fauteuil (sol nu)
   assertEq(g2.zone, 'agents');
 });
 test('overflow subagents : compté PAR PARENT dans zones.agents.overflow.total (au-delà de 2)', () => {

@@ -794,5 +794,39 @@ test('acteur subagent/meeting/headless → étiquette = projet PARENT (la sessio
   assertEq(OL.labelFor({ kind: 'subagent' }, sess('a', 'running', { projectName: 'parent-project' })), 'parent-p');
 });
 
+
+console.log('\ncloche needs-you (retour Paul 2026-07-19) :');
+test('waiting + cloche active → reste en salle Travail, assis à son poste', () => {
+  const st = OL.createState();
+  const run = sess('a', 'running');
+  OL.syncActors(st, { interactive: [run], background: [] });
+  const a = st.actors.get('a');
+  const sz = null; // installons-le d'abord
+  for (let i = 0; i < 200 && a.path.length > 0; i++) OL.tickActor(a);
+  const posAvant = { tx: a.tx, ty: a.ty };
+  const waitBell = Object.assign(sess('a', 'waiting'), { bellActive: true });
+  OL.syncActors(st, { interactive: [waitBell], background: [] });
+  assertEq(a.roomKey, 'work');
+  assertEq(a.migratingTo, null);
+  assertEq(a.path.length, 0);
+  assertEq(a.tx, posAvant.tx); assertEq(a.ty, posAvant.ty);
+  assertEq(OL.animFor(a), `char${a.charIdx}.idle.up`); // assis au poste, dos caméra
+});
+test('cloche expirée → il part alors en salle Pause', () => {
+  const st = OL.createState();
+  OL.syncActors(st, { interactive: [sess('a', 'running')], background: [] });
+  const a = st.actors.get('a');
+  for (let i = 0; i < 200 && a.path.length > 0; i++) OL.tickActor(a);
+  OL.syncActors(st, { interactive: [Object.assign(sess('a', 'waiting'), { bellActive: true })], background: [] });
+  assertEq(a.roomKey, 'work'); // reste tant que la cloche sonne
+  OL.syncActors(st, { interactive: [sess('a', 'waiting')], background: [] }); // cloche expirée
+  assert(a.migratingTo === 'break' || a.roomKey === 'break', 'pas de départ en pause après expiration');
+});
+test('le compteur logique compte le waiting-à-cloche en salle Travail', () => {
+  const rooms = OL.roomsFor({ interactive: [Object.assign(sess('a', 'waiting'), { bellActive: true }), sess('b', 'waiting')], background: [] });
+  const work = rooms.find(r => r.key === 'work'), brk = rooms.find(r => r.key === 'break');
+  assertEq(work.counter, 1); assertEq(brk.counter, 1);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -59,8 +59,11 @@
 
   // Salle cible selon l'état de la session (table du design doc) : Travail
   // = running/thinking/pending/error ; Pause = waiting.
-  function roomKeyForState(stateName) {
-    return stateName === 'waiting' ? 'break' : 'work';
+  // Nuance cloche (retour Paul 2026-07-19) : un waiting dont la CLOCHE
+  // needs-you est active (bulle « ! ») RESTE à son PC — il ne part en pause
+  // que quand la notif est traitée ou expirée (BELL_DURATION côté renderer).
+  function roomKeyForState(stateName, bellActive) {
+    return (stateName === 'waiting' && !bellActive) ? 'break' : 'work';
   }
 
   // Comptes « logiques » (déduits du snapshot seul, indépendants de tout
@@ -69,7 +72,7 @@
   function logicalRoomCounts(interactive) {
     let work = 0, brk = 0;
     for (const s of interactive) {
-      if (roomKeyForState(s.state && s.state.name) === 'work') work++; else brk++;
+      if (roomKeyForState(s.state && s.state.name, s.bellActive) === 'work') work++; else brk++;
     }
     return { work, break: brk };
   }
@@ -201,7 +204,6 @@
       for (const deskTx of [0, 4]) {
         statics.push({ frame: 'desk', tx: deskTx, ty: deskTy });
         statics.push({ frame: 'deskSetup', tx: deskTx, ty: deskTy });
-        statics.push({ frame: 'deskLamp', tx: deskTx, ty: deskTy, dy: -4 });
         const charTx = deskTx === 0 ? 1 : 5;
         statics.push({ frame: 'chairOver', tx: charTx, ty: deskTy + 1, dy: 2, z: 'over' });
       }
@@ -421,8 +423,12 @@
   function syncMainActor(state, s, sizing) {
     const sid = s.sessionId;
     const stateName = s.state && s.state.name;
-    const activity = activityFor(stateName);
-    const desiredRoom = roomKeyForState(stateName);
+    // waiting + cloche : il reste assis à son poste (activité 'work' = assis
+    // dos caméra) avec la bulle « ! » (emoteFor, priorité bell) ; il ne passe
+    // en 'relax'/salle pause qu'à l'expiration ou au traitement de la cloche.
+    const bellActive = !!s.bellActive;
+    const activity = (stateName === 'waiting' && bellActive) ? 'work' : activityFor(stateName);
+    const desiredRoom = roomKeyForState(stateName, bellActive);
 
     let actor = state.actors.get(sid);
     if (!actor) {

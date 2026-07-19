@@ -338,8 +338,14 @@ const Office = (() => {
 
   // ─── Sync + boucle ───
   function snapshotSessions() {
+    // `bellActive` est annoté sur une COPIE (ne pas muter les objets partagés
+    // avec renderer.js) : le layout en a besoin pour garder au poste un
+    // waiting dont la cloche needs-you est active (retour Paul 2026-07-19).
     const interactive = [], background = [];
-    for (const s of sessions.values()) (s.isBackground ? background : interactive).push(s);
+    for (const s of sessions.values()) {
+      const copy = { ...s, bellActive: activeBells.has(s.sessionId) };
+      (s.isBackground ? background : interactive).push(copy);
+    }
     return { interactive, background };
   }
 

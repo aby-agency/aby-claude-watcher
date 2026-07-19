@@ -209,6 +209,10 @@ if (process.argv.includes('--preview')) {
                  'desk', 'deskSetup', 'chairBack', 'chairFront', 'chairOver', 'plant', 'coffee.0', 'coffee.3',
                  'floor', 'floorDark', 'floorWood', 'wall', 'meetingTable', 'sideDesk', 'laptop', 'vending', 'waterCooler',
                  'deskLamp', 'whiteboard', 'wallFrame',
+                 // v4 (open-space zoné, mockup-v4.png)
+                 'chairOrange', 'chairBlack', 'stationConsole',
+                 'sofaCornerA', 'sofaCornerB', 'sofaCornerC', 'sofaCornerD',
+                 'coffeeTable', 'sideDesk90', 'sideSetup90', 'tv',
                  'emote.think.0', 'emote.think.1', 'emote.alert.0', 'emote.alert.1',
                  'emote.angry.0', 'emote.angry.1', 'emote.zzz.0', 'emote.zzz.1',
                  'emote.mail.0', 'emote.mail.1', 'emote.work.0', 'emote.work.1',

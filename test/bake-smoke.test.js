@@ -36,7 +36,11 @@ test('toutes les anims référencent des frames existantes', () => {
 test('frames obligatoires présentes', () => {
   for (const req of ['floor', 'floorDark', 'floorWood', 'wall', 'desk', 'deskSetup',
                      'chairBack', 'chairFront', 'chairOver', 'plant', 'coffee.0', 'meetingTable', 'sideDesk', 'laptop',
-                     'deskLamp', 'whiteboard', 'wallFrame', 'waterCooler', 'vending', 'sofa']) {
+                     'deskLamp', 'whiteboard', 'wallFrame', 'waterCooler', 'vending', 'sofa',
+                     // v4 (open-space zoné) — cf. office-sprites.js § v4
+                     'chairOrange', 'chairBlack', 'stationConsole',
+                     'sofaCornerA', 'sofaCornerB', 'sofaCornerC', 'sofaCornerD',
+                     'coffeeTable', 'sideDesk90', 'sideSetup90', 'tv']) {
     assert(manifest.frames[req], `frame manquante: ${req}`);
   }
 });

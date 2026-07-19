@@ -54,6 +54,90 @@ const FURNITURE = {
   // Retenu : 205 — accoudoirs nets des deux côtés, dossier plus haut/carré
   // que 200 (silhouette plus lisible en miniature 16×16 rogné).
   sofa:         `${SINGLES_DIR}/Modern_Office_Singles_205.png`,
+
+  // ─── v4 (Task 1, open-space zoné) — assets identifiés par comparaison
+  // PIXEL avec .superpowers/sdd/mockup-v4.png (contact-sheets étiquetés +
+  // zoom magick, cf. rapport task-v4-1-report.md pour le détail méthode).
+  // Étalonnage d'échelle : le mockup rend 1 tuile native 16×16 à ~125px
+  // (repérage par comptage de cases du sol à damier + espacement des
+  // postes), donc les crops mockup sont ~7.8× la taille des singles — les
+  // comparaisons ci-dessous sont faites à cette échelle, pas au ratio
+  // ~2× supposé dans le plan.
+
+  // chairOrange : même silhouette EXACTE que chairOver/106 (bbox 16×21,
+  // même décalage) — famille orange parallèle. 111 a un badge damier
+  // blanc/gris cousu au dossier (écarté, absent des chaises du mockup) ;
+  // 112 est le dossier plein uni, identique à 106 en orange → retenu.
+  chairOrange:  `${SINGLES_DIR}/Modern_Office_Singles_112.png`,
+  // chairBlack : nom v4 pour l'usage "poste headless" — MÊME fichier que
+  // chairOver/106 (déjà "vue de dos" noire/grise). Alias volontaire, pas
+  // un nouvel asset : cf. plan Task 1 ("garde chairOver en alias si plus
+  // simple, documente"). Les deux clés pointent le même PNG.
+  chairBlack:   `${SINGLES_DIR}/Modern_Office_Singles_106.png`,
+
+  // stationConsole : l'unité écran-bleu+clavier des postes (mockup, bas-
+  // gauche). Comparaison pixel exacte du motif d'écran (carré rouge en
+  // haut-gauche, jaune dessous, 2 carrés blancs à droite + clavier gris) :
+  // c'est LE MÊME single que deskSetup/227 déjà baké — alias v4 pour un nom
+  // de frame explicite côté layout, pas un nouvel asset. Les montants
+  // orange qui encadrent l'écran dans le mockup (meuble/cloison derrière le
+  // poste) n'ont PAS été retrouvés comme single séparé malgré recherche sur
+  // l'intégralité des 339 singles (cf. rapport, § introuvables) — non
+  // bloquant, l'écran+clavier suffit à identifier le poste.
+  stationConsole: `${SINGLES_DIR}/Modern_Office_Singles_227.png`,
+
+  // sofaCornerA-D : canapé d'angle du lounge (mockup, haut-gauche). Les 4
+  // fragments 201-204 avaient été écartés en v3 (salle Pause, cf. note
+  // ci-dessus) faute de lire comme un canapé autonome seul sur une tuile —
+  // mais le mockup v4 compose PRÉCISÉMENT un angle en L avec ces 4
+  // fragments empilés/assemblés (match pixel direct, cf. rapport) :
+  //  - sofaCornerB (203) : le coin en L complet (bras haut 2×2 damier +
+  //    virage + 1 tuile basse + pieds visibles) — pièce d'ancrage.
+  //  - sofaCornerA (201) : segment droit 2 places (bras du haut, sans le
+  //    virage), à poser à gauche de B pour rallonger le bras horizontal.
+  //  - sofaCornerC (202) / sofaCornerD (204) : segments verticaux (bras du
+  //    bas, C avec le raccord haut en zigzag, D plus court/sans raccord) —
+  //    à empiler sous B pour rallonger le bras vertical à la hauteur du
+  //    mockup (~3 tuiles).
+  sofaCornerA:  `${SINGLES_DIR}/Modern_Office_Singles_201.png`,
+  sofaCornerB:  `${SINGLES_DIR}/Modern_Office_Singles_203.png`,
+  sofaCornerC:  `${SINGLES_DIR}/Modern_Office_Singles_202.png`,
+  sofaCornerD:  `${SINGLES_DIR}/Modern_Office_Singles_204.png`,
+
+  // coffeeTable : table basse + machine à café + tasses + bouteilles d'eau
+  // (mockup, haut-centre-gauche). PAS une composition — 320/321/322 sont un
+  // objet déjà assemblé dans le pack (table bois + machine noire écran bleu
+  // + mug + bouteilles), match pixel quasi parfait avec le crop mockup.
+  // 320/321/322 sont des quasi-doublons (variations infimes d'AA) ; 322
+  // retenu (liseré rouge le plus saturé, le plus proche du mockup).
+  coffeeTable:  `${SINGLES_DIR}/Modern_Office_Singles_322.png`,
+
+  // sideDesk90 / sideSetup90 : poste latéral haut-droite (deep research),
+  // bureau + écran perçus de profil (le perso y travaille "de côté").
+  // sideSetup90 = écran incliné/vu de profil, famille 129-134 confirmée par
+  // le plan ; 132 a le meilleur rendu (carré rouge net, silhouette entière).
+  // sideDesk90 = bureau bois clair même famille de forme que sideDesk/75
+  // (bureau blanc existant) mais teinte bois (single 60) — la tour
+  // empilée du mockup (écrans + caisson à tiroirs + bureau) est une
+  // composition PROPRE À PAUL (plusieurs pièces posées en colonne pour
+  // simuler la rotation) : on ne rebake que les 2 pièces utiles (écran +
+  // bureau), pas le caisson à tiroirs intermédiaire (détail non requis).
+  sideDesk90:   `${SINGLES_DIR}/Modern_Office_Singles_60.png`,
+  sideSetup90:  `${SINGLES_DIR}/Modern_Office_Singles_132.png`,
+
+  // tv : écran mural haut-droite. Match pixel exact (cadre gris avec pattes
+  // de fixation en haut, écran vide lavande, 3 pastilles de couleur
+  // vert/bleu/rouge + petits boutons sur la lisière basse) — trouvé par
+  // recherche automatisée (scan couleur des 339 singles) puis confirmé au
+  // zoom, PAS dans la plage 170-172 supposée pour whiteboard (172 est le
+  // graphe déjà baké) mais 170 lui-même, jusqu'ici non catalogué.
+  tv:           `${SINGLES_DIR}/Modern_Office_Singles_170.png`,
+
+  // climatiseur/meuble blanc (mockup, haut-gauche, au-dessus du canapé) :
+  // INTROUVABLE — recherche exhaustive sur les 339 singles Modern Office
+  // (contact-sheets zoomés 1-339 intégralement) + le tileset Room_Builder
+  // Office (sol/murs uniquement, pas de mobilier) sans match. Pas baké,
+  // cf. rapport task-v4-1-report.md § introuvables.
 };
 
 // Tiles 16×16 découpées dans le Room Builder.

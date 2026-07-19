@@ -397,6 +397,106 @@ test('lounge plein (cap 8) : une 9e session waiting ne disparaît jamais — rep
   assertEq(st.actors.get('w8').zone, 'agents', 'la 9e session doit rester visible, repliée en agents');
 });
 
+// Critical (reviewer) — pacing perpétuel des débordés du lounge : la
+// comparaison de migration se faisait sur `desiredZone` BRUT (ignore le
+// cap), pas la zone EFFECTIVE (celle qu'`allocateSessionSlot` peut
+// réellement offrir). Un débordé installé en agents (lounge plein) voyait
+// donc `desiredZone('lounge') !== actor.zone('agents')` redevenir vrai à
+// CHAQUE syncActors, même snapshot inchangé → `migratingTo` reflippé →
+// nouveau path vers la porte → navette porte↔siège en boucle infinie tant
+// que le lounge restait plein. Fix : `effectiveZoneFor` (dry run du cap,
+// recalculé à chaque appel) avant le test de migration.
+test('Critical (reviewer) : débordé installé en agents, lounge toujours plein → 10 syncActors à snapshot INCHANGÉ → aucun pacing', () => {
+  const st = OL.createState();
+  const nine = many('w', 9, 'waiting');
+  OL.syncActors(st, snap(nine));
+  const w8 = st.actors.get('w8');
+  assertEq(w8.zone, 'agents');
+  walkToRest(w8, st);
+  assertEq(w8.path.length, 0);
+  const before = { tx: w8.tx, ty: w8.ty };
+
+  for (let i = 0; i < 10; i++) {
+    OL.syncActors(st, snap(nine)); // snapshot STRICTEMENT identique à chaque tour
+    assertEq(w8.migratingTo, null, `migratingTo reflippé au tour ${i} (pacing)`);
+    assertEq(w8.path.length, 0, `path non-vide au tour ${i} (navette porte↔siège)`);
+    assertEq(w8.tx, before.tx, `position tx changée au tour ${i}`);
+    assertEq(w8.ty, before.ty, `position ty changée au tour ${i}`);
+  }
+});
+test('Critical (reviewer) : une place du lounge se libère → le débordé migre UNE fois (marche visible), puis se stabilise', () => {
+  const st = OL.createState();
+  const nine = many('w', 9, 'waiting');
+  OL.syncActors(st, snap(nine));
+  const w8 = st.actors.get('w8');
+  assertEq(w8.zone, 'agents');
+  walkToRest(w8, st);
+
+  // w0 (tenait un slot lounge) part et sort COMPLÈTEMENT → une place se libère.
+  const remaining = nine.slice(1); // w1..w8
+  OL.syncActors(st, snap(remaining));
+  fullyExit('w0', st);
+
+  // Resync (même `remaining`) : la place libérée doit permettre à w8 de
+  // migrer — émergence naturelle de `effectiveZoneFor` (recalculé à chaque
+  // appel, pas mis en cache), sans logique dédiée « place libérée ».
+  OL.syncActors(st, snap(remaining));
+  assertEq(w8.migratingTo, 'lounge', 'le débordé doit migrer vers le lounge maintenant qu\'une place existe');
+
+  let prev = { tx: w8.tx, ty: w8.ty };
+  let ticks = 0, moved = false;
+  while (w8.zone === 'agents' && ticks < 300) {
+    OL.tickActor(w8, st);
+    if (w8.tx !== prev.tx || w8.ty !== prev.ty) moved = true;
+    prev = { tx: w8.tx, ty: w8.ty };
+    ticks++;
+  }
+  assert(moved, 'aucune marche visible observée (migration attendue)');
+  assertEq(w8.zone, 'lounge');
+  walkToRest(w8, st);
+
+  // Stabilisation : resyncs répétés à snapshot inchangé → plus aucune
+  // migration, plus aucun mouvement (une seule migration, propre).
+  const settled = { tx: w8.tx, ty: w8.ty };
+  for (let i = 0; i < 10; i++) {
+    OL.syncActors(st, snap(remaining));
+    assertEq(w8.migratingTo, null, `migratingTo reflippé après stabilisation, tour ${i}`);
+    assertEq(w8.path.length, 0, `re-marche après stabilisation, tour ${i}`);
+  }
+  assertEq(w8.tx, settled.tx); assertEq(w8.ty, settled.ty);
+});
+test('Critical (reviewer) — re-fuzz déterministe : churn au cap (arrivées/départs alternés) → aucun acteur avec path non-vide sur des syncs consécutifs à snapshot constant', () => {
+  const st = OL.createState();
+  let idCounter = 0;
+  const activeIds = [];
+
+  for (let round = 0; round < 40; round++) {
+    if (round % 3 === 0 && activeIds.length < 12) activeIds.push(`f${idCounter++}`);
+    else if (round % 5 === 0 && activeIds.length > 6) {
+      const leaving = activeIds.shift();
+      OL.syncActors(st, snap(activeIds.map(id => sess(id, 'waiting'))));
+      if (st.actors.has(leaving)) fullyExit(leaving, st);
+      continue;
+    }
+    OL.syncActors(st, snap(activeIds.map(id => sess(id, 'waiting'))));
+    for (const id of activeIds) walkToRest(st.actors.get(id), st);
+  }
+
+  // Phase finale : snapshot STRICTEMENT constant, répété — aucun acteur ne
+  // doit jamais avoir un path non-vide (le fix rend cela immédiat, pas
+  // seulement "borné" — donc l'invariant le plus strict est vérifiable ici).
+  const finalSessions = activeIds.map(id => sess(id, 'waiting'));
+  for (const id of activeIds) walkToRest(st.actors.get(id), st);
+  for (let i = 0; i < 15; i++) {
+    OL.syncActors(st, snap(finalSessions));
+    for (const id of activeIds) {
+      const a = st.actors.get(id);
+      assertEq(a.path.length, 0, `${id} a un path non-vide au tour ${i} (pacing, snapshot constant)`);
+      assertEq(a.migratingTo, null, `${id} a migratingTo non-null au tour ${i} (pacing, snapshot constant)`);
+    }
+  }
+});
+
 console.log('\nI2 (transposé) — erreur en pleine migration/annulation:');
 test('running → waiting (migration démarrée) → error avant la sortie : le perso se fige, ne marche plus', () => {
   const st = OL.createState();

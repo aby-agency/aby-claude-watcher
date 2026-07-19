@@ -231,11 +231,40 @@
   // Décision documentée (au-delà de la lettre de la spec, qui ne précise pas
   // ce cas) : un outil de monitoring ne doit jamais rendre une session
   // invisible.
+  //
+  // `effectiveZoneFor` est la version SANS ALLOCATION de cette même
+  // résolution — un « dry run » pur (lecture de `slotCount`, aucune
+  // mutation) utilisé par `syncMainActor` pour décider s'il faut (re)lancer
+  // une migration. Fix reviewer (Critical, pacing des débordés) : comparer
+  // `desiredZone` (brut, ignore le cap) à `actor.zone` faisait rejouer une
+  // migration lounge→agents à CHAQUE sync tant que le lounge restait plein,
+  // même snapshot inchangé — l'acteur navette porte↔siège en boucle. La
+  // comparaison doit se faire sur la zone EFFECTIVE (celle que l'allocation
+  // peut réellement offrir MAINTENANT, cap compris) : si le débordé est déjà
+  // installé en agents et que le lounge est toujours plein, effectiveZone
+  // === 'agents' === actor.zone → aucune migration. Recalculée à CHAQUE
+  // appel (jamais mise en cache) : dès qu'une place se libère au lounge,
+  // effectiveZone repasse à 'lounge' et une migration UNIQUE et propre se
+  // déclenche naturellement au sync suivant.
+  //
+  // `excludeSid` (2e fix, même famille de bug) : un acteur DÉJÀ installé au
+  // lounge, en train de se demander « dois-je y rester ? », tient LUI-MÊME
+  // un des slots comptés par `slotCount` — sans l'exclure, un lounge
+  // EXACTEMENT au cap (8/8, lui compris) se voit comme « plein » et se
+  // renvoie en agents tout seul, ce qui rouvre le pacing dans l'AUTRE sens
+  // (allers-retours lounge→agents→lounge→...). `allocateSessionSlot`
+  // (création, ou réallocation après libération effective du slot) n'a
+  // jamais ce problème : l'acteur n'y détient encore AUCUN slot au moment de
+  // l'appel, `excludeSid` y est donc toujours omis.
+  function effectiveZoneFor(state, wantedZone, excludeSid) {
+    if (wantedZone !== 'lounge') return wantedZone;
+    let count = slotCount(state, 'lounge', 'session');
+    if (excludeSid && state.slots.lounge.has(excludeSid)) count -= 1;
+    return count >= LOUNGE_CAP ? 'agents' : 'lounge';
+  }
   function allocateSessionSlot(state, wantedZone, sid) {
-    if (wantedZone === 'lounge' && slotCount(state, 'lounge', 'session') >= LOUNGE_CAP) {
-      return { zone: 'agents', idx: allocateSlot(state, 'agents', 'session', sid) };
-    }
-    return { zone: wantedZone, idx: allocateSlot(state, wantedZone, 'session', sid) };
+    const zone = effectiveZoneFor(state, wantedZone);
+    return { zone, idx: allocateSlot(state, zone, 'session', sid) };
   }
 
   // ─── Routage : couloir central, connecteur par zone ──────────────────────
@@ -448,10 +477,16 @@
       return;
     }
 
-    // Zone cible différente de la zone physique actuelle → migration.
-    if (desiredZone !== actor.zone) {
-      if (actor.migratingTo !== desiredZone) {
-        actor.migratingTo = desiredZone;
+    // Zone EFFECTIVE (cap lounge résolu, cf. `effectiveZoneFor`) différente
+    // de la zone physique actuelle → migration. Comparer sur `desiredZone`
+    // brut ici reproduirait le bug du pacing perpétuel (cf. commentaire de
+    // `effectiveZoneFor`) : un débordé déjà installé en agents, avec le
+    // lounge toujours plein, ne doit JAMAIS redéclencher de migration à
+    // snapshot inchangé.
+    const effectiveZone = effectiveZoneFor(state, desiredZone, sid);
+    if (effectiveZone !== actor.zone) {
+      if (actor.migratingTo !== effectiveZone) {
+        actor.migratingTo = effectiveZone;
         actor.activity = activity;
         actor.done = false; // annule un `leave` définitif en cours (résurrection avant sortie complète)
         retarget(actor, { ...SPAWN_TILE });

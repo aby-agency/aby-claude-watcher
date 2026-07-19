@@ -397,9 +397,20 @@
   // rendu (constaté au CDP, screenshot zoomé). tx+1 reste dans la boîte dr
   // (cols 10-15) sans jamais toucher le couloir (cols 6-9, testé ailleurs) —
   // vérifié pour les 2 colonnes de poste (10→11, 13→14).
-  function buildDR(statics, count) {
-    for (let i = 0; i < count; i++) {
-      const p = drPosition(i);
+  //
+  // Fix reviewer final (fragmentation dr, même famille que F1 agents/
+  // headless) : `indices` = slots RÉELLEMENT tenus (cf. `heldSlotIndices`),
+  // jamais un remplissage contigu [0..n-1] — sinon un workflow qui hérite de
+  // slots hauts (voisins partis avant lui) se voit meublé aux mauvais
+  // indices : bureaux dessinés aux positions basses (vides) tandis que les
+  // acteurs restent à leurs vraies positions (slots hauts), 1 poste vide +
+  // 1 perso sans bureau par slot fragmenté. `indices` vide (zone
+  // effectivement inoccupée) → décor de secours au slot 0 (boîte FIXE,
+  // jamais 0 mobilier, cf. test « salle vide »).
+  function buildDR(statics, indices) {
+    const list = indices.length > 0 ? indices : [0];
+    for (const idx of list) {
+      const p = drPosition(idx);
       statics.push({ frame: 'sideDesk90', tx: p.tx + 1, ty: p.ty });
       statics.push({ frame: 'sideSetup90', tx: p.tx + 1, ty: p.ty, dy: -3 });
     }
@@ -419,6 +430,8 @@
     const interactive = (snapshot && snapshot.interactive) || [];
     const background = (snapshot && snapshot.background) || [];
 
+    const all = [...interactive, ...background];
+
     let loungeLogical = 0, agentsLogical = 0;
     for (const s of interactive) {
       const zone = zoneForState(s.state && s.state.name, !!s.bellActive);
@@ -427,7 +440,13 @@
     // Overflow subagents : calculable depuis le SNAPSHOT SEUL (indépendant
     // du rendu/adjacence réelle, qui nécessite `state` — cf. note plus bas).
     const subOverflow = interactive.reduce((n, s) => n + Math.max(0, (s.subagents || []).length - MAX_SUB_PER_PARENT), 0);
-    const wfTotal = interactive.reduce((n, s) => n + workflowRunning(s), 0);
+    // Fix reviewer final : sommer sur interactive+background, PAS interactive
+    // seul — `syncWorkflowAgents` (plus bas) crée déjà les acteurs `workflow`
+    // depuis `all` (une session headless peut porter un workflow, le watcher
+    // les attache réellement) ; compter seulement `interactive` ici désynchro-
+    // nisait le counter/mobilier de la zone dr des acteurs réels (persos
+    // flottants, counter à 0, aucun bureau/badge pour un workflow headless).
+    const wfTotal = all.reduce((n, s) => n + workflowRunning(s), 0);
     const bgTotal = background.length;
 
     // Sizing dynamique (C1/C2/C3 transposé) : SEULES les zones agents et
@@ -464,7 +483,7 @@
     buildLounge(statics);
     buildAgents(statics, heldSlotIndices(state, 'agents', 'session', agentsLogical));
     const drVisible = Math.min(wfTotal, MAX_DR);
-    buildDR(statics, Math.max(1, drVisible));
+    buildDR(statics, heldSlotIndices(state, 'dr', 'workflow', drVisible));
     buildHeadless(statics, heldSlotIndices(state, 'headless', 'headless', headlessCapped));
     // Portables (subagents) : dérivés des acteurs `subagent` DÉJÀ positionnés
     // par syncActors (nécessite `state` — l'adjacence au poste du parent est

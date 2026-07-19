@@ -218,6 +218,28 @@ test('overflow au-delà de 8 agents de workflow, dédup par runId', () => {
   assertEq(room.zones.dr.overflow.total, 3);
   assertEq(room.zones.dr.box.rows, 4); // boîte fixe même en overflow
 });
+// Fix reviewer final (fragmentation dr, même famille que le test C2-mobilier
+// agents ci-dessus) : session A (workflow running:3, slots 0-2) + session B
+// (workflow running:3, slots 3-5) → A se termine → B garde les slots 3-5.
+// Le mobilier doit suivre ces indices RÉELLEMENT tenus, pas un remplissage
+// [0..2] (qui meublerait des postes vides tout en laissant les acteurs de B
+// sans bureau, cf. repro reviewer).
+test('dr : fragmentation — le mobilier suit les slots réellement tenus, pas 0..n-1', () => {
+  const st = OL.createState();
+  const a = sess('a', 'running', { workflows: [{ runId: 'wa', running: 3 }] });
+  const b = sess('b', 'running', { workflows: [{ runId: 'wb', running: 3 }] });
+  OL.syncActors(st, snap([a, b]));
+  const aDone = sess('a', 'running', { workflows: [{ runId: 'wa', running: 0 }] });
+  OL.syncActors(st, snap([aDone, b])); // a se termine → libère les slots 0,1,2
+  const heldIdxs = [...st.slots.dr.values()].map(v => v.idx).sort((x, y) => x - y);
+  assertEq(heldIdxs.join(','), '3,4,5', 'fragmentation confirmée : b tient les slots hauts');
+  const room = OL.roomFor(snap([aDone, b]), st);
+  const desks = room.statics.filter(s => s.frame === 'sideDesk90');
+  assertEq(desks.length, 3, 'des bureaux vides sont restés meublés après le départ de a');
+  const positions = desks.map(d => `${d.tx},${d.ty}`).sort();
+  // idx 3→(13,2) idx 4→(10,3) idx 5→(13,3), desk = tx+1 (cf. buildDR)
+  assertEq(positions.join(' | '), '11,3 | 14,2 | 14,3');
+});
 
 console.log('\nlounge : boîte fixe, cap 8 + overflow:');
 test('overflow au-delà de 8 sessions waiting', () => {
@@ -681,6 +703,23 @@ test('workflow terminé → acteurs supprimés', () => {
   OL.syncActors(st, snap([sess('a', 'running', { workflows: [{ runId: 'w', running: 3 }] })]));
   OL.syncActors(st, snap([sess('a', 'running', { workflows: [{ runId: 'w', running: 0 }] })]));
   assertEq([...st.actors.values()].filter(x => x.kind === 'workflow').length, 0);
+});
+// Fix reviewer final : une session BACKGROUND avec un workflow running
+// crée bien ses acteurs (`syncWorkflowAgents` reçoit déjà interactive+
+// background) mais `roomFor` sommait `wfTotal` sur `interactive` SEUL — le
+// counter/mobilier de la zone dr restait à 0 alors que des persos flottaient
+// déjà dans la salle. Vérifie que counter et mobilier sont cohérents avec
+// les acteurs réellement créés.
+test('session background avec workflow running → counter/mobilier dr cohérents (pas juste des persos flottants)', () => {
+  const st = OL.createState();
+  const h = sess('h', 'running', { isBackground: true, workflows: [{ runId: 'w', running: 5 }] });
+  OL.syncActors(st, snap([], [h]));
+  const wf = [...st.actors.values()].filter(x => x.kind === 'workflow');
+  assertEq(wf.length, 5, 'les acteurs workflow doivent exister pour une session headless');
+  const room = OL.roomFor(snap([], [h]), st);
+  assertEq(room.zones.dr.counter, 5, 'le counter dr doit refléter le workflow headless');
+  const consoles = room.statics.filter(s => s.frame === 'sideDesk90');
+  assertEq(consoles.length, 5, 'le mobilier dr doit suivre les 5 acteurs, pas rester à 0');
 });
 
 console.log('\nheadless : cap 6, jamais de marche, pas de focus, purge:');

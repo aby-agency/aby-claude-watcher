@@ -26,6 +26,12 @@ const Office = (() => {
   const TICK_MS = 125;
   const SCALE_MIN = 1, SCALE_MAX = 4;
   const STATE_COLORS = { thinking: '#a78bfa', running: '#3b82f6', waiting: '#22c55e', pending: '#f59e0b', error: '#ef4444' };
+  // Décalage des badges « +N » (cf. drawOverflowBadge) : quadrants du HAUT
+  // (lounge/dr) → quart gauche de leur boîte ; quadrants du BAS (agents/
+  // headless) → quart droit — lounge+agents et dr+headless partagent
+  // chacun la même boîte en x (office-layout.js), donc sans ce décalage
+  // leurs badges se dessineraient au même endroit si les deux débordent.
+  const BADGE_SIDE = { lounge: 'left', agents: 'right', dr: 'left', headless: 'right' };
 
   let atlas = null, manifest = null;
   let available = null;
@@ -52,6 +58,18 @@ const Office = (() => {
         const res = await fetch('office-assets/atlas.json');
         if (!res.ok) throw new Error(res.status);
         manifest = await res.json();
+        // Fix reviewer final (quick-win, atlas périmé) : un manifest v3 (ou
+        // antérieur) charge sans erreur réseau — `stationConsole` est un
+        // frame v4 (postes agents/headless, cf. office-layout.js buildAgents/
+        // buildHeadless) absent de tout atlas plus ancien. Sans ce garde,
+        // `available=true` sur un atlas périmé fait planter le rendu plus
+        // tard (frames v4 manquantes) au lieu de retomber, ici, sur le même
+        // chemin que « pas d'atlas du tout » (bouton masqué, cf. isAvailable).
+        if (!manifest.frames || !manifest.frames.stationConsole) {
+          console.warn('[office] atlas périmé — relancer npm run bake');
+          available = false;
+          return available;
+        }
         atlas = new Image();
         await new Promise((ok, ko) => { atlas.onload = ok; atlas.onerror = ko; atlas.src = 'office-assets/atlas.png'; });
         available = true;
@@ -116,10 +134,20 @@ const Office = (() => {
   // dans la bande mur (row 0), toujours libre de tout mobilier/acteur (cf.
   // buildShell) — donc aucun risque de collision avec le reste du rendu, pas
   // besoin de le faire participer à la passe anti-collision des étiquettes.
-  // Centré horizontalement sur la largeur de la boîte de la zone.
-  function drawOverflowBadge(c2d, box, total, scale) {
+  //
+  // Fix reviewer final (quick-win, badges superposés) : lounge/agents
+  // partagent la même boîte en x (tx:0, cols:6) et dr/headless idem (tx:10,
+  // cols:6, cf. office-layout.js zones) — centrer sur `box.cols/2` pour les
+  // deux zones d'un même côté produit DEUX badges dessinés au même endroit
+  // quand les deux débordent en même temps (lounge+agents, ou dr+headless).
+  // `side` ('left'|'right') décale le centre au quart gauche/droit de la
+  // boîte : les deux zones d'un côté restent chacune lisibles, sans jamais
+  // sortir de leur propre boîte (cf. `BADGE_SIDE` plus bas, appariement
+  // quadrant haut=left / quadrant bas=right).
+  function drawOverflowBadge(c2d, box, total, scale, side) {
     const txt = `+${total}`;
-    const cx = (box.tx + box.cols / 2) * 16 * scale;
+    const frac = side === 'right' ? 3 / 4 : side === 'left' ? 1 / 4 : 1 / 2;
+    const cx = (box.tx + box.cols * frac) * 16 * scale;
     const b = measureLabelBox(c2d, txt, scale);
     const rectTop = Math.max(0, (16 * scale - b.h) / 2);
     const topY = rectTop + b.padY;
@@ -276,9 +304,13 @@ const Office = (() => {
 
     // Badges « +N » par zone (v4) : bande mur (row 0), toujours libre —
     // dessinés en tout dernier, ne participent à aucune passe de collision.
+    // `BADGE_SIDE` décale lounge/dr (quadrants du HAUT) à gauche et agents/
+    // headless (quadrants du BAS) à droite de leur boîte — évite la
+    // superposition quand les deux zones d'un même côté débordent ensemble
+    // (même boîte en x, cf. commentaire de `drawOverflowBadge`).
     for (const key of Object.keys(room.zones)) {
       const zone = room.zones[key];
-      if (zone.overflow && zone.overflow.total > 0) drawOverflowBadge(c2d, zone.box, zone.overflow.total, scale);
+      if (zone.overflow && zone.overflow.total > 0) drawOverflowBadge(c2d, zone.box, zone.overflow.total, scale, BADGE_SIDE[key]);
     }
   }
 

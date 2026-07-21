@@ -213,7 +213,10 @@ const Office = (() => {
           if (color && stateName !== 'waiting') {
             c2d.fillStyle = color;
             c2d.globalAlpha = (stateName === 'running' && (tickCount & 4)) ? 0.4 : 0.9;
-            c2d.fillRect((st.tx * 16 + 5) * scale, (st.ty * 16 - 8) * scale, 6 * scale, 4 * scale);
+            // -6 : calée sur le sprite 130 (16×14) remonté de 8 px par le
+            // layout (dy:-8, cf. buildAgents) — bord haut de l'écran à
+            // ty·16-6, la LED se pose sur le cadre au lieu de flotter.
+            c2d.fillRect((st.tx * 16 + 5) * scale, (st.ty * 16 - 6) * scale, 6 * scale, 4 * scale);
             c2d.globalAlpha = 1;
           }
         }
@@ -233,6 +236,23 @@ const Office = (() => {
     const rects = [];
     const labels = [];
     const bubbles = [];
+    // Obstacles « sensibles » de la passe étiquettes (fix 2026-07-21, retour
+    // Paul : une étiquette décalée par l'anti-collision atterrissait sur
+    // l'écran du poste) : écrans/setups des postes + acteurs installés à un
+    // poste. Une étiquette qui les chevauche tente ses décalages comme face
+    // à une autre étiquette, sinon n'est pas dessinée (tooltip = filet).
+    // PAS les fauteuils (l'étiquette d'un assis frôle 1 px le bas du sien —
+    // l'inclure décalerait systématiquement toutes les étiquettes de postes)
+    // ni les persos du lounge (leurs étiquettes se gênent déjà entre elles ;
+    // les bloquer mutuellement n'en laisserait dessiner presque aucune).
+    const labelObstacles = [];
+    for (const st of room.statics) {
+      if (st.frame !== 'stationConsole' && st.frame !== 'sideDesk90' && st.frame !== 'sideSetup90') continue;
+      const f = manifest.frames[st.frame];
+      if (!f) continue;
+      const opx = st.tx * 16 * scale, opy = (st.ty * 16 + (st.dy || 0)) * scale - (f.h - 16) * scale;
+      labelObstacles.push({ x: opx, y: opy, w: f.w * scale, h: f.h * scale });
+    }
     for (const a of actors) {
       const fi = a.activity === 'think' ? (a.animFrame >> 2) : a.animFrame;
       const fname = animFrameName(OfficeLayout.animFor(a), fi);
@@ -245,6 +265,13 @@ const Office = (() => {
       if (fname) drawFrameOn(c2d, fname, px, py, scale);
 
       rects.push({ aid: a.id, sessionId: a.sessionId, kind: a.kind, x: px, y: py - 16 * scale, w: 16 * scale, h: 32 * scale });
+
+      // Acteur installé à un poste (immobile, hors lounge/départ) → obstacle
+      // pour les étiquettes (cf. labelObstacles) : son sprite ne doit jamais
+      // être enseveli. Même rect que le dessin (16×32 ancré bas).
+      if (a.path.length === 0 && a.activity !== 'relax' && a.activity !== 'leave') {
+        labelObstacles.push({ x: px, y: py - 16 * scale, w: 16 * scale, h: 32 * scale });
+      }
 
       const parentSession = sessionFor(a.sessionId);
       const label = OfficeLayout.labelFor(a, parentSession);
@@ -286,7 +313,7 @@ const Office = (() => {
     // moment de la collecte, une seule formule partagée avec le dessin.
     const bubbleRects = bubbles.map(b => ({ x: b.px, y: b.by, w: 16 * scale, h: 16 * scale }));
     const sortedLabels = [...labels].sort((a, b) => (a.ty - b.ty) || (a.tx - b.tx));
-    const placedLabelRects = [...bubbleRects];
+    const placedLabelRects = [...bubbleRects, ...labelObstacles];
     for (const l of sortedLabels) {
       const box = measureLabelBox(c2d, l.text, scale);
       // Clamp horizontal (pendant du clamp vertical ci-dessous) : centrée sur

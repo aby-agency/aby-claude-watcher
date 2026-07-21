@@ -392,7 +392,13 @@
   function buildAgents(statics, indices) {
     for (const idx of indices) {
       const p = agentStationPosition(idx);
-      statics.push({ frame: 'stationConsole', tx: p.consoleTx, ty: p.consoleTy });
+      // dy:-8 (2026-07-21, avec le passage au single 130) : l'écran 16×14
+      // partage sa colonne avec le perso assis (16 px aussi) — ancré bas de
+      // tuile, il disparaissait entièrement derrière la tête (seuls les
+      // bords bleus dépassaient). Remonté de 8 px, il dépasse au-dessus de
+      // la tête comme l'écran du mockup au-dessus du dossier ; il déborde de
+      // 6 px sur la rangée de respiration (sol nu, jamais de mobilier).
+      statics.push({ frame: 'stationConsole', tx: p.consoleTx, ty: p.consoleTy, dy: -8 });
       statics.push({ frame: 'chairOrange', tx: p.chairTx, ty: p.chairTy, dy: 2, z: 'over' });
     }
   }
@@ -428,7 +434,7 @@
   function buildHeadless(statics, indices) {
     for (const idx of indices) {
       const p = headlessPosition(idx);
-      statics.push({ frame: 'stationConsole', tx: p.consoleTx, ty: p.consoleTy });
+      statics.push({ frame: 'stationConsole', tx: p.consoleTx, ty: p.consoleTy, dy: -8 }); // cf. buildAgents
       statics.push({ frame: 'chairBlack', tx: p.chairTx, ty: p.chairTy, dy: 2, z: 'over' });
     }
   }

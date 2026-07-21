@@ -75,16 +75,17 @@ const FURNITURE = {
   // simple, documente"). Les deux clés pointent le même PNG.
   chairBlack:   `${SINGLES_DIR}/Modern_Office_Singles_106.png`,
 
-  // stationConsole : l'unité écran-bleu+clavier des postes (mockup, bas-
-  // gauche). Comparaison pixel exacte du motif d'écran (carré rouge en
-  // haut-gauche, jaune dessous, 2 carrés blancs à droite + clavier gris) :
-  // c'est LE MÊME single que deskSetup/227 déjà baké — alias v4 pour un nom
-  // de frame explicite côté layout, pas un nouvel asset. Les montants
-  // orange qui encadrent l'écran dans le mockup (meuble/cloison derrière le
-  // poste) n'ont PAS été retrouvés comme single séparé malgré recherche sur
-  // l'intégralité des 339 singles (cf. rapport, § introuvables) — non
-  // bloquant, l'écran+clavier suffit à identifier le poste.
-  stationConsole: `${SINGLES_DIR}/Modern_Office_Singles_227.png`,
+  // stationConsole : l'écran des postes (mockup, bas-gauche). Retour Paul
+  // 2026-07-21 (« l'ordi des agents est [éclaté] ») : le 227 précédent est un
+  // sprite COMPOSITE 32×23 — moniteur incliné sur pied à gauche + écran-
+  // clavier à droite ; posé sur la tuile console (fauteuil dessous, MÊME
+  // colonne), le perso se retrouvait sous le pied du moniteur gauche avec le
+  // setup droit flottant à côté. Le 130 (écran panoramique double sur pied
+  // central, face caméra — le motif exact du mockup) trime à 16×14 : UNE
+  // tuile, naturellement centré au-dessus du fauteuil, aucun débord. Variante
+  // 133 écartée (même écran mais ombre portée noire dure, incohérente sur le
+  // sol gris du rendu).
+  stationConsole: `${SINGLES_DIR}/Modern_Office_Singles_130.png`,
 
   // sofaCornerA-D : canapé d'angle du lounge (mockup, haut-gauche). Les 4
   // fragments 201-204 avaient été écartés en v3 (salle Pause, cf. note

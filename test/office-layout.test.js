@@ -30,7 +30,8 @@ function many(prefix, n, state, extraFn) {
 // tout le reste (wall/floor/door/chairOrange/chairBlack/sideSetup90 [même
 // tuile que sideDesk90]/laptop) est walkable, cf. tête de module.
 const COLLISION_WIDTH = {
-  stationConsole: 2, sofaCornerA: 2, sofaCornerB: 2, sofaCornerC: 1, sofaCornerD: 1,
+  stationConsole: 1, // single 130 (16×14, 1 tuile) depuis 2026-07-21 — le 227 (32px) couvrait 2 tuiles
+  sofaCornerA: 2, sofaCornerB: 2, sofaCornerC: 1, sofaCornerD: 1,
   coffeeTable: 2, sideDesk90: 1, tv: 2, plant: 1,
 };
 function furnitureTiles(statics) {

@@ -185,6 +185,28 @@ test('boîtes fixes : lounge (rows1-4) et deep-research (rows1-4) ne redimension
     assertEq(room.zones.dr.box.rows, 4);
   }
 });
+// Fix écrasement (2026-07-21, constaté au CDP en conditions réelles) : les
+// étiquettes pixel des debout du lounge (row 4) se dessinent une rangée SOUS
+// eux — pile sur la première rangée de consoles agents quand AGENTS_TOP
+// collait la boîte lounge (perso assis + console ensevelis, illisible). Même
+// géométrie côté droit (debout dr row 4 / consoles headless). Le mockup v4
+// montre du sol libre entre les quadrants haut et bas : la rangée juste sous
+// les boîtes fixes doit rester SANS mobilier, des deux côtés.
+test('respiration : aucun mobilier sur la rangée juste sous les boîtes fixes (lounge/dr)', () => {
+  const breather = OL.LOUNGE_TOP + OL.LOUNGE_ROWS; // première rangée après les boîtes fixes
+  assert(OL.AGENTS_TOP > breather, 'AGENTS_TOP doit laisser une rangée de respiration sous le lounge');
+  assert(OL.HEADLESS_TOP > breather, 'HEADLESS_TOP doit laisser une rangée de respiration sous deep-research');
+  const rooms = [
+    OL.roomFor(snap([...many('w', 8, 'waiting'), ...many('a', 3, 'running')], many('h', 6, 'running'))),
+    OL.roomFor(snap(many('a', 12, 'running'))),
+  ];
+  for (const room of rooms) {
+    for (const st of room.statics) {
+      if (st.frame === 'wall' || st.frame === 'floor' || st.frame === 'door') continue;
+      assert(st.ty !== breather, `${st.frame} en (${st.tx},${st.ty}) colle la boîte fixe (rangée de respiration)`);
+    }
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log('\nagents : croissance par rangées de 3 postes (aucun cap):');
@@ -256,7 +278,7 @@ test('le compteur logique compte le waiting-à-cloche EN AGENTS, pas en lounge',
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log('\nsyncActors : spawn, slots stables, non-traversée générique:');
-test('nouvelle session running → acteur en zone agents, spawn (7,1), poste (0,6)', () => {
+test('nouvelle session running → acteur en zone agents, spawn (7,1), poste (0,7)', () => {
   const st = OL.createState();
   OL.syncActors(st, snap([sess('a', 'running')]));
   const a = st.actors.get('a');
@@ -264,7 +286,7 @@ test('nouvelle session running → acteur en zone agents, spawn (7,1), poste (0,
   assertEq(a.zone, 'agents');
   assertEq(a.tx, 7); assertEq(a.ty, 1); // spawn
   const dest = a.path[a.path.length - 1];
-  assertEq(dest.tx, 0); assertEq(dest.ty, 6);
+  assertEq(dest.tx, 0); assertEq(dest.ty, 7);
 });
 test('nouvelle session waiting (sans cloche) → acteur en zone lounge', () => {
   const st = OL.createState();
@@ -300,7 +322,7 @@ test('3 postes agents occupés → slots stables (0,2,4 en colonne), inchangés 
   const txs = ['a', 'b', 'c'].map(id => st.actors.get(id).tx).sort((x, y) => x - y);
   assertEq(JSON.stringify(txs), JSON.stringify([0, 2, 4]));
   OL.syncActors(st, snap([sess('a', 'thinking'), sess('b', 'running'), sess('c', 'running')]));
-  assertEq(st.actors.get('a').tx, 0); assertEq(st.actors.get('a').ty, 6);
+  assertEq(st.actors.get('a').tx, 0); assertEq(st.actors.get('a').ty, 7);
 });
 test('un 4e occupant après le départ du 1er réutilise le plus petit slot libre', () => {
   const st = OL.createState();
@@ -311,7 +333,7 @@ test('un 4e occupant après le départ du 1er réutilise le plus petit slot libr
   OL.syncActors(st, snap([sess('c', 'running')]));
   const c = st.actors.get('c');
   walkToRest(c, st);
-  assertEq(c.tx, 0); assertEq(c.ty, 6); // réutilise le slot 0 libéré
+  assertEq(c.tx, 0); assertEq(c.ty, 7); // réutilise le slot 0 libéré
 });
 test('purge → activity leave, done une fois au spawn', () => {
   const st = OL.createState();
@@ -405,7 +427,7 @@ test('waiting → running : migration retour lounge → agents, marche visible',
   while (a.zone === 'lounge' && ticks < 300) { OL.tickActor(a, st); ticks++; }
   assertEq(a.zone, 'agents');
   walkToRest(a, st);
-  assertEq(a.tx, 0); assertEq(a.ty, 6);
+  assertEq(a.tx, 0); assertEq(a.ty, 7);
 });
 test('migration en cours annulée AVANT d\'avoir quitté la zone → retour au même poste, aucun téléport', () => {
   const st = OL.createState();
@@ -629,7 +651,7 @@ test('C2 : 5 running (slots 0..4) → r0..r3 sortent COMPLÈTEMENT → r4 (slot 
   for (const s of five) walkToRest(st.actors.get(s.sessionId), st);
   const r4 = st.actors.get('r4');
   assertEq(r4.slotIdx, 4); // groupe1, within1 → c=2 ; groupe1 démarre à AGENTS_TOP+3
-  assertEq(r4.tx, 2); assertEq(r4.ty, 9);
+  assertEq(r4.tx, 2); assertEq(r4.ty, 10);
 
   OL.syncActors(st, snap([sess('r4', 'running')]));
   for (const s of five) if (s.sessionId !== 'r4') fullyExit(s.sessionId, st);
@@ -640,11 +662,11 @@ test('C2 : 5 running (slots 0..4) → r0..r3 sortent COMPLÈTEMENT → r4 (slot 
   assert(r4.tx >= 0 && r4.tx < room.cols && r4.ty >= 0 && r4.ty < room.rows,
     `r4 en (${r4.tx},${r4.ty}) hors bornes de la salle rendue (rows=${room.rows})`);
   // slotIdx=4 → groupe1 (0-indexé) : il faut donc 2 groupes (agentsGroups)
-  // pour que (2,9) existe. Un dimensionnement par COMPTE brut (logical=1)
-  // donnerait agentsGroups(1)=1, rows=2, et (2,9) serait hors sol. Le fix
-  // (maxHeldSlotIdx+1=5) donne agentsGroups(5)=2, rows=5 : (2,9) est dans
-  // les bornes (AGENTS_TOP=5 .. 5+5-1=9).
-  assertEq(room.zones.agents.box.rows, 5, 'la zone doit rester assez grande pour (2,9) (slot 4 encore tenu), peu importe le compte brut');
+  // pour que (2,10) existe. Un dimensionnement par COMPTE brut (logical=1)
+  // donnerait agentsGroups(1)=1, rows=2, et (2,10) serait hors sol. Le fix
+  // (maxHeldSlotIdx+1=5) donne agentsGroups(5)=2, rows=5 : (2,10) est dans
+  // les bornes (AGENTS_TOP=6 .. 6+5-1=10).
+  assertEq(room.zones.agents.box.rows, 5, 'la zone doit rester assez grande pour (2,10) (slot 4 encore tenu), peu importe le compte brut');
 });
 
 console.log('\nC3 (transposé) — perso gelé en erreur, loin du compte logique restant:');
@@ -655,21 +677,21 @@ test('C3 : 7 running, r6 (slot le plus haut, groupe 2) migre et erreure presque 
   for (const s of seven) walkToRest(st.actors.get(s.sessionId), st);
   const r6 = st.actors.get('r6');
   assertEq(r6.slotIdx, 6); // groupe 2 (0-indexé), within 0 → c=0
-  assertEq(r6.tx, 0); assertEq(r6.ty, 12); // AGENTS_TOP(5) + 2*3 + 1
+  assertEq(r6.tx, 0); assertEq(r6.ty, 13); // AGENTS_TOP(6) + 2*3 + 1
 
   const stillRunning = Array.from({ length: 6 }, (_, i) => sess(`r${i}`, 'running'));
   const snapAfterWaiting = snap([...stillRunning, sess('r6', 'waiting')]);
   OL.syncActors(st, snapAfterWaiting);
   assertEq(r6.migratingTo, 'lounge');
-  OL.tickActor(r6, st); OL.tickActor(r6, st); // 1 pas : encore tout près de son poste (ty=12)
+  OL.tickActor(r6, st); OL.tickActor(r6, st); // 1 pas : encore tout près de son poste (ty=13)
   assert(r6.path.length > 0, 'r6 doit être encore en marche, pas arrivé');
   const frozenTy = r6.ty;
-  assertEq(frozenTy, 12);
+  assertEq(frozenTy, 13);
 
   // Erreur en pleine sortie : r6 se fige SUR PLACE, encore loin dans la zone
-  // agents (ty=12), alors que le compte logique restant (lui seul, en
+  // agents (ty=13), alors que le compte logique restant (lui seul, en
   // erreur) ne réclamerait naturellement qu'1 groupe (rows=2, jusqu'à
-  // AGENTS_TOP+2-1=6) — largement insuffisant pour couvrir ty=12.
+  // AGENTS_TOP+2-1=7) — largement insuffisant pour couvrir ty=13.
   const snapWithError = snap([...stillRunning, sess('r6', 'error')]);
   OL.syncActors(st, snapWithError);
   assertEq(r6.path.length, 0);
@@ -767,7 +789,7 @@ test('subagents : positionnés à la colonne réservée (c+1) du poste du parent
   const st = OL.createState();
   OL.syncActors(st, snap([sess('a', 'running', { subagents: [{ agentId: 'g1' }, { agentId: 'g2' }, { agentId: 'g3' }] })]));
   const parent = st.actors.get('a');
-  walkToRest(parent, st); // le parent atteint son poste (0,6) ; le portable suit le SLOT, pas la position transitoire
+  walkToRest(parent, st); // le parent atteint son poste (0,7) ; le portable suit le SLOT, pas la position transitoire
   const g1 = st.actors.get('a:sub:g1'), g2 = st.actors.get('a:sub:g2');
   assert(g1 && g2, 'subagents manquants');
   assert(!st.actors.has('a:sub:g3'), 'un 3e subagent ne doit pas apparaître (cap 2 par parent)');

@@ -253,8 +253,13 @@ const Office = (() => {
       if (a.kind === 'session' && parentSession) {
         const emote = OfficeLayout.emoteFor(parentSession, activeBells.has(a.sessionId));
         if (emote) {
+          // Clamp vertical : un acteur en row 1 (sièges canapé du lounge) a
+          // sa bulle à py-34·scale < 0 — entièrement hors canvas, donc émote
+          // jamais visible (constaté au CDP 2026-07-21). Clampée à 0, elle
+          // glisse sur la bande mur (row 0), libre de tout mobilier/acteur —
+          // même convention que les badges « +N ».
           const eFrame = animFrameName(emote, tickCount >> 2);
-          if (eFrame) bubbles.push({ frame: eFrame, px, py });
+          if (eFrame) bubbles.push({ frame: eFrame, px, by: Math.max(0, py - 34 * scale) });
         }
       }
     }
@@ -277,15 +282,18 @@ const Office = (() => {
     // tooltip au survol reste le filet de sécurité pour l'identifier.
     const labelBoxH = 9 * scale; // 7*scale texte + 2*(1*scale) padding, cf. measureLabelBox
     // Rect d'une bulle : `drawFrameOn` la dessine 16×16 (natif, pas de scale
-    // d'atlas — cf. bake-smoke) ancrée à (b.px, b.py - 34*scale), cf. l'appel
-    // de dessin plus bas — même formule, dupliquée ici pour le calcul du rect
-    // AVANT que le dessin lui-même n'ait lieu.
-    const bubbleRects = bubbles.map(b => ({ x: b.px, y: b.py - 34 * scale, w: 16 * scale, h: 16 * scale }));
+    // d'atlas — cf. bake-smoke) ancrée à (b.px, b.by) — `by` déjà clampé au
+    // moment de la collecte, une seule formule partagée avec le dessin.
+    const bubbleRects = bubbles.map(b => ({ x: b.px, y: b.by, w: 16 * scale, h: 16 * scale }));
     const sortedLabels = [...labels].sort((a, b) => (a.ty - b.ty) || (a.tx - b.tx));
     const placedLabelRects = [...bubbleRects];
     for (const l of sortedLabels) {
-      const cx = (l.tx * 16 + 8) * scale;
       const box = measureLabelBox(c2d, l.text, scale);
+      // Clamp horizontal (pendant du clamp vertical ci-dessous) : centrée sur
+      // un acteur à tx 0 ou cols-1, la boîte déborde du canvas et le texte est
+      // tronqué (« stleGe », constaté au CDP 2026-07-21) — ramenée entière
+      // dans la salle, au prix d'un centrage décalé d'une demi-boîte max.
+      const cx = Math.max(box.w / 2, Math.min((l.tx * 16 + 8) * scale, w - box.w / 2));
       let topY = Math.min((l.ty * 16 + 17) * scale, h - labelBoxH);
       for (let attempt = 0; attempt < 3; attempt++) {
         const rect = { x: cx - box.w / 2, y: topY - box.padY, w: box.w, h: box.h };
@@ -300,7 +308,7 @@ const Office = (() => {
 
     // Bulles émotes : dessinées en tout dernier (étiquettes déjà posées),
     // ancrées au-dessus de la tête (perso 16×32 ancré bas de tuile).
-    for (const b of bubbles) drawFrameOn(c2d, b.frame, b.px, b.py - 34 * scale, scale);
+    for (const b of bubbles) drawFrameOn(c2d, b.frame, b.px, b.by, scale);
 
     // Badges « +N » par zone (v4) : bande mur (row 0), toujours libre —
     // dessinés en tout dernier, ne participent à aucune passe de collision.

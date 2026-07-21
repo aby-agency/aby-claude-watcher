@@ -52,12 +52,14 @@
 // colonne 7, qui porte aussi la porte/spawn — « au bord du couloir central »,
 // le mockup n'en montre pas). Bloc gauche (cols 0-5) : lounge fixe en haut
 // (rows 1-4, canapé d'angle + table basse, cap 8 + "+N"), agents extensible
-// en bas (row 5+, rangées de 3 postes, AUCUN cap — c'est le compte réel de
+// en bas (row 6+, rangées de 3 postes, AUCUN cap — c'est le compte réel de
 // sessions actives). Bloc droit (cols 10-15) : deep-research fixe en haut
 // (rows 1-4, postes latéraux empilés, cap 8 + "+N"), headless extensible en
-// bas (row 5+, cap 6 + "+N", mêmes rangées de 3 que agents mais fauteuil
-// NOIR). Rangée basse de circulation = toujours la dernière rangée rendue,
-// jamais de mobilier dessus (générique, en plus du couloir vertical).
+// bas (row 6+, cap 6 + "+N", mêmes rangées de 3 que agents mais fauteuil
+// NOIR). Row 5 = rangée de RESPIRATION (sol nu des deux côtés, cf.
+// commentaire d'AGENTS_TOP). Rangée basse de circulation = toujours la
+// dernière rangée rendue, jamais de mobilier dessus (générique, en plus du
+// couloir vertical).
 //
 // Migration lounge↔agents = la SEULE marche intra-salle (les autres kinds —
 // subagent/workflow/headless — apparaissent/disparaissent directement à leur
@@ -87,7 +89,13 @@
   const LOUNGE_SEATS = [{ tx: 1, ty: 1 }, { tx: 3, ty: 1 }, { tx: 0, ty: 3 }]; // sur le canapé
   const LOUNGE_STAND_TXS = [1, 2, 3, 4, 5]; // debout, row 4 (5 places)
 
-  const AGENTS_TOP = 5;                  // juste sous le lounge, FIXE (le lounge ne grandit jamais)
+  // Une rangée de RESPIRATION (row 5, sol nu) sépare les boîtes fixes du haut
+  // des zones extensibles du bas (fix écrasement 2026-07-21) : les étiquettes
+  // pixel des debout du lounge/dr (row 4) se dessinent une rangée sous eux —
+  // collées à row 5, elles ensevelissaient la première rangée de consoles
+  // (perso assis + console illisibles, constaté au CDP). Le mockup v4 montre
+  // ce sol libre entre quadrants haut et bas.
+  const AGENTS_TOP = 6;                  // sous le lounge + 1 rangée de respiration (le lounge ne grandit jamais)
   const MAX_SUB_PER_PARENT = 2;          // portables : jusqu'à 2 par parent, "+N" au-delà (cap PAR PARENT, pas global)
 
   const DR_TOP = 1;
@@ -95,7 +103,7 @@
   const MAX_DR = 8;
   const DR_COL_A = 10, DR_COL_B = 13;    // 2 postes par rangée
 
-  const HEADLESS_TOP = 5;                // juste sous deep-research, FIXE (deep-research ne grandit jamais)
+  const HEADLESS_TOP = 6;                // sous deep-research + 1 rangée de respiration (deep-research ne grandit jamais)
   const MAX_HEADLESS = 6;
   const HEADLESS_COLS = [10, 12, 14];    // 3 postes par rangée, comme agents
 

@@ -20,8 +20,14 @@ function charFrameRect(row, i) {
 // Mobilier : singles Modern Office (canvas 32×48, rogné à la bbox au bake).
 const SINGLES_DIR = 'Modern_Office_Revamped_v1.2/4_Modern_Office_singles/16x16';
 const FURNITURE = {
-  // v26 (swaps Paul 2026-07-17) : bureau principal en blanc, 2 tuiles.
-  desk:         `${SINGLES_DIR}/Modern_Office_Singles_263.png`,
+  // v26 (swaps Paul 2026-07-17) : bureau principal en blanc. Retour Paul
+  // 2026-07-21 (« il fait 2 de large le bureau ? il devrait faire un ») :
+  // 263 (2 tuiles) → 262, le pendant 1 tuile EXACT de la même famille
+  // (plateau blanc + façade/pieds) — le poste tient sur la colonne du perso,
+  // écran centré dessus, comme le meuble du mockup. Conséquence assumée :
+  // le portable du 1er subagent (c+1) pose au sol comme le 2e, plus de
+  // moitié droite de plateau sous lui.
+  desk:         `${SINGLES_DIR}/Modern_Office_Singles_262.png`,
   deskSetup:    `${SINGLES_DIR}/Modern_Office_Singles_227.png`,
   chairBack:    `${SINGLES_DIR}/Modern_Office_Singles_106.png`,
   chairFront:   `${SINGLES_DIR}/Modern_Office_Singles_196.png`,

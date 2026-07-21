@@ -392,11 +392,11 @@
   function buildAgents(statics, indices) {
     for (const idx of indices) {
       const p = agentStationPosition(idx);
-      // desk (32×19, 2 tuiles — retour Paul 2026-07-21 « il manque le bureau
-      // sous le pc ») : la surface du poste, poussée AVANT l'écran (dessinée
-      // dessous). Sa moitié droite (c+1) est le plateau sous lequel se pose
-      // le portable du 1er subagent — la géométrie que le commentaire F2
-      // décrivait déjà du temps du 227 (32 px lui aussi).
+      // desk (single 262, 16×16, 1 tuile — retours Paul 2026-07-21 « il
+      // manque le bureau sous le pc » puis « il devrait faire un [de
+      // large] ») : la surface du poste, poussée AVANT l'écran (dessinée
+      // dessous), sur la seule colonne du perso. Les portables subagents
+      // (c+1) posent au sol — assumé, cf. office-sprites.js.
       statics.push({ frame: 'desk', tx: p.consoleTx, ty: p.consoleTy });
       // dy:-8 (2026-07-21, avec le passage au single 130) : l'écran 16×14
       // partage sa colonne avec le perso assis (16 px aussi) — ancré bas de

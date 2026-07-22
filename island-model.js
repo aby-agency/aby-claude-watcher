@@ -3,7 +3,6 @@
 // Dual export: module.exports (main process, tests) + window.islandModel
 // (island renderer, loaded via <script> like i18n.js).
 
-const CAP_PER_WING = 4;
 // Menu bar is ~37px on notched MacBooks vs ~25px otherwise. No public API
 // exposes the notch — this heuristic is the standard technique.
 const NOTCH_MENUBAR_MIN = 30;
@@ -66,6 +65,7 @@ function sortSessions(sessions, sessionOrder) {
 }
 
 const ATTENTION = ['pending', 'error', 'waiting'];
+const LED_ORDER = ['pending', 'error', 'waiting', 'thinking', 'running'];
 
 function buildIsland(sessions, config, now = Date.now()) {
   const order = (config && config.sessionOrder) || [];
@@ -73,10 +73,19 @@ function buildIsland(sessions, config, now = Date.now()) {
   const interactive = sorted.filter((s) => !s.isBackground);
   const background = sorted.filter((s) => s.isBackground);
 
-  const wing = (list) => ({
-    leds: list.slice(0, CAP_PER_WING).map((s) => ({ sessionId: s.sessionId, state: s.state.name })),
-    more: Math.max(0, list.length - CAP_PER_WING),
-  });
+  // Ailes agrégées par état : une LED par couleur + compte (choix Paul, a
+  // remplacé « une LED par session, cap 4 + +N »). Ordre fixe urgent-d'abord
+  // → les positions ne se mélangent jamais.
+  const wing = (list) => {
+    const counts = new Map();
+    for (const s of list) {
+      const st = s.state.name;
+      counts.set(st, (counts.get(st) || 0) + 1);
+    }
+    const known = LED_ORDER.filter((st) => counts.has(st));
+    const unknown = [...counts.keys()].filter((st) => !LED_ORDER.includes(st));
+    return { leds: [...known, ...unknown].map((st) => ({ state: st, count: counts.get(st) })) };
+  };
 
   const row = (s) => ({
     sessionId: s.sessionId,
@@ -96,6 +105,6 @@ function buildIsland(sessions, config, now = Date.now()) {
   };
 }
 
-const api = { buildIsland, menuBarHeight, isNotchedDisplay, islandLayout, bannerPayload, CAP_PER_WING };
+const api = { buildIsland, menuBarHeight, isNotchedDisplay, islandLayout, bannerPayload };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.islandModel = api;

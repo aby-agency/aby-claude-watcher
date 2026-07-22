@@ -1,5 +1,5 @@
 // Tests for island-model.js. Run: node test/island-model.test.js
-const { buildIsland, islandLayout, isNotchedDisplay, CAP_PER_WING, bannerPayload } = require('../island-model.js');
+const { buildIsland, islandLayout, isNotchedDisplay, bannerPayload } = require('../island-model.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -35,16 +35,17 @@ test('splits interactive (left) and background (right)', () => {
   assertEq(m.left.leds.length, 1);
   assertEq(m.right.leds.length, 1);
 });
-test('caps each wing at CAP_PER_WING with a more count', () => {
-  const many = Array.from({ length: 6 }, () => sess('running'));
-  const m = buildIsland(many, {}, NOW);
-  assertEq(m.left.leds.length, CAP_PER_WING);
-  assertEq(m.left.more, 2);
-  assertEq(m.right.more, 0);
+test('wings aggregate per state with counts, urgent states first', () => {
+  const m = buildIsland([sess('running'), sess('running'), sess('waiting'), sess('pending'), sess('running')], {}, NOW);
+  assertEq(m.left.leds, [
+    { state: 'pending', count: 1 },
+    { state: 'waiting', count: 1 },
+    { state: 'running', count: 3 },
+  ]);
 });
-test('led carries sessionId and state name', () => {
-  const m = buildIsland([sess('pending', { id: 'abc' })], {}, NOW);
-  assertEq(m.left.leds[0], { sessionId: 'abc', state: 'pending' });
+test('no cap: many sessions collapse into one led per state', () => {
+  const many = Array.from({ length: 9 }, () => sess('running'));
+  assertEq(buildIsland(many, {}, NOW).left.leds, [{ state: 'running', count: 9 }]);
 });
 test('sessionOrder from config wins, then newest first', () => {
   const a = sess('running', { id: 'a', age: 10 });

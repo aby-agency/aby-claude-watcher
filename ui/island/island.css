@@ -61,7 +61,8 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.4); opacity: .7; }
 }
-.more { color: #6b7385; font-size: 9px; font-family: var(--font-mono); }
+.led-group { display: inline-flex; align-items: center; gap: 3px; }
+.led-count { color: #8b93a7; font-size: 10px; font-family: var(--font-mono); line-height: 1; }
 
 /* Bannière needs-you — absolute sous la pilule, glisse de derrière elle
    (translateY GPU : le max-height re-layoutait à chaque frame, saccadé).

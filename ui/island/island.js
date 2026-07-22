@@ -32,8 +32,10 @@ function ledHtml(led, bg) {
 }
 
 function wingHtml(wing, bg) {
-  return wing.leds.map((l) => ledHtml(l, bg)).join('')
-    + (wing.more ? `<span class="more">+${wing.more}</span>` : '');
+  // LED agrégée par état + compte (les rangées gardent leur LED par session).
+  return wing.leds.map((l) =>
+    `<span class="led-group">${ledHtml(l, bg)}<span class="led-count">${l.count}</span></span>`
+  ).join('');
 }
 
 function rowHtml(row) {

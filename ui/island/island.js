@@ -93,25 +93,35 @@ async function refresh() {
 }
 
 // ── Hover machinery ──
+// hovering pilote le click-through (IPC) ; l'expansion du panneau est
+// distincte : pilule/panneau seulement — survoler la bannière rend les clics
+// possibles SANS déplier le panneau.
 let hovering = false;
 function inRect(el, x, y, pad = 0) {
   const r = el.getBoundingClientRect();
   return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
 }
-function setHover(next) {
+function setMouse(next) {
   if (next === hovering) return;
   hovering = next;
-  document.body.classList.toggle('expanded', hovering);
   window.islandApi.setHover(hovering);
+}
+function setExpanded(next) {
+  if (next === document.body.classList.contains('expanded')) return;
+  document.body.classList.toggle('expanded', next);
+  if (next) hideBanner(); // le panneau prend le dessus
 }
 document.addEventListener('mousemove', (e) => {
   const overPill = inRect(document.getElementById('pill'), e.clientX, e.clientY, 4);
-  const overPanel = hovering && inRect(document.getElementById('panel'), e.clientX, e.clientY, 4);
-  setHover(overPill || overPanel);
+  const expanded = document.body.classList.contains('expanded');
+  const overPanel = expanded && inRect(document.getElementById('panel'), e.clientX, e.clientY, 4);
+  const $banner = document.getElementById('banner');
+  const overBanner = $banner.classList.contains('visible') && inRect($banner, e.clientX, e.clientY, 4);
+  setMouse(overPill || overPanel || overBanner);
+  setExpanded(overPill || overPanel);
 });
-// Mouse left the window entirely (fast exit can skip the last mousemove).
-document.addEventListener('mouseleave', () => setHover(false));
-window.addEventListener('blur', () => setHover(false));
+document.addEventListener('mouseleave', () => { setMouse(false); setExpanded(false); });
+window.addEventListener('blur', () => { setMouse(false); setExpanded(false); });
 
 // Debounce rapid updates (same pattern as the old popover).
 let refreshPending = null;
@@ -119,6 +129,30 @@ function scheduleRefresh() {
   if (refreshPending) return;
   refreshPending = setTimeout(() => { refreshPending = null; refresh(); }, 100);
 }
+// ── Bannière needs-you ──
+const BANNER_MS = 4000;
+let bannerTimer = null;
+let bannerSessionId = null;
+function hideBanner() {
+  if (bannerTimer) { clearTimeout(bannerTimer); bannerTimer = null; }
+  bannerSessionId = null;
+  document.getElementById('banner').classList.remove('visible');
+}
+window.islandApi.onBanner((b) => {
+  if (document.body.classList.contains('expanded')) return; // panneau ouvert
+  bannerSessionId = b.sessionId;
+  document.getElementById('bannerLed').dataset.state = b.state || '';
+  // textContent : pas d'injection possible, pas d'échappement nécessaire.
+  document.getElementById('bannerText').textContent =
+    `${b.name} — ${window.i18n.t('state_' + b.state)}`;
+  document.getElementById('banner').classList.add('visible');
+  if (bannerTimer) clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(hideBanner, BANNER_MS);
+});
+document.getElementById('banner').addEventListener('click', () => {
+  if (bannerSessionId) window.islandApi.focusSession(bannerSessionId);
+  hideBanner();
+});
 window.islandApi.onUpdate(scheduleRefresh);
 // Largeur réelle de l'encoche mesurée par le main (fallback CSS : 180px).
 window.islandApi.onGeometry((g) => {

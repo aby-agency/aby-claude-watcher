@@ -48,6 +48,23 @@ body {
 }
 .more { color: #6b7385; font-size: 9px; font-family: var(--font-mono); }
 
+/* Bannière needs-you — glisse de sous la pilule, 4 s, une seule à la fois.
+   Seul mouvement autonome de l'île (le panneau reste hover-only). */
+.banner {
+  display: flex; align-items: center; gap: 8px;
+  width: 250px;
+  background: #000; border-radius: 0 0 12px 12px;
+  padding: 0 14px;
+  font-size: 12px; color: #e8eaf0;
+  max-height: 0; overflow: hidden;
+  transition: max-height .22s ease;
+  cursor: pointer;
+}
+.banner.visible { max-height: 32px; padding-bottom: 8px; padding-top: 4px; }
+/* Panneau ouvert → la bannière s'efface (le JS la masque aussi). */
+body.expanded .banner { max-height: 0; padding-top: 0; padding-bottom: 0; }
+.banner-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* Expanded panel below the pill. max-height transition = fold animation. */
 .panel {
   width: 340px;

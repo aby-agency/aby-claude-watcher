@@ -10,6 +10,11 @@ function esc(str) {
   return div.innerHTML;
 }
 
+// Escape for use in HTML attribute (onclick handlers, etc.)
+function escAttr(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function fmtMin(minutes) {
   if (minutes === null || minutes === undefined) return '';
   if (minutes < 60) return `${minutes} min`;
@@ -23,7 +28,7 @@ function fmtRemaining(resetsAt) {
 }
 
 function ledHtml(led, bg) {
-  return `<span class="led${bg ? ' bg' : ''}" data-state="${esc(led.state)}"></span>`;
+  return `<span class="led${bg ? ' bg' : ''}" data-state="${escAttr(led.state)}"></span>`;
 }
 
 function wingHtml(wing, bg) {
@@ -34,8 +39,8 @@ function wingHtml(wing, bg) {
 function rowHtml(row) {
   const dur = row.minutes !== null ? ` · ${fmtMin(row.minutes)}` : '';
   return `
-    <div class="row" data-session="${esc(row.sessionId)}" data-bg="${row.isBackground ? '1' : ''}">
-      <span class="led${row.isBackground ? ' bg' : ''}" data-state="${esc(row.state)}"></span>
+    <div class="row" data-session="${escAttr(row.sessionId)}" data-bg="${row.isBackground ? '1' : ''}">
+      <span class="led${row.isBackground ? ' bg' : ''}" data-state="${escAttr(row.state)}"></span>
       <span class="r-name">${esc(row.name)}</span>
       <span class="r-state">${esc(window.i18n.t('state_' + row.state))}${esc(dur)}</span>
     </div>`;

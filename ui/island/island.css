@@ -158,13 +158,16 @@ body.expanded .banner { transform: translate(-50%, -100%); opacity: 0; pointer-e
   transition: max-height .22s ease;
 }
 body.expanded .panel { max-height: 300px; }
-.panel-inner { padding: 6px 14px 12px; }
+/* 6px + 8px de padding des .row = 14px d'alignement texte. PAS de marges
+   négatives sur les .row : elles créaient un débordement horizontal de .rows
+   (overflow-y:auto force overflow-x:auto) → pouce de scrollbar horizontale
+   affiché comme une « barre » fantôme sous chaque section. */
+.panel-inner { padding: 6px 6px 12px; }
 .rows { max-height: 190px; overflow-y: auto; }
 .rows::-webkit-scrollbar { width: 4px; }
 .rows::-webkit-scrollbar-thumb { background: #333c50; border-radius: 2px; }
 .row {
   display: flex; align-items: center; gap: 8px;
-  margin: 0 -8px;
   padding: 5px 8px;
   border-radius: 6px;
   font-size: 12px; color: #e8eaf0;
@@ -181,7 +184,7 @@ body.expanded .panel { max-height: 300px; }
 .rows-bg .row { cursor: default; opacity: .65; }
 .island-empty { padding: 10px 0; text-align: center; color: #6b7385; font-size: 11px; }
 
-.gauge-block { margin-top: 8px; }
+.gauge-block { margin: 8px 8px 0; }
 /* Pas de filet entre les deux jauges (retour Paul) — l'air + les labels
    5H/7J suffisent. */
 #gauge7Block { margin-top: 12px; }

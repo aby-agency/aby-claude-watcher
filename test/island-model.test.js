@@ -1,5 +1,5 @@
 // Tests for island-model.js. Run: node test/island-model.test.js
-const { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, CAP_PER_WING, bannerPayload } = require('../island-model.js');
+const { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, isNotchedDisplay, CAP_PER_WING, bannerPayload } = require('../island-model.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -97,20 +97,30 @@ test('centers window on the MEASURED notch, gap = notch + margin', () => {
   const d = { bounds: { x: 0, y: 0, width: 1728, height: 1117 } };
   const l = islandLayout(d, { left: 771, width: 185 }, 460);
   // centre encoche = 771 + 92.5 = 863.5 → x = 863.5 - 230 arrondi
-  assertEq(l, { x: 634, gapPx: 197 });
+  assertEq(l, { x: 634, gapPx: 209 });
 });
 test('secondary display coords: bounds.x is added', () => {
   const d = { bounds: { x: 2000, y: 0, width: 1728, height: 1117 } };
-  assertEq(islandLayout(d, { left: 771, width: 185 }, 460).x, 2634);
+  assertEq(islandLayout(d, { left: 771, width: 185 }, 460), { x: 2634, gapPx: 209 });
 });
 test('no measurement → window centered on display, default gap 180', () => {
-  const d = { bounds: { x: 0, y: 0, width: 1728, height: 1117 } };
+  const d = { internal: true, bounds: { x: 0, y: 0, width: 1728, height: 1117 }, workArea: { x: 0, y: 34, width: 1728, height: 1083 } };
   assertEq(islandLayout(d, null, 460), { x: 634, gapPx: 180 });
 });
 test('invalid measurement (width <= 0, negative left) → fallback', () => {
-  const d = { bounds: { x: 0, y: 0, width: 1728, height: 1117 } };
+  const d = { internal: true, bounds: { x: 0, y: 0, width: 1728, height: 1117 }, workArea: { x: 0, y: 34, width: 1728, height: 1083 } };
   assertEq(islandLayout(d, { left: 771, width: 0 }, 460), { x: 634, gapPx: 180 });
   assertEq(islandLayout(d, { left: -5, width: 185 }, 460), { x: 634, gapPx: 180 });
+});
+test('display sans encoche (docké) → centré, gap 0', () => {
+  const d = { internal: false, bounds: { x: 0, y: 0, width: 3440, height: 1440 }, workArea: { x: 0, y: 31, width: 3440, height: 1409 } };
+  assertEq(islandLayout(d, null, 460), { x: 1490, gapPx: 0 });
+});
+test('isNotchedDisplay : externe à barre 31px → false, interne encoché → true', () => {
+  const ext = { internal: false, bounds: { x: 0, y: 0, width: 3440, height: 1440 }, workArea: { x: 0, y: 31, width: 3440, height: 1409 } };
+  const mbp = { internal: true, bounds: { x: 0, y: 0, width: 1728, height: 1117 }, workArea: { x: 0, y: 34, width: 1728, height: 1083 } };
+  assertEq(isNotchedDisplay(ext), false);
+  assertEq(isNotchedDisplay(mbp), true);
 });
 
 console.log('\nbannerPayload:');

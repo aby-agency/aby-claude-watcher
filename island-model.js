@@ -12,10 +12,12 @@ function menuBarHeight(display) {
   return display.workArea.y - display.bounds.y;
 }
 
+function isNotchedDisplay(d) {
+  return !!d.internal && menuBarHeight(d) >= NOTCH_MENUBAR_MIN;
+}
+
 function notchedInternalDisplay(displays) {
-  return (displays || []).find(
-    (d) => d.internal && menuBarHeight(d) >= NOTCH_MENUBAR_MIN
-  ) || null;
+  return (displays || []).find(isNotchedDisplay) || null;
 }
 
 // Position horizontale de la fenêtre + largeur du gap central (zone encoche).
@@ -24,20 +26,22 @@ function notchedInternalDisplay(displays) {
 // décentrée de quelques pt — 7 pt constatés sur MBP 16") et gap = largeur
 // mesurée + marge de sécurité. Sans mesure : centré display, gap 180.
 const NOTCH_GAP_FALLBACK = 180;
-const NOTCH_GAP_MARGIN = 12;
+const NOTCH_GAP_MARGIN = 24;
 
 function islandLayout(display, notch, winW) {
   const valid = notch && notch.width > 0 && notch.left >= 0;
-  if (!valid) {
+  if (valid) {
+    const notchCenter = display.bounds.x + notch.left + notch.width / 2;
     return {
-      x: Math.round(display.bounds.x + (display.bounds.width - winW) / 2),
-      gapPx: NOTCH_GAP_FALLBACK,
+      x: Math.round(notchCenter - winW / 2),
+      gapPx: Math.round(notch.width + NOTCH_GAP_MARGIN),
     };
   }
-  const notchCenter = display.bounds.x + notch.left + notch.width / 2;
   return {
-    x: Math.round(notchCenter - winW / 2),
-    gapPx: Math.round(notch.width + NOTCH_GAP_MARGIN),
+    x: Math.round(display.bounds.x + (display.bounds.width - winW) / 2),
+    // Display à encoche mais mesure indisponible → largeur prudente ;
+    // display sans encoche (mode docké) → pilule compacte.
+    gapPx: isNotchedDisplay(display) ? NOTCH_GAP_FALLBACK : 0,
   };
 }
 
@@ -95,6 +99,6 @@ function buildIsland(sessions, config, now = Date.now()) {
   };
 }
 
-const api = { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, bannerPayload, CAP_PER_WING };
+const api = { buildIsland, notchedInternalDisplay, menuBarHeight, isNotchedDisplay, islandLayout, bannerPayload, CAP_PER_WING };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.islandModel = api;

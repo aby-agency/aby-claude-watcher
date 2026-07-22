@@ -694,7 +694,7 @@ function serializeSession(session) {
     model: session.model,
     gitBranch: session.gitBranch || null,
     startedAt: session.startedAt,
-    lastEventTime: session.lastEventTime || null,
+    lastEventTime: session.lastEventTime ?? null,
     tokens: session.tokens,
     cwd: session.cwd,
     isBackground: !!session.isBackground,

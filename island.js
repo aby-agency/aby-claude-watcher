@@ -52,7 +52,8 @@ function create(display) {
     win.showInactive();
     sendUpdate();
   });
-  win.on('closed', () => { win = null; });
+  const w = win;
+  win.on('closed', () => { if (win === w) win = null; });
 }
 
 function destroy() {

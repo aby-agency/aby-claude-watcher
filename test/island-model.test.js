@@ -1,5 +1,5 @@
 // Tests for island-model.js. Run: node test/island-model.test.js
-const { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, isNotchedDisplay, CAP_PER_WING, bannerPayload } = require('../island-model.js');
+const { buildIsland, islandLayout, isNotchedDisplay, CAP_PER_WING, bannerPayload } = require('../island-model.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -12,22 +12,6 @@ function assertEq(a, b) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new
 const notched = { internal: true, bounds: { x: 0, y: 0, width: 1512, height: 982 }, workArea: { x: 0, y: 37, width: 1512, height: 945 } };
 const plain = { internal: true, bounds: { x: 0, y: 0, width: 1440, height: 900 }, workArea: { x: 0, y: 25, width: 1440, height: 875 } };
 const external = { internal: false, bounds: { x: 1512, y: 0, width: 2560, height: 1440 }, workArea: { x: 1512, y: 25, width: 2560, height: 1415 } };
-
-console.log('\nnotchedInternalDisplay:');
-test('detects notched internal display (menu bar ≥ 30)', () => {
-  assertEq(notchedInternalDisplay([external, notched]) === notched, true);
-});
-test('plain internal display → null', () => {
-  assertEq(notchedInternalDisplay([plain, external]), null);
-});
-test('no displays → null', () => {
-  assertEq(notchedInternalDisplay([]), null);
-});
-test('menuBarHeight subtracts bounds.y (secondary display coords are absolute)', () => {
-  const below = { internal: true, bounds: { x: 0, y: 900, width: 1512, height: 982 }, workArea: { x: 0, y: 937, width: 1512, height: 945 } };
-  assertEq(menuBarHeight(below), 37);
-  assertEq(notchedInternalDisplay([below]) === below, true);
-});
 
 // Session factory
 const NOW = 1_000_000_000_000;

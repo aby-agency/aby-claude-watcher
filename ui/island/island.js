@@ -111,8 +111,9 @@ function setExpanded(next) {
   document.body.classList.toggle('expanded', next);
   if (next) hideBanner(); // le panneau prend le dessus
 }
+const $pill = document.getElementById('pill');
 document.addEventListener('mousemove', (e) => {
-  const overPill = inRect(document.getElementById('pill'), e.clientX, e.clientY, 4);
+  const overPill = inRect($pill, e.clientX, e.clientY, 4);
   const expanded = document.body.classList.contains('expanded');
   const overPanel = expanded && inRect(document.getElementById('panel'), e.clientX, e.clientY, 4);
   const $banner = document.getElementById('banner');
@@ -165,7 +166,6 @@ window.islandApi.onGeometry((g) => {
   document.documentElement.style.setProperty('--notch-gap', `${Math.max(g.gapPx, 10)}px`);
 });
 // Largeur/hauteur réelles de la pilule → le drop (bannière, panneau) s'aligne.
-const $pill = document.getElementById('pill');
 new ResizeObserver(() => {
   document.documentElement.style.setProperty('--pill-w', `${$pill.offsetWidth}px`);
   document.documentElement.style.setProperty('--pill-h', `${$pill.offsetHeight}px`);

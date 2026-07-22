@@ -16,10 +16,6 @@ function isNotchedDisplay(d) {
   return !!d.internal && menuBarHeight(d) >= NOTCH_MENUBAR_MIN;
 }
 
-function notchedInternalDisplay(displays) {
-  return (displays || []).find(isNotchedDisplay) || null;
-}
-
 // Position horizontale de la fenêtre + largeur du gap central (zone encoche).
 // `notch` = mesure AppKit {left, width} en pt relative au display, ou null.
 // Mesuré : fenêtre centrée sur le CENTRE RÉEL de l'encoche (elle peut être
@@ -100,6 +96,6 @@ function buildIsland(sessions, config, now = Date.now()) {
   };
 }
 
-const api = { buildIsland, notchedInternalDisplay, menuBarHeight, isNotchedDisplay, islandLayout, bannerPayload, CAP_PER_WING };
+const api = { buildIsland, menuBarHeight, isNotchedDisplay, islandLayout, bannerPayload, CAP_PER_WING };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.islandModel = api;

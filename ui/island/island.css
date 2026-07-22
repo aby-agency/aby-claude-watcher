@@ -38,7 +38,9 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
 /* Largeur par défaut = fallback ; le main pousse la largeur MESURÉE de
    l'encoche (AppKit) via island-geometry → var --notch-gap. */
 .notch-gap { width: var(--notch-gap, 180px); flex: none; }
-.wing { display: flex; align-items: center; gap: 6px; flex: 1; }
+/* 12px : l'anneau des badges actifs déborde de 4px de chaque côté — à 6px
+   deux anneaux voisins se touchaient presque. */
+.wing { display: flex; align-items: center; gap: 12px; flex: 1; }
 .wing-left { justify-content: flex-end; }
 
 .led {

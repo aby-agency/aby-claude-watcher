@@ -41,6 +41,16 @@ function islandLayout(display, notch, winW) {
   };
 }
 
+// Payload de la bannière needs-you — construit depuis une session watcher
+// fraîche (main.js re-lit par id avant d'appeler : jamais d'objet périmé).
+function bannerPayload(session, customName) {
+  return {
+    sessionId: session.sessionId,
+    name: customName || session.projectName || 'Claude Code',
+    state: (session.state && session.state.name) || null,
+  };
+}
+
 // Same ordering as the main window / popover: user-defined sessionOrder
 // first, then newest first. Stable → LEDs never jump on state changes.
 function sortSessions(sessions, sessionOrder) {
@@ -85,6 +95,6 @@ function buildIsland(sessions, config, now = Date.now()) {
   };
 }
 
-const api = { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, CAP_PER_WING };
+const api = { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, bannerPayload, CAP_PER_WING };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.islandModel = api;

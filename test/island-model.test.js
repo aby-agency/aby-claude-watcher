@@ -1,5 +1,5 @@
 // Tests for island-model.js. Run: node test/island-model.test.js
-const { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, CAP_PER_WING } = require('../island-model.js');
+const { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, CAP_PER_WING, bannerPayload } = require('../island-model.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -111,6 +111,18 @@ test('invalid measurement (width <= 0, negative left) → fallback', () => {
   const d = { bounds: { x: 0, y: 0, width: 1728, height: 1117 } };
   assertEq(islandLayout(d, { left: 771, width: 0 }, 460), { x: 634, gapPx: 180 });
   assertEq(islandLayout(d, { left: -5, width: 185 }, 460), { x: 634, gapPx: 180 });
+});
+
+console.log('\nbannerPayload:');
+test('customName prioritaire, puis projectName, puis fallback', () => {
+  const s = { sessionId: 'x', projectName: 'proj', state: { name: 'waiting' } };
+  assertEq(bannerPayload(s, 'mon-nom'), { sessionId: 'x', name: 'mon-nom', state: 'waiting' });
+  assertEq(bannerPayload(s, null).name, 'proj');
+  assertEq(bannerPayload({ sessionId: 'y', state: { name: 'pending' } }, null).name, 'Claude Code');
+});
+test('state extrait du nom d\'état ; null si absent', () => {
+  assertEq(bannerPayload({ sessionId: 'z', projectName: 'p', state: { name: 'pending' } }, null).state, 'pending');
+  assertEq(bannerPayload({ sessionId: 'z', projectName: 'p' }, null).state, null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -4,6 +4,38 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] — 2026-07-22
+
+### Added
+- **Dynamic island.** Une île ancrée à l'encoche du MacBook (et simulée en
+  haut de l'écran principal quand il n'y en a pas — mode docké) remplace le
+  popover du tray. Repliée : pastilles d'état agrégées avec compteur (chiffre
+  dans la pastille, anneau rotatif pour les sessions actives, pulse pour
+  celles qui réclament une action), sessions interactives à gauche de
+  l'encoche, headless à droite. Au survol, le volet se déplie : liste des
+  sessions cliquables (focus du terminal), sous-lignes des subagents actifs
+  et des workflows (⚡ nom + progression), jauges de consommation 5 h et
+  7 jours. L'encoche est mesurée précisément via AppKit (largeur et
+  décentrage réels) ; clics au travers de la fenêtre partout hors de l'île.
+- **Bannières de notification dans l'île.** Les événements « besoin de toi »
+  (fin de tour, permission) descendent de l'île en pile : une ligne par
+  session, chacune visible 10 s avec son propre compte à rebours, clic =
+  focus du terminal. Mêmes règles que les anciennes notifications (cloche
+  par session, report du son pending, mode Focus respecté).
+- Réglage « Dynamic island » (activée par défaut).
+
+### Changed
+- Le clic sur l'icône du tray ouvre la fenêtre principale (le popover
+  n'existe plus).
+- La jauge du tray est inchangée ; le détail 5 h + 7 jours vit dans l'île.
+
+### Removed
+- **Notifications système macOS** — remplacées par les bannières de l'île,
+  sans fallback : sans île affichée, l'attention passe par les sons, le badge
+  du Dock et la jauge du tray.
+- **Popover du tray** — remplacé par l'île.
+- **Vue office pixel** (et son pipeline d'assets) — remplacée par l'île.
+
 ## [1.13.0] — 2026-07-15
 
 ### Added

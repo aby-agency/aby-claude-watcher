@@ -21,11 +21,16 @@ body {
   padding: 0 14px;
   position: relative;
   z-index: 2;
+  /* C'est la PILULE qui porte la largeur minimale — bannière et panneau la
+     suivent à l'identique (--pill-w) : trois largeurs toujours égales, zéro
+     marche. Les ailes flex:1 absorbent le surplus symétriquement. */
+  box-sizing: border-box;
+  min-width: 320px;
 }
 /* Largeur par défaut = fallback ; le main pousse la largeur MESURÉE de
    l'encoche (AppKit) via island-geometry → var --notch-gap. */
 .notch-gap { width: var(--notch-gap, 180px); flex: none; }
-.wing { display: flex; align-items: center; gap: 6px; min-width: 20px; }
+.wing { display: flex; align-items: center; gap: 6px; flex: 1; }
 .wing-left { justify-content: flex-end; }
 
 .led {
@@ -62,10 +67,7 @@ body {
   opacity: 0;
   pointer-events: none;
   display: flex; align-items: center; gap: 8px;
-  /* Jamais plus étroite que la pilule ; plancher pour le texte (pilule
-     compacte en docké : sans lui, « aby-cl… »). L'évasement centré = le
-     morphing assumé de l'île, façon iPhone. */
-  width: max(var(--pill-w, 250px), 280px);
+  width: var(--pill-w, 320px); /* = pilule, toujours (le minimum est sur elle) */
   box-sizing: border-box;
   background: #000; border-radius: 0 0 12px 12px;
   padding: 4px 14px 8px;
@@ -80,7 +82,7 @@ body.expanded .banner { transform: translate(-50%, -100%); opacity: 0; pointer-e
 
 /* Expanded panel below the pill. max-height transition = fold animation. */
 .panel {
-  width: max(var(--pill-w, 340px), 320px); /* même plancher-évasement que la bannière */
+  width: var(--pill-w, 320px); /* = pilule, toujours */
   box-sizing: border-box;
   background: #000;
   border-radius: 0 0 12px 12px;

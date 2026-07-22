@@ -65,7 +65,9 @@ async function refresh() {
   const $rows = document.getElementById('rows');
   $rows.innerHTML = m.rows.length
     ? m.rows.map(rowHtml).join('')
-    : `<div class="island-empty">${esc(window.i18n.t('island_empty'))}</div>`;
+    : (m.backgroundRows.length === 0
+      ? `<div class="island-empty">${esc(window.i18n.t('island_empty'))}</div>`
+      : '');
   document.getElementById('rowsBg').innerHTML = m.backgroundRows.map(rowHtml).join('');
 
   // Focus on click — interactive rows only (headless: no click-focus).
@@ -79,7 +81,7 @@ async function refresh() {
     const pct = Math.round(five.utilization);
     const $fill = document.getElementById('gaugeFill');
     $fill.style.width = `${Math.min(100, pct)}%`;
-    $fill.className = 'gauge-fill' + (pct >= 80 ? ' hot' : pct >= 50 ? ' warn' : '');
+    $fill.className = 'gauge-fill' + (pct > 80 ? ' hot' : pct >= 50 ? ' warn' : '');
     document.getElementById('gaugeLeft').textContent = `5H · ${pct}%`;
     const rem = five.resetsAt ? fmtRemaining(five.resetsAt) : '';
     document.getElementById('gaugeRight').textContent = rem

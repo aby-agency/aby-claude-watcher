@@ -525,6 +525,7 @@ function setupIPC() {
 
 ipcMain.handle('set-session-order', (_, order) => {
     config.setSessionOrder(order);
+    island.sendUpdate();
   });
 
   ipcMain.handle('set-custom-name', (_, sessionId, name) => {
@@ -534,6 +535,7 @@ ipcMain.handle('set-session-order', (_, order) => {
       sendToRenderer('session-updated', serializeSession(session));
       updateTrayMenu();
       refreshTrayGlance();
+      island.sendUpdate();
     }
   });
 

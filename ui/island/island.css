@@ -76,12 +76,15 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
 /* Badge d'état (ailes de la pilule) : pastille couleur d'état, chiffre
    sombre centré dedans, façon badge iOS. */
 .state-badge {
-  min-width: 15px; height: 15px;
-  padding: 0 3px; /* comptes à 2 chiffres */
+  /* Géométrie ENTIÈRE et paire (16/−4/2) : sur écran 1x, les demi-pixels
+     (15px, inset -3, bordure 1.5) s'arrondissent de travers — chiffre
+     décadré, anneau bancal (constaté par Paul sur l'ultrawide). */
+  min-width: 16px; height: 16px;
+  padding: 0 4px; /* comptes à 2 chiffres */
   border-radius: 999px;
   background: var(--led, #555);
   color: rgba(0, 0, 0, .78);
-  font-size: 10px; font-weight: 700; font-family: var(--font-mono); line-height: 1;
+  font-size: 10px; font-weight: 700; font-family: var(--font-mono); line-height: 16px;
   display: inline-flex; align-items: center; justify-content: center;
   box-sizing: border-box;
   box-shadow: 0 0 6px 1px color-mix(in srgb, var(--led, #555) 45%, transparent);
@@ -101,9 +104,9 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
 .state-badge[data-state="thinking"]::after,
 .state-badge[data-state="running"]::after {
   content: '';
-  position: absolute; inset: -3px;
+  position: absolute; inset: -4px;
   border-radius: 999px;
-  border: 1.5px solid var(--led);
+  border: 2px solid var(--led);
   border-top-color: transparent;
   border-right-color: transparent;
   animation: led-spin .8s linear infinite;

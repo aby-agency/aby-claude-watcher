@@ -54,7 +54,6 @@
     "files": [
       "main.js",
       "preload.js",
-      "preload-popover.js",
       "watcher.js",
       "subagents.js",
       "socket.js",

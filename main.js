@@ -162,7 +162,6 @@ function workflowTick() {
 }
 
 let mainWindow;
-let popoverWindow;
 let watcher;
 let socketServer;
 let usageMonitor;
@@ -304,12 +303,13 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-    // On non-macOS, close the popover too (otherwise window-all-closed never fires)
-    if (process.platform !== 'darwin' && popoverWindow && !popoverWindow.isDestroyed()) {
-      popoverWindow.destroy();
-      popoverWindow = null;
-    }
   });
+}
+
+function showMainWindow() {
+  if (!mainWindow) createWindow();
+  else mainWindow.show();
+  mainWindow.focus();
 }
 
 function setupWatcher() {
@@ -532,9 +532,6 @@ ipcMain.handle('set-session-order', (_, order) => {
     const session = watcher.getSessions().find(s => s.sessionId === sessionId);
     if (session) {
       sendToRenderer('session-updated', serializeSession(session));
-      if (popoverWindow && !popoverWindow.isDestroyed()) {
-        popoverWindow.webContents.send('popover-update');
-      }
       updateTrayMenu();
       refreshTrayGlance();
     }
@@ -582,9 +579,6 @@ ipcMain.handle('set-session-order', (_, order) => {
     // Broadcast to both windows so they reload text immediately
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('language-changed', i18n.getLanguage());
-    }
-    if (popoverWindow && !popoverWindow.isDestroyed()) {
-      popoverWindow.webContents.send('popover-update');
     }
     island.sendUpdate();
     // Update tray tooltip with new language
@@ -638,27 +632,6 @@ ipcMain.handle('set-session-order', (_, order) => {
     if (typeof text !== 'string') return false;
     clipboard.writeText(text);
     return true;
-  });
-
-  ipcMain.handle('popover-hide', () => {
-    if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.hide();
-  });
-
-  ipcMain.handle('popover-open-main', () => {
-    if (!mainWindow) createWindow();
-    else mainWindow.show();
-    mainWindow.focus();
-  });
-
-  ipcMain.handle('popover-quit', () => {
-    app.quit();
-  });
-
-  ipcMain.handle('popover-resize', (_, height) => {
-    if (!popoverWindow || popoverWindow.isDestroyed()) return;
-    const clamped = Math.max(120, Math.min(600, Math.round(height)));
-    const [w] = popoverWindow.getSize();
-    popoverWindow.setSize(w, clamped, false);
   });
 
   ipcMain.handle('island-hover', (_, hovering) => island.setHover(!!hovering));
@@ -763,7 +736,6 @@ app.whenReady().then(() => {
   setupSocket();
   setupUsageMonitor();
   setupTray();
-  createPopoverWindow();
 
   island.refresh(!!config.get().islandEnabled);
   const refreshIsland = () => island.refresh(!!config.get().islandEnabled);
@@ -793,70 +765,6 @@ app.on('window-all-closed', () => {
   // On macOS, keep running in tray when window is closed
   if (process.platform !== 'darwin') app.quit();
 });
-
-function createPopoverWindow() {
-  popoverWindow = new BrowserWindow({
-    width: 320,
-    height: 360,
-    show: false,
-    frame: false,
-    resizable: false,
-    movable: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    transparent: true,
-    backgroundColor: '#00000000',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-popover.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  popoverWindow.loadFile(path.join(__dirname, 'ui', 'popover.html'));
-  popoverWindow._loaded = false;
-  popoverWindow.webContents.once('did-finish-load', () => {
-    popoverWindow._loaded = true;
-  });
-
-  popoverWindow.on('blur', () => {
-    if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.hide();
-  });
-}
-
-let popoverToggleLock = false;
-function togglePopover() {
-  if (popoverToggleLock) return;
-  popoverToggleLock = true;
-  setTimeout(() => { popoverToggleLock = false; }, 200);
-
-  if (!popoverWindow || popoverWindow.isDestroyed()) createPopoverWindow();
-
-  if (popoverWindow.isVisible()) {
-    popoverWindow.hide();
-    return;
-  }
-
-  // Position below the tray icon
-  const trayBounds = tray.getBounds();
-  const winBounds = popoverWindow.getBounds();
-  const x = Math.round(trayBounds.x + (trayBounds.width / 2) - (winBounds.width / 2));
-  const y = Math.round(trayBounds.y + trayBounds.height + 4);
-  popoverWindow.setPosition(x, y, false);
-  popoverWindow.show();
-  popoverWindow.focus();
-  // Force refresh on open, wait for load if needed
-  const sendUpdate = () => {
-    if (popoverWindow && !popoverWindow.isDestroyed()) {
-      popoverWindow.webContents.send('popover-update');
-    }
-  };
-  if (popoverWindow._loaded) {
-    sendUpdate();
-  } else {
-    popoverWindow.webContents.once('did-finish-load', sendUpdate);
-  }
-}
 
 function generateTrayIcon(color, pct) {
   // Anneau de conso : pct fourni → dessine la jauge (image non-template, vraies couleurs).
@@ -888,8 +796,8 @@ function setupTray() {
   tray = new Tray(icon);
   tray.setToolTip('Aby Claude Watcher');
 
-  tray.on('click', togglePopover);
-  tray.on('right-click', togglePopover);
+  tray.on('click', showMainWindow);
+  tray.on('right-click', showMainWindow);
 
   updateTrayMenu();
   refreshTrayGlance();
@@ -902,10 +810,6 @@ function setupTray() {
       updateTrayMenu();
       updateDockBadge();
       refreshTrayGlance();
-      // Always send updates (popover might be hidden but still subscribed)
-      if (popoverWindow && !popoverWindow.isDestroyed()) {
-        popoverWindow.webContents.send('popover-update');
-      }
       island.sendUpdate();
     }, 300);
   };
@@ -971,5 +875,4 @@ app.on('will-quit', () => {
   if (watcher) watcher.stop();
   if (socketServer) socketServer.stop();
   if (usageMonitor) usageMonitor.stop();
-  if (popoverWindow && !popoverWindow.isDestroyed()) popoverWindow.destroy();
 });

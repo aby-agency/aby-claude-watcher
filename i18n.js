@@ -125,13 +125,6 @@ settings_title: 'Paramètres',
       notif_body_pending: 'Permission requise',
       notif_body_waiting: 'En attente de ta saisie',
 
-      // Popover
-      popover_empty: 'Aucune session active',
-      popover_header: '{n} session{s}',
-      popover_open: 'Ouvrir',
-      popover_quit: 'Quitter',
-      popover_quit_title: 'Quitter Aby Claude Watcher',
-
       // Island
       island_empty: 'aucune session',
       island_reste: 'reste {t}',
@@ -284,13 +277,6 @@ settings_title: 'Settings',
       notif_session_waiting: 'Session waiting',
       notif_body_pending: 'Permission required',
       notif_body_waiting: 'Waiting for your input',
-
-      // Popover
-      popover_empty: 'No active session',
-      popover_header: '{n} session{s}',
-      popover_open: 'Open',
-      popover_quit: 'Quit',
-      popover_quit_title: 'Quit Aby Claude Watcher',
 
       // Island
       island_empty: 'no sessions',

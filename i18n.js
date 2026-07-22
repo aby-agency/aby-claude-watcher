@@ -124,8 +124,6 @@ settings_title: 'Paramètres',
       notif_modal: 'Modal in-app',
       notif_sound: 'Son',
       notif_session_waiting: 'Session en attente',
-      notif_body_pending: 'Permission requise',
-      notif_body_waiting: 'En attente de ta saisie',
 
       // Island
       island_empty: 'aucune session',
@@ -279,8 +277,6 @@ settings_title: 'Settings',
       notif_modal: 'In-app modal',
       notif_sound: 'Sound',
       notif_session_waiting: 'Session waiting',
-      notif_body_pending: 'Permission required',
-      notif_body_waiting: 'Waiting for your input',
 
       // Island
       island_empty: 'no sessions',

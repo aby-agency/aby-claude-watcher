@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, session, Tray, Menu, nativeImage, shell, screen, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Tray, Menu, nativeImage, shell, screen, clipboard } = require('electron');
 const { log } = require('./logger'); // first: initializes file logging + crash catching
 const path = require('path');
 const { SessionWatcher, STATES } = require('./watcher');
@@ -11,6 +11,7 @@ const i18n = require('./i18n');
 const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
 const { trayGlance } = require('./tray-glance');
 const island = require('./island');
+const { bannerPayload } = require('./island-model');
 const { gaugeColor, ringBitmap, dotBitmap, trayUsageLabel } = require('./ring-gauge');
 const { isFocusActive } = require('./focus-state');
 
@@ -81,7 +82,7 @@ function schedulePendingSound(sessionId) {
     log.info(`[notif] sound for ${sessionId.slice(0, 8)} — kind=pending (deferred)`);
     if (!isFocusActive()) {
       sendToRenderer('play-sound', { kind: 'pending', sessionId });
-      emitNativeNotification(sessionId);
+      emitIslandBanner(sessionId);
     } else {
       log.info(`[notif] suppressed sound/banner for ${sessionId.slice(0, 8)} — Focus active`);
     }
@@ -89,23 +90,14 @@ function schedulePendingSound(sessionId) {
   pendingSoundTimers.set(sessionId, timer);
 }
 
-// Native macOS banner — co-located with the themed sound so it inherits the
-// same `prefs.sound` gating, the 5s pending defer, and the fresh re-read at
-// fire time. No action buttons (focus.js exposes only focusTerminal); silent
-// because the themed sound already handles audio (no double-ding). Re-looks
-// up the session by id on click so a stale captured object never drives focus.
-function emitNativeNotification(sessionId) {
+// Bannière d'île — remplace l'ex-notification macOS (supprimée sans fallback,
+// décision Paul 2026-07-22) : mêmes points d'appel, donc mêmes gardes
+// (prefs.sound, defer 5s du pending, Focus). Re-lit la session par id pour
+// ne jamais émettre depuis un objet périmé. Clic-bannière = focus, côté renderer.
+function emitIslandBanner(sessionId) {
   const s = watcher.getSessions().find(x => x.sessionId === sessionId);
   if (!s) return;
-  const title = config.getCustomName(sessionId) || s.projectName || 'Claude Code';
-  const pending = s.state && s.state.name === 'pending';
-  const body = pending ? i18n.t('notif_body_pending') : i18n.t('notif_body_waiting');
-  const n = new Notification({ title, body, silent: true });
-  n.on('click', () => {
-    const fresh = watcher.getSessions().find(x => x.sessionId === sessionId);
-    if (fresh) focusTerminal(fresh);
-  });
-  n.show();
+  island.sendBanner(bannerPayload(s, config.getCustomName(sessionId)));
 }
 
 function notifyWorkflowDone(session, wf) {
@@ -349,7 +341,7 @@ function setupWatcher() {
         log.info(`[notif] sound for ${session.sessionId.slice(0, 8)} — kind=${kind}`);
         if (!isFocusActive()) {
           sendToRenderer('play-sound', { kind, sessionId: session.sessionId });
-          emitNativeNotification(session.sessionId);
+          emitIslandBanner(session.sessionId);
         } else {
           log.info(`[notif] suppressed sound/banner for ${session.sessionId.slice(0, 8)} — Focus active`);
         }

@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('islandApi', {
   setHover: (hovering) => ipcRenderer.invoke('island-hover', hovering),
   onUpdate: (cb) => ipcRenderer.on('island-update', () => cb()),
   onGeometry: (cb) => ipcRenderer.on('island-geometry', (_, g) => cb(g)),
+  onBanner: (cb) => ipcRenderer.on('island-banner', (_, b) => cb(b)),
 });

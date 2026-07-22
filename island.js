@@ -137,10 +137,17 @@ function sendUpdate() {
   if (win && !win.isDestroyed() && win._loaded) win.webContents.send('island-update');
 }
 
+// Bannière needs-you — auto-gardée : sans île visible, silence (aucun fallback).
+function sendBanner(payload) {
+  if (win && !win.isDestroyed() && win._loaded && win.isVisible()) {
+    win.webContents.send('island-banner', payload);
+  }
+}
+
 function setHover(hovering) {
   if (!win || win.isDestroyed()) return;
   if (hovering) win.setIgnoreMouseEvents(false);
   else win.setIgnoreMouseEvents(true, { forward: true });
 }
 
-module.exports = { refresh, destroy, sendUpdate, setHover, window: () => win };
+module.exports = { refresh, destroy, sendUpdate, sendBanner, setHover, window: () => win };

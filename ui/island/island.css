@@ -80,7 +80,7 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
      (15px, inset -3, bordure 1.5) s'arrondissent de travers — chiffre
      décadré, anneau bancal (constaté par Paul sur l'ultrawide). */
   min-width: 16px; height: 16px;
-  padding: 0 4px; /* comptes à 2 chiffres */
+  padding: 1px 4px 0; /* +1px haut : correction optique, le chiffre siégeait trop haut */
   border-radius: 999px;
   background: var(--led, #555);
   color: rgba(0, 0, 0, .78);

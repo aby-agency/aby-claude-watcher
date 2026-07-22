@@ -160,8 +160,16 @@ document.getElementById('banner').addEventListener('click', () => {
 window.islandApi.onUpdate(scheduleRefresh);
 // Largeur réelle de l'encoche mesurée par le main (fallback CSS : 180px).
 window.islandApi.onGeometry((g) => {
-  document.documentElement.style.setProperty('--notch-gap', `${g.gapPx}px`);
+  // max(gap, 10) : en pilule compacte (docké, gap 0) on garde une respiration
+  // entre les deux ailes.
+  document.documentElement.style.setProperty('--notch-gap', `${Math.max(g.gapPx, 10)}px`);
 });
+// Largeur/hauteur réelles de la pilule → le drop (bannière, panneau) s'aligne.
+const $pill = document.getElementById('pill');
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--pill-w', `${$pill.offsetWidth}px`);
+  document.documentElement.style.setProperty('--pill-h', `${$pill.offsetHeight}px`);
+}).observe($pill);
 // Re-render every 30s so the "· N min" durations tick without session events.
 setInterval(scheduleRefresh, 30000);
 refresh();

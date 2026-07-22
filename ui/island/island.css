@@ -7,7 +7,7 @@ body {
   -webkit-user-select: none;
 }
 
-.island { display: flex; flex-direction: column; align-items: center; }
+.island { display: flex; flex-direction: column; align-items: center; position: relative; }
 
 /* Collapsed pill: fused with the physical notch (same black, bottom radius).
    .notch-gap reserves the zone hidden by the hardware notch — never put
@@ -19,6 +19,8 @@ body {
   border-radius: 0 0 12px 12px;
   height: 34px;
   padding: 0 14px;
+  position: relative;
+  z-index: 2;
 }
 /* Largeur par défaut = fallback ; le main pousse la largeur MESURÉE de
    l'encoche (AppKit) via island-geometry → var --notch-gap. */
@@ -48,28 +50,37 @@ body {
 }
 .more { color: #6b7385; font-size: 9px; font-family: var(--font-mono); }
 
-/* Bannière needs-you — glisse de sous la pilule, 4 s, une seule à la fois.
-   Seul mouvement autonome de l'île (le panneau reste hover-only). */
+/* Bannière needs-you — absolute sous la pilule, glisse de derrière elle
+   (translateY GPU : le max-height re-layoutait à chaque frame, saccadé).
+   Largeur = pilule (var --pill-w, poussée par ResizeObserver). */
 .banner {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: var(--pill-h, 34px);
+  transform: translate(-50%, -100%);
+  opacity: 0;
+  pointer-events: none;
   display: flex; align-items: center; gap: 8px;
-  width: 250px;
+  width: var(--pill-w, 250px);
+  box-sizing: border-box;
   background: #000; border-radius: 0 0 12px 12px;
-  padding: 0 14px;
+  padding: 4px 14px 8px;
   font-size: 12px; color: #e8eaf0;
-  max-height: 0; overflow: hidden;
-  transition: max-height .22s ease;
+  transition: transform .28s cubic-bezier(.32, .72, .28, 1), opacity .2s ease;
   cursor: pointer;
 }
-.banner.visible { max-height: 32px; padding-bottom: 8px; padding-top: 4px; }
-/* Panneau ouvert → la bannière s'efface (le JS la masque aussi). */
-body.expanded .banner { max-height: 0; padding-top: 0; padding-bottom: 0; }
+.banner.visible { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+/* Panneau ouvert → bannière escamotée (le JS la masque aussi). */
+body.expanded .banner { transform: translate(-50%, -100%); opacity: 0; pointer-events: none; }
 .banner-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Expanded panel below the pill. max-height transition = fold animation. */
 .panel {
-  width: 340px;
+  width: var(--pill-w, 340px);
+  box-sizing: border-box;
   background: #000;
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 12px 12px;
   overflow: hidden;
   max-height: 0;
   transition: max-height .22s ease;

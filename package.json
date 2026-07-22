@@ -69,6 +69,8 @@
       "tray-glance.js",
       "ring-gauge.js",
       "island-model.js",
+      "island.js",
+      "preload-island.js",
       "ui/**/*",
       "bin/**/*",
       "assets/**/*"

@@ -10,6 +10,7 @@ const config = require('./config');
 const i18n = require('./i18n');
 const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
 const { trayGlance } = require('./tray-glance');
+const island = require('./island');
 const { gaugeColor, ringBitmap, dotBitmap, trayUsageLabel } = require('./ring-gauge');
 const { isFocusActive } = require('./focus-state');
 
@@ -417,6 +418,7 @@ function setupUsageMonitor() {
     // tray title (when showing a usage %, no attention pending) would go
     // stale between session events.
     refreshTrayGlance();
+    island.sendUpdate();
   });
   usageMonitor.on('error', (code) => sendToRenderer('usage-error', code));
   usageMonitor.start();
@@ -584,6 +586,7 @@ ipcMain.handle('set-session-order', (_, order) => {
     if (popoverWindow && !popoverWindow.isDestroyed()) {
       popoverWindow.webContents.send('popover-update');
     }
+    island.sendUpdate();
     // Update tray tooltip with new language
     updateTrayMenu();
     refreshTrayGlance();
@@ -657,6 +660,8 @@ ipcMain.handle('set-session-order', (_, order) => {
     const [w] = popoverWindow.getSize();
     popoverWindow.setSize(w, clamped, false);
   });
+
+  ipcMain.handle('island-hover', (_, hovering) => island.setHover(!!hovering));
 }
 
 function serializeSession(session) {
@@ -689,6 +694,7 @@ function serializeSession(session) {
     model: session.model,
     gitBranch: session.gitBranch || null,
     startedAt: session.startedAt,
+    lastEventTime: session.lastEventTime || null,
     tokens: session.tokens,
     cwd: session.cwd,
     isBackground: !!session.isBackground,
@@ -758,6 +764,12 @@ app.whenReady().then(() => {
   setupUsageMonitor();
   setupTray();
   createPopoverWindow();
+
+  island.refresh(!!config.get().islandEnabled);
+  const refreshIsland = () => island.refresh(!!config.get().islandEnabled);
+  screen.on('display-added', refreshIsland);
+  screen.on('display-removed', refreshIsland);
+  screen.on('display-metrics-changed', refreshIsland);
 
   // Update check: first attempt 10s after startup, then every 2 hours.
   // The 1h rate limit inside checkForUpdates(false) will skip checks that
@@ -894,6 +906,7 @@ function setupTray() {
       if (popoverWindow && !popoverWindow.isDestroyed()) {
         popoverWindow.webContents.send('popover-update');
       }
+      island.sendUpdate();
     }, 300);
   };
   watcher.on('session-added', debouncedUpdate);

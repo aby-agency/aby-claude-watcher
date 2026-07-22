@@ -26,12 +26,15 @@ body {
      marche. Les ailes flex:1 absorbent le surplus symétriquement. */
   box-sizing: border-box;
   min-width: 320px;
-  transition: border-radius .22s ease;
+  /* Fermeture : les coins ne se re-arrondissent qu'APRÈS la fin du pli
+     (délai .2s), sinon pincement fugace pendant que le drop se replie. */
+  transition: border-radius .12s ease .2s;
 }
 /* Quelque chose d'ouvert dessous (panneau ou bannière) → raccord net,
-   les coins bas de la pilule disparaissent. */
+   coins bas à 0 INSTANTANÉMENT (transition: none — un fondu à l'ouverture
+   laissait voir le pincement). */
 body.expanded .pill,
-body:has(.banner.visible) .pill { border-radius: 0; }
+body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
 /* Largeur par défaut = fallback ; le main pousse la largeur MESURÉE de
    l'encoche (AppKit) via island-geometry → var --notch-gap. */
 .notch-gap { width: var(--notch-gap, 180px); flex: none; }

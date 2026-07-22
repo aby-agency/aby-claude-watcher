@@ -26,7 +26,12 @@ body {
      marche. Les ailes flex:1 absorbent le surplus symétriquement. */
   box-sizing: border-box;
   min-width: 320px;
+  transition: border-radius .22s ease;
 }
+/* Quelque chose d'ouvert dessous (panneau ou bannière) → raccord net,
+   les coins bas de la pilule disparaissent. */
+body.expanded .pill,
+body:has(.banner.visible) .pill { border-radius: 0; }
 /* Largeur par défaut = fallback ; le main pousse la largeur MESURÉE de
    l'encoche (AppKit) via island-geometry → var --notch-gap. */
 .notch-gap { width: var(--notch-gap, 180px); flex: none; }

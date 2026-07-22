@@ -7,7 +7,7 @@
 const { BrowserWindow, screen } = require('electron');
 const { execFile } = require('child_process');
 const path = require('path');
-const { notchedInternalDisplay, islandLayout } = require('./island-model');
+const { isNotchedDisplay, islandLayout } = require('./island-model');
 
 const WIN_W = 460;
 const WIN_H = 340;
@@ -110,15 +110,17 @@ function destroy() {
   win = null;
 }
 
-// (Re)create, reposition or drop the island for the current displays + config.
-// Called at startup, on every screen event, and when the setting toggles.
-// La mesure est async : on revérifie le display après coup (il peut avoir
-// disparu pendant les ~50ms d'osascript).
+// (Re)create, reposition or drop the island. Called at startup, on every
+// screen event, and when the setting toggles. L'île suit l'écran PRINCIPAL
+// (barre de menu), encoche ou non — mode docké compris. La mesure est async :
+// on re-lit le primary après coup.
 function refresh(enabled) {
-  if (!enabled || !notchedInternalDisplay(screen.getAllDisplays())) return destroy();
-  const display = notchedInternalDisplay(screen.getAllDisplays());
-  measureNotch(display).then((notch) => {
-    const still = notchedInternalDisplay(screen.getAllDisplays());
+  if (!enabled) return destroy();
+  const display = screen.getPrimaryDisplay();
+  if (!display) return destroy();
+  const measure = isNotchedDisplay(display) ? measureNotch(display) : Promise.resolve(null);
+  measure.then((notch) => {
+    const still = screen.getPrimaryDisplay();
     if (!still) return destroy();
     lastLayout = islandLayout(still, notch, WIN_W);
     if (!win || win.isDestroyed()) return create(still);

@@ -102,9 +102,8 @@ async function refresh() {
     $block.style.display = '';
     return true;
   };
-  const has5 = renderGauge('gaugeBlock', 'gaugeFill', 'gaugeLeft', 'gaugeRight', '5H', usage && usage.fiveHour);
-  const has7 = renderGauge('gauge7Block', 'gauge7Fill', 'gauge7Left', 'gauge7Right', '7J', usage && usage.sevenDay);
-  document.getElementById('gaugeSep').style.display = has5 && has7 ? '' : 'none';
+  renderGauge('gaugeBlock', 'gaugeFill', 'gaugeLeft', 'gaugeRight', '5H', usage && usage.fiveHour);
+  renderGauge('gauge7Block', 'gauge7Fill', 'gauge7Left', 'gauge7Right', '7J', usage && usage.sevenDay);
 }
 
 // ── Hover machinery ──

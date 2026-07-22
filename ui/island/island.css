@@ -169,7 +169,9 @@ body.expanded .panel { max-height: 300px; }
 .island-empty { padding: 10px 0; text-align: center; color: #6b7385; font-size: 11px; }
 
 .gauge-block { margin-top: 8px; }
-.gauge-sep { border: none; border-top: 1px solid #1d2330; margin: 8px 0 0; }
+/* Pas de filet entre les deux jauges (retour Paul) — l'air + les labels
+   5H/7J suffisent. */
+#gauge7Block { margin-top: 12px; }
 .gauge { height: 4px; border-radius: 2px; background: #1d2330; overflow: hidden; }
 .gauge-fill { height: 100%; border-radius: 2px; background: var(--state-waiting); transition: width .3s ease; }
 .gauge-fill.warn { background: var(--state-pending); }

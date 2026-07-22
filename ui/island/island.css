@@ -38,7 +38,7 @@ body {
 .led[data-state="error"]    { --led: var(--state-error); }
 /* Headless: smaller, dimmer, no glow. */
 .led.bg { width: 6px; height: 6px; opacity: .55; box-shadow: none; }
-/* Attention pulse — the ONLY autonomous motion of the island. */
+/* Attention pulse — autonomous, like the needs-you banner below. */
 .led[data-state="pending"], .led[data-state="error"] {
   animation: led-pulse 1.2s ease-in-out infinite;
 }

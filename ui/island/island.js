@@ -137,8 +137,12 @@ function hideBanner() {
   if (bannerTimer) { clearTimeout(bannerTimer); bannerTimer = null; }
   bannerSessionId = null;
   document.getElementById('banner').classList.remove('visible');
+  // Bannière partie sous un curseur immobile → relâcher la capture des clics
+  // (sauf panneau ouvert : le survol pilule garde la main légitimement).
+  if (!document.body.classList.contains('expanded')) setMouse(false);
 }
 window.islandApi.onBanner((b) => {
+  if (!b.state) return; // payload sans état — rien à afficher
   if (document.body.classList.contains('expanded')) return; // panneau ouvert
   bannerSessionId = b.sessionId;
   document.getElementById('bannerLed').dataset.state = b.state || '';

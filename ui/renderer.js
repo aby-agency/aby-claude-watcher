@@ -24,7 +24,7 @@ const ICONS = {
 };
 
 const sessions = new Map();
-let viewMode = 'grid'; // 'grid' | 'compact' | 'micro' | 'office'
+let viewMode = 'grid'; // 'grid' | 'compact' | 'micro'
 let previousViewMode = 'grid'; // remembered when entering micro so Back can restore
 let alwaysOnTop = false;
 let volume = 0.7;
@@ -80,7 +80,7 @@ async function init() {
   viewMode = config.viewMode || 'grid';
   // Migration: old 'list' → 'compact'
   if (viewMode === 'list' || config.compactMode) viewMode = 'compact';
-  if (!['grid', 'compact', 'micro', 'office'].includes(viewMode)) viewMode = 'grid';
+  if (!['grid', 'compact', 'micro'].includes(viewMode)) viewMode = 'grid';
   previousViewMode = (viewMode === 'micro') ? 'grid' : viewMode;
   alwaysOnTop = config.alwaysOnTop || false;
   volume = config.volume ?? 0.7;
@@ -160,15 +160,6 @@ async function init() {
   $btnGrid.addEventListener('click', () => setView('grid'));
   $btnCompact.addEventListener('click', () => setView('compact'));
   $btnMicro.addEventListener('click', () => setView('micro'));
-  const $btnOffice = document.getElementById('btnOffice');
-  $btnOffice.addEventListener('click', () => setView('office'));
-  Office.probe().then(ok => {
-    if (ok) {
-      $btnOffice.style.display = '';
-      if (viewMode === 'office') render(); // le 1er render() est parti avant la résolution du probe
-    }
-    else if (viewMode === 'office') setView('grid'); // atlas parti entre deux runs
-  });
   $btnBack.addEventListener('click', () => setView(previousViewMode || 'grid'));
   $btnPinMicro.addEventListener('click', togglePin);
 
@@ -337,7 +328,6 @@ async function init() {
 // ═══ View switching ═══
 
 function setView(mode) {
-  if (mode !== 'office') Office.deactivate();
   // Save previous non-micro view so Back can return to it
   if (mode === 'micro' && viewMode !== 'micro') {
     previousViewMode = viewMode;
@@ -353,7 +343,6 @@ function updateViewToggle() {
   $btnGrid.classList.toggle('active', viewMode === 'grid');
   $btnCompact.classList.toggle('active', viewMode === 'compact');
   $btnMicro.classList.toggle('active', viewMode === 'micro');
-  document.getElementById('btnOffice').classList.toggle('active', viewMode === 'office');
 }
 
 function applyMicroMode() {
@@ -688,28 +677,6 @@ function getRenderableSessions() {
 function render() {
   const count = sessions.size;
 
-  // Vue office (v4, open-space zoné) : LA salle est GLOBALE, indépendante du
-  // flux cartes-par-session (pas de filtre recherche, pas de tri — spec
-  // office-open-space §Hors périmètre). Early path assumé : on ne passe
-  // jamais par getRenderableSessions()/fullRender() ici, Office possède son
-  // propre container et sa propre boucle de sync. `showOffice` ne dépend que
-  // du nombre TOTAL de sessions (pas de la recherche) : tant qu'il en existe
-  // au moins une, la salle reste affichée (salle vide visible, taille
-  // minimale — seule la disparition de TOUTE session bascule vers l'état
-  // vide générique, cf. Office.tick()).
-  if (viewMode === 'office') {
-    $emptyState.style.display = count === 0 ? 'flex' : 'none';
-    $emptyFiltered.style.display = 'none';
-    $gridView.style.display = 'none';
-    $compactView.style.display = 'none';
-    $microView.style.display = 'none';
-    const showOffice = count > 0;
-    document.getElementById('officeView').style.display = showOffice ? 'flex' : 'none';
-    if (showOffice) Office.renderRoom(); else Office.deactivate();
-    updateStatusBar();
-    return;
-  }
-
   const visibleCount = getRenderableSessions().length;
 
   const showNoSessions = count === 0;
@@ -721,7 +688,6 @@ function render() {
   $gridView.style.display = showItems && viewMode === 'grid' ? 'grid' : 'none';
   $compactView.style.display = showItems && viewMode === 'compact' ? 'grid' : 'none';
   $microView.style.display = showItems && viewMode === 'micro' ? 'flex' : 'none';
-  document.getElementById('officeView').style.display = 'none';
 
   // Full rebuild — used for initial load, view switch, add/remove
   fullRender();
@@ -780,24 +746,14 @@ function updateSession(s) {
   const isActiveAgain = stateName === 'running' || stateName === 'thinking';
   const isInactive = stateName === 'error';
 
-  // Bell + toast handoff (I-1, hissé avant le early-return office) : une
-  // cloche devenue obsolète (session repartie active ou en erreur) doit être
-  // nettoyée dans TOUTES les vues, office compris — sinon la bulle enveloppe
-  // reste affichée jusqu'à 2 min sur un perso qui a repris la main. Cette
+  // Bell + toast handoff : une cloche devenue obsolète (session repartie
+  // active ou en erreur) doit être nettoyée dans TOUTES les vues. Cette
   // partie n'a aucune dépendance DOM (clearBell/dismissToastForSession sont
   // du nettoyage pur). Le RE-attachement visuel (bell encore pertinente) a
   // lui besoin du DOM à jour — il reste plus bas, après le patch in-place,
   // pour cibler le nœud fraîchement rendu en grid/compact/micro.
   if (bell && (isActiveAgain || isInactive)) clearBell(s.sessionId, { skipRender: true });
   if (isActiveAgain || isInactive) dismissToastForSession(s.sessionId);
-
-  // Vue office (v4) : pas de DOM par session à patcher (salle unique) —
-  // Office.notifyUpdate() re-sync/redessine depuis `sessions` directement.
-  if (viewMode === 'office') {
-    Office.notifyUpdate();
-    updateStatusBar();
-    return;
-  }
 
   // Targeted update: find the existing element and patch it in place
   const container = viewContainer();
@@ -848,19 +804,13 @@ function updateSession(s) {
 
   // Bell re-attach: session still inactive with an active bell — reapply
   // the visual on the freshly patched DOM node (clear/dismiss already ran
-  // above, before the office early-return).
+  // above).
   if (bell && !isActiveAgain && !isInactive) applyBellVisual(s.sessionId, bell.kind);
 
   updateStatusBar();
 }
 
 function removeSessionFromDOM(sessionId) {
-  if (viewMode === 'office') {
-    clearBell(sessionId);
-    Office.notifyUpdate();   // l'acteur sort, le prochain tick() retirera son sprite
-    updateStatusBar();
-    return;
-  }
   clearBell(sessionId);
   for (const container of [$gridView, $compactView]) {
     const el = container.querySelector(`[data-session="${sessionId}"]`);
@@ -1607,8 +1557,6 @@ function onDragOver(e) {
   if (!dragged) return;
 
   const rect = target.getBoundingClientRect();
-  // Vue office (v4) : pas de drag-drop (pas de DOM par session), cette
-  // branche n'est jamais atteinte en viewMode 'office'.
   const isGrid = viewMode === 'grid';
   const mid = isGrid
     ? rect.left + rect.width / 2

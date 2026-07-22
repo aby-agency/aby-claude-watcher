@@ -24,7 +24,13 @@ function fmtMin(minutes) {
 function fmtRemaining(resetsAt) {
   const ms = new Date(resetsAt).getTime() - Date.now();
   if (!Number.isFinite(ms) || ms <= 0) return '';
-  return fmtMin(Math.round(ms / 60000));
+  const min = Math.round(ms / 60000);
+  if (min >= 1440) { // fenêtre 7 jours : « 3 j 12 h »
+    const d = Math.floor(min / 1440);
+    const h = Math.round((min % 1440) / 60);
+    return h ? `${d} j ${h} h` : `${d} j`;
+  }
+  return fmtMin(min);
 }
 
 function ledHtml(led, bg) {
@@ -78,21 +84,27 @@ async function refresh() {
     item.addEventListener('click', () => window.islandApi.focusSession(item.dataset.session));
   });
 
-  const $gauge = document.getElementById('gaugeBlock');
-  const five = usage && usage.fiveHour;
-  if (five && typeof five.utilization === 'number') {
-    const pct = Math.round(five.utilization);
-    const $fill = document.getElementById('gaugeFill');
+  // Jauges 5h + 7j (même recette), séparées par un filet.
+  const renderGauge = (blockId, fillId, leftId, rightId, label, data) => {
+    const $block = document.getElementById(blockId);
+    if (!data || typeof data.utilization !== 'number') {
+      $block.style.display = 'none';
+      return false;
+    }
+    const pct = Math.round(data.utilization);
+    const $fill = document.getElementById(fillId);
     $fill.style.width = `${Math.min(100, pct)}%`;
     $fill.className = 'gauge-fill' + (pct > 80 ? ' hot' : pct >= 50 ? ' warn' : '');
-    document.getElementById('gaugeLeft').textContent = `5H · ${pct}%`;
-    const rem = five.resetsAt ? fmtRemaining(five.resetsAt) : '';
-    document.getElementById('gaugeRight').textContent = rem
+    document.getElementById(leftId).textContent = `${label} · ${pct}%`;
+    const rem = data.resetsAt ? fmtRemaining(data.resetsAt) : '';
+    document.getElementById(rightId).textContent = rem
       ? window.i18n.t('island_reste', { t: rem }) : '';
-    $gauge.style.display = '';
-  } else {
-    $gauge.style.display = 'none';
-  }
+    $block.style.display = '';
+    return true;
+  };
+  const has5 = renderGauge('gaugeBlock', 'gaugeFill', 'gaugeLeft', 'gaugeRight', '5H', usage && usage.fiveHour);
+  const has7 = renderGauge('gauge7Block', 'gauge7Fill', 'gauge7Left', 'gauge7Right', '7J', usage && usage.sevenDay);
+  document.getElementById('gaugeSep').style.display = has5 && has7 ? '' : 'none';
 }
 
 // ── Hover machinery ──

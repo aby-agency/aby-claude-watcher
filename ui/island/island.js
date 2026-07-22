@@ -144,33 +144,53 @@ function scheduleRefresh() {
   if (refreshPending) return;
   refreshPending = setTimeout(() => { refreshPending = null; refresh(); }, 100);
 }
-// ── Bannière needs-you ──
+// ── Bannière needs-you : pile de notifications ──
+// Chaque session a sa ligne avec son propre timer 10s ; les lignes arrivent
+// et repartent indépendamment, la bande suit en hauteur. Dédup par session :
+// un nouvel événement de la même session rafraîchit sa ligne et son timer.
 const BANNER_MS = 10000; // 4s puis 6s jugées trop courtes par Paul
-let bannerTimer = null;
-let bannerSessionId = null;
-function hideBanner() {
-  if (bannerTimer) { clearTimeout(bannerTimer); bannerTimer = null; }
-  bannerSessionId = null;
-  document.getElementById('banner').classList.remove('visible');
-  // Bannière partie sous un curseur immobile → relâcher la capture des clics
-  // (sauf panneau ouvert : le survol pilule garde la main légitimement).
-  if (!document.body.classList.contains('expanded')) setMouse(false);
+const banners = new Map(); // sessionId → { el, timer }
+function removeBanner(sessionId) {
+  const entry = banners.get(sessionId);
+  if (!entry) return;
+  banners.delete(sessionId);
+  clearTimeout(entry.timer);
+  entry.el.classList.remove('in'); // rétraction animée de la ligne
+  setTimeout(() => entry.el.remove(), 250);
+  if (banners.size === 0) {
+    document.getElementById('banner').classList.remove('visible');
+    // Pile vidée sous un curseur immobile → relâcher la capture des clics
+    // (sauf panneau ouvert : le survol pilule garde la main légitimement).
+    if (!document.body.classList.contains('expanded')) setMouse(false);
+  }
+}
+function hideBanner() { // vidage complet (appelé à l'ouverture du panneau)
+  [...banners.keys()].forEach(removeBanner);
 }
 window.islandApi.onBanner((b) => {
   if (!b.state) return; // payload sans état — rien à afficher
   if (document.body.classList.contains('expanded')) return; // panneau ouvert
-  bannerSessionId = b.sessionId;
-  document.getElementById('bannerLed').dataset.state = b.state || '';
+  let entry = banners.get(b.sessionId);
+  if (!entry) {
+    const el = document.createElement('div');
+    el.className = 'banner-item';
+    el.innerHTML = '<span class="led"></span><span class="banner-text"></span>';
+    el.addEventListener('click', () => {
+      window.islandApi.focusSession(b.sessionId);
+      removeBanner(b.sessionId);
+    });
+    document.getElementById('banner').appendChild(el);
+    entry = { el, timer: null };
+    banners.set(b.sessionId, entry);
+    requestAnimationFrame(() => el.classList.add('in'));
+  }
+  entry.el.querySelector('.led').dataset.state = b.state;
   // textContent : pas d'injection possible, pas d'échappement nécessaire.
-  document.getElementById('bannerText').textContent =
+  entry.el.querySelector('.banner-text').textContent =
     `${b.name} — ${window.i18n.t('state_' + b.state)}`;
+  if (entry.timer) clearTimeout(entry.timer);
+  entry.timer = setTimeout(() => removeBanner(b.sessionId), BANNER_MS);
   document.getElementById('banner').classList.add('visible');
-  if (bannerTimer) clearTimeout(bannerTimer);
-  bannerTimer = setTimeout(hideBanner, BANNER_MS);
-});
-document.getElementById('banner').addEventListener('click', () => {
-  if (bannerSessionId) window.islandApi.focusSession(bannerSessionId);
-  hideBanner();
 });
 window.islandApi.onUpdate(scheduleRefresh);
 // Largeur réelle de l'encoche mesurée par le main (fallback CSS : 180px).

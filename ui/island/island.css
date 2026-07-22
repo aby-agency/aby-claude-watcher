@@ -114,9 +114,10 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
   animation: led-spin .8s linear infinite;
 }
 
-/* Bannière needs-you — absolute sous la pilule, glisse de derrière elle
-   (translateY GPU : le max-height re-layoutait à chaque frame, saccadé).
-   Largeur = pilule (var --pill-w, poussée par ResizeObserver). */
+/* Bannière needs-you — PILE de notifications sous la pilule : chaque ligne
+   vit ses 10 s indépendamment (arrive, repart), la bande s'allonge/rétracte
+   d'elle-même. Conteneur absolute qui glisse de derrière la pilule (translateY
+   GPU) ; hauteur = contenu. Largeur = pilule (var --pill-w). */
 .banner {
   position: absolute;
   z-index: 1;
@@ -125,18 +126,25 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
   transform: translate(-50%, -100%);
   opacity: 0;
   pointer-events: none;
-  display: flex; align-items: center; gap: 8px;
   width: var(--pill-w, 320px); /* = pilule, toujours (le minimum est sur elle) */
   box-sizing: border-box;
   background: #000; border-radius: 0 0 12px 12px;
-  padding: 4px 14px 8px;
-  font-size: 12px; color: #e8eaf0;
+  padding: 2px 0 7px;
   transition: transform .28s cubic-bezier(.32, .72, .28, 1), opacity .2s ease;
-  cursor: pointer;
 }
 .banner.visible { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
-/* Panneau ouvert → bannière escamotée (le JS la masque aussi). */
+/* Panneau ouvert → bannière escamotée (le JS la vide aussi). */
 body.expanded .banner { transform: translate(-50%, -100%); opacity: 0; pointer-events: none; }
+.banner-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 14px;
+  max-height: 0; opacity: 0; overflow: hidden;
+  font-size: 12px; color: #e8eaf0;
+  cursor: pointer;
+  transition: max-height .22s ease, opacity .18s ease, padding .22s ease;
+}
+.banner-item.in { max-height: 26px; opacity: 1; padding-top: 3px; padding-bottom: 3px; }
+.banner-item:hover { color: #fff; }
 .banner-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Expanded panel below the pill. max-height transition = fold animation. */

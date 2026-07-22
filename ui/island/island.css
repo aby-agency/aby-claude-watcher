@@ -62,7 +62,10 @@ body {
   opacity: 0;
   pointer-events: none;
   display: flex; align-items: center; gap: 8px;
-  width: var(--pill-w, 250px);
+  /* Jamais plus étroite que la pilule ; plancher pour le texte (pilule
+     compacte en docké : sans lui, « aby-cl… »). L'évasement centré = le
+     morphing assumé de l'île, façon iPhone. */
+  width: max(var(--pill-w, 250px), 280px);
   box-sizing: border-box;
   background: #000; border-radius: 0 0 12px 12px;
   padding: 4px 14px 8px;
@@ -77,7 +80,7 @@ body.expanded .banner { transform: translate(-50%, -100%); opacity: 0; pointer-e
 
 /* Expanded panel below the pill. max-height transition = fold animation. */
 .panel {
-  width: var(--pill-w, 340px);
+  width: max(var(--pill-w, 340px), 320px); /* même plancher-évasement que la bannière */
   box-sizing: border-box;
   background: #000;
   border-radius: 0 0 12px 12px;

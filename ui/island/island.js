@@ -32,9 +32,10 @@ function ledHtml(led, bg) {
 }
 
 function wingHtml(wing, bg) {
-  // LED agrégée par état + compte (les rangées gardent leur LED par session).
+  // Badge par état : pastille couleur d'état, chiffre dedans, anneau rotatif
+  // autour pour les actifs (CSS). Les rangées gardent leur LED par session.
   return wing.leds.map((l) =>
-    `<span class="led-group">${ledHtml(l, bg)}<span class="led-count">${l.count}</span></span>`
+    `<span class="state-badge${bg ? ' bg' : ''}" data-state="${escAttr(l.state)}">${l.count}</span>`
   ).join('');
 }
 

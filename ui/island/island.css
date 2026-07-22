@@ -73,8 +73,41 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
   animation: led-spin .8s linear infinite;
 }
 @keyframes led-spin { to { transform: rotate(360deg); } }
-.led-group { display: inline-flex; align-items: center; gap: 3px; }
-.led-count { color: #8b93a7; font-size: 10px; font-family: var(--font-mono); line-height: 1; }
+/* Badge d'état (ailes de la pilule) : pastille couleur d'état, chiffre
+   sombre centré dedans, façon badge iOS. */
+.state-badge {
+  min-width: 15px; height: 15px;
+  padding: 0 3px; /* comptes à 2 chiffres */
+  border-radius: 999px;
+  background: var(--led, #555);
+  color: rgba(0, 0, 0, .78);
+  font-size: 10px; font-weight: 700; font-family: var(--font-mono); line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-sizing: border-box;
+  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--led, #555) 45%, transparent);
+  position: relative;
+  flex: none;
+}
+.state-badge[data-state="thinking"] { --led: var(--state-thinking); }
+.state-badge[data-state="running"]  { --led: var(--state-running); }
+.state-badge[data-state="waiting"]  { --led: var(--state-waiting); }
+.state-badge[data-state="pending"]  { --led: var(--state-pending); }
+.state-badge[data-state="error"]    { --led: var(--state-error); }
+.state-badge.bg { transform: scale(.8); opacity: .6; box-shadow: none; }
+.state-badge[data-state="pending"], .state-badge[data-state="error"] {
+  animation: led-pulse 1.2s ease-in-out infinite;
+}
+/* Actifs : l'anneau tourne AUTOUR du chiffre. */
+.state-badge[data-state="thinking"]::after,
+.state-badge[data-state="running"]::after {
+  content: '';
+  position: absolute; inset: -3px;
+  border-radius: 999px;
+  border: 1.5px solid var(--led);
+  border-top-color: transparent;
+  border-right-color: transparent;
+  animation: led-spin .8s linear infinite;
+}
 
 /* Bannière needs-you — absolute sous la pilule, glisse de derrière elle
    (translateY GPU : le max-height re-layoutait à chaque frame, saccadé).

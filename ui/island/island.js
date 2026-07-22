@@ -47,12 +47,24 @@ function wingHtml(wing, bg) {
 
 function rowHtml(row) {
   const dur = row.minutes !== null ? ` · ${fmtMin(row.minutes)}` : '';
+  // Sous-lignes indentées : workflows (deep research, violet) d'abord puis
+  // subagents — non cliquables, le focus passe par la ligne parente.
+  const subs = row.workflows.map((w) => `
+    <div class="subrow subrow-wf">
+      <span class="subrow-spin"></span>
+      <span class="subrow-label">⚡ ${esc(w.name)}</span>
+      <span class="subrow-meta">${w.done}/${w.started}</span>
+    </div>`).join('') + row.subagents.map((a) => `
+    <div class="subrow">
+      <span class="subrow-spin"></span>
+      <span class="subrow-label">${esc(a.label)}</span>
+    </div>`).join('');
   return `
     <div class="row" data-session="${escAttr(row.sessionId)}" data-bg="${row.isBackground ? '1' : ''}">
       <span class="led${row.isBackground ? ' bg' : ''}" data-state="${escAttr(row.state)}"></span>
       <span class="r-name">${esc(row.name)}</span>
       <span class="r-state">${esc(window.i18n.t('state_' + row.state))}${esc(dur)}</span>
-    </div>`;
+    </div>${subs}`;
 }
 
 let refreshSeq = 0;

@@ -95,6 +95,14 @@ function buildIsland(sessions, config, now = Date.now()) {
       ? Math.max(0, Math.floor((now - s.lastEventTime) / 60000))
       : null,
     isBackground: !!s.isBackground,
+    // Sous-lignes : subagents actifs + runs de workflow (déjà filtrés
+    // « running » par serializeSession).
+    subagents: (s.subagents || []).map((sa) => ({
+      label: sa.description || sa.agentType || 'subagent',
+    })),
+    workflows: (s.workflows || []).map((wf) => ({
+      name: wf.name, started: wf.started, done: wf.done, running: wf.running,
+    })),
   });
 
   return {

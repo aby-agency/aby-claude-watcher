@@ -75,6 +75,23 @@ test('backgroundRows flagged isBackground', () => {
   assertEq(m.rows.length, 0);
   assertEq(m.backgroundRows[0].isBackground, true);
 });
+test('rows carry subagents (label fallback desc→type→subagent) and workflows', () => {
+  const s = sess('running');
+  s.subagents = [
+    { agentId: 'a1', description: 'Review Task 2', agentType: 'general-purpose' },
+    { agentId: 'a2', description: null, agentType: 'Explore' },
+    { agentId: 'a3' },
+  ];
+  s.workflows = [{ runId: 'wf_x', name: 'review-changes', started: 7, done: 3, running: 2 }];
+  const r = buildIsland([s], {}, NOW).rows[0];
+  assertEq(r.subagents, [{ label: 'Review Task 2' }, { label: 'Explore' }, { label: 'subagent' }]);
+  assertEq(r.workflows, [{ name: 'review-changes', started: 7, done: 3, running: 2 }]);
+});
+test('rows default to empty subagents/workflows when absent', () => {
+  const r = buildIsland([sess('running')], {}, NOW).rows[0];
+  assertEq(r.subagents, []);
+  assertEq(r.workflows, []);
+});
 
 console.log('\nislandLayout:');
 // Mesure réelle (MBP 16" 1728pt) : encoche 185pt décentrée de 7pt à gauche.

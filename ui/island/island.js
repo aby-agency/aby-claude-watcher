@@ -131,7 +131,7 @@ function scheduleRefresh() {
   refreshPending = setTimeout(() => { refreshPending = null; refresh(); }, 100);
 }
 // ── Bannière needs-you ──
-const BANNER_MS = 6000; // 4s jugées trop courtes par Paul
+const BANNER_MS = 10000; // 4s puis 6s jugées trop courtes par Paul
 let bannerTimer = null;
 let bannerSessionId = null;
 function hideBanner() {

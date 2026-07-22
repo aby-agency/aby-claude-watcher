@@ -1,5 +1,5 @@
 // Tests for island-model.js. Run: node test/island-model.test.js
-const { buildIsland, notchedInternalDisplay, menuBarHeight, CAP_PER_WING } = require('../island-model.js');
+const { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, CAP_PER_WING } = require('../island-model.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -89,6 +89,28 @@ test('backgroundRows flagged isBackground', () => {
   const m = buildIsland([sess('running', { bg: true })], {}, NOW);
   assertEq(m.rows.length, 0);
   assertEq(m.backgroundRows[0].isBackground, true);
+});
+
+console.log('\nislandLayout:');
+// Mesure réelle (MBP 16" 1728pt) : encoche 185pt décentrée de 7pt à gauche.
+test('centers window on the MEASURED notch, gap = notch + margin', () => {
+  const d = { bounds: { x: 0, y: 0, width: 1728, height: 1117 } };
+  const l = islandLayout(d, { left: 771, width: 185 }, 460);
+  // centre encoche = 771 + 92.5 = 863.5 → x = 863.5 - 230 arrondi
+  assertEq(l, { x: 634, gapPx: 197 });
+});
+test('secondary display coords: bounds.x is added', () => {
+  const d = { bounds: { x: 2000, y: 0, width: 1728, height: 1117 } };
+  assertEq(islandLayout(d, { left: 771, width: 185 }, 460).x, 2634);
+});
+test('no measurement → window centered on display, default gap 180', () => {
+  const d = { bounds: { x: 0, y: 0, width: 1728, height: 1117 } };
+  assertEq(islandLayout(d, null, 460), { x: 634, gapPx: 180 });
+});
+test('invalid measurement (width <= 0, negative left) → fallback', () => {
+  const d = { bounds: { x: 0, y: 0, width: 1728, height: 1117 } };
+  assertEq(islandLayout(d, { left: 771, width: 0 }, 460), { x: 634, gapPx: 180 });
+  assertEq(islandLayout(d, { left: -5, width: 185 }, 460), { x: 634, gapPx: 180 });
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

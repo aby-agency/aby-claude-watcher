@@ -10,4 +10,5 @@ contextBridge.exposeInMainWorld('islandApi', {
   focusSession: (sessionId) => ipcRenderer.invoke('focus-terminal', sessionId),
   setHover: (hovering) => ipcRenderer.invoke('island-hover', hovering),
   onUpdate: (cb) => ipcRenderer.on('island-update', () => cb()),
+  onGeometry: (cb) => ipcRenderer.on('island-geometry', (_, g) => cb(g)),
 });

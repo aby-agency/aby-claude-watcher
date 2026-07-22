@@ -120,6 +120,10 @@ function scheduleRefresh() {
   refreshPending = setTimeout(() => { refreshPending = null; refresh(); }, 100);
 }
 window.islandApi.onUpdate(scheduleRefresh);
+// Largeur réelle de l'encoche mesurée par le main (fallback CSS : 180px).
+window.islandApi.onGeometry((g) => {
+  document.documentElement.style.setProperty('--notch-gap', `${g.gapPx}px`);
+});
 // Re-render every 30s so the "· N min" durations tick without session events.
 setInterval(scheduleRefresh, 30000);
 refresh();

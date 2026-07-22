@@ -18,6 +18,29 @@ function notchedInternalDisplay(displays) {
   ) || null;
 }
 
+// Position horizontale de la fenêtre + largeur du gap central (zone encoche).
+// `notch` = mesure AppKit {left, width} en pt relative au display, ou null.
+// Mesuré : fenêtre centrée sur le CENTRE RÉEL de l'encoche (elle peut être
+// décentrée de quelques pt — 7 pt constatés sur MBP 16") et gap = largeur
+// mesurée + marge de sécurité. Sans mesure : centré display, gap 180.
+const NOTCH_GAP_FALLBACK = 180;
+const NOTCH_GAP_MARGIN = 12;
+
+function islandLayout(display, notch, winW) {
+  const valid = notch && notch.width > 0 && notch.left >= 0;
+  if (!valid) {
+    return {
+      x: Math.round(display.bounds.x + (display.bounds.width - winW) / 2),
+      gapPx: NOTCH_GAP_FALLBACK,
+    };
+  }
+  const notchCenter = display.bounds.x + notch.left + notch.width / 2;
+  return {
+    x: Math.round(notchCenter - winW / 2),
+    gapPx: Math.round(notch.width + NOTCH_GAP_MARGIN),
+  };
+}
+
 // Same ordering as the main window / popover: user-defined sessionOrder
 // first, then newest first. Stable → LEDs never jump on state changes.
 function sortSessions(sessions, sessionOrder) {
@@ -62,6 +85,6 @@ function buildIsland(sessions, config, now = Date.now()) {
   };
 }
 
-const api = { buildIsland, notchedInternalDisplay, menuBarHeight, CAP_PER_WING };
+const api = { buildIsland, notchedInternalDisplay, menuBarHeight, islandLayout, CAP_PER_WING };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.islandModel = api;

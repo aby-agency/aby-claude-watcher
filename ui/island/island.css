@@ -20,7 +20,9 @@ body {
   height: 34px;
   padding: 0 14px;
 }
-.notch-gap { width: 180px; flex: none; }
+/* Largeur par défaut = fallback ; le main pousse la largeur MESURÉE de
+   l'encoche (AppKit) via island-geometry → var --notch-gap. */
+.notch-gap { width: var(--notch-gap, 180px); flex: none; }
 .wing { display: flex; align-items: center; gap: 6px; min-width: 20px; }
 .wing-left { justify-content: flex-end; }
 

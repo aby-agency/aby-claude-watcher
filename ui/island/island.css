@@ -61,6 +61,18 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.4); opacity: .7; }
 }
+/* États actifs (thinking/running) : anneau qui tourne, comme l'ex-popover —
+   le mouvement dit « ça travaille », le point plein dit « stable ». */
+.led[data-state="thinking"], .led[data-state="running"] {
+  background: transparent;
+  border: 1.5px solid var(--led);
+  border-top-color: transparent;
+  border-right-color: transparent;
+  box-sizing: border-box;
+  box-shadow: none;
+  animation: led-spin .8s linear infinite;
+}
+@keyframes led-spin { to { transform: rotate(360deg); } }
 .led-group { display: inline-flex; align-items: center; gap: 3px; }
 .led-count { color: #8b93a7; font-size: 10px; font-family: var(--font-mono); line-height: 1; }
 

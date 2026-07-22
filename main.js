@@ -573,6 +573,11 @@ ipcMain.handle('set-session-order', (_, order) => {
     applyAutoLaunch();
   });
 
+  ipcMain.handle('set-island-enabled', (_, value) => {
+    config.setIslandEnabled(value);
+    island.refresh(!!config.get().islandEnabled);
+  });
+
   ipcMain.handle('set-language', (_, lang) => {
     config.setLanguage(lang);
     applyLanguage();

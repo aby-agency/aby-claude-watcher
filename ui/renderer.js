@@ -30,6 +30,7 @@ let alwaysOnTop = false;
 let volume = 0.7;
 let notifPosition = 'top-right';
 let autoLaunch = false;
+let islandEnabled = true;
 let windowTransparencyEnabled = false;
 let windowOpacity = 0.85;
 let vibrancyExperimental = false;
@@ -85,6 +86,7 @@ async function init() {
   volume = config.volume ?? 0.7;
   notifPosition = config.notifPosition || 'top-right';
   autoLaunch = !!config.autoLaunch;
+  islandEnabled = config.islandEnabled !== false;
   windowTransparencyEnabled = !!config.windowTransparencyEnabled;
   windowOpacity = config.windowOpacity ?? 0.85;
   vibrancyExperimental = !!config.vibrancyExperimental;
@@ -100,6 +102,7 @@ async function init() {
   updateViewToggle();
   updateNotifPosition();
   updateAutoLaunchToggle();
+  updateIslandToggle();
   $volumeSlider.value = Math.round(volume * 100);
   $volumeValue.textContent = `${Math.round(volume * 100)}%`;
   updateTransparencyControls();
@@ -220,6 +223,10 @@ async function init() {
   // Auto-launch toggle
   const autoLaunchBtn = document.getElementById('autoLaunchToggle');
   if (autoLaunchBtn) autoLaunchBtn.addEventListener('click', toggleAutoLaunch);
+
+  // Dynamic island toggle
+  const islandBtn = document.getElementById('islandToggle');
+  if (islandBtn) islandBtn.addEventListener('click', toggleIsland);
 
   // Language picker
   document.querySelectorAll('.language-btn').forEach(btn => {
@@ -452,6 +459,20 @@ function toggleAutoLaunch() {
   autoLaunch = !autoLaunch;
   window.api.setAutoLaunch(autoLaunch);
   updateAutoLaunchToggle();
+}
+
+function updateIslandToggle() {
+  const btn = document.getElementById('islandToggle');
+  if (btn) {
+    btn.classList.toggle('on', islandEnabled);
+    btn.setAttribute('aria-checked', String(islandEnabled));
+  }
+}
+
+function toggleIsland() {
+  islandEnabled = !islandEnabled;
+  window.api.setIslandEnabled(islandEnabled);
+  updateIslandToggle();
 }
 
 function updateTransparencyControls() {

@@ -72,6 +72,8 @@ settings_title: 'Paramètres',
       vibrancy_label: 'Verre translucide (expérimental)',
       vibrancy_hint: 'Instable sur macOS Tahoe — désactivé par défaut. Redémarrer l\'app pour appliquer.',
       vibrancy_restart_hint: 'Redémarrer l\'app pour appliquer.',
+      island_label: 'Dynamic island',
+      island_hint: "LEDs des sessions autour de l'encoche, se déplie au survol (Mac à encoche uniquement)",
 
       // Settings — notifications
       volume_label: 'Volume',
@@ -225,6 +227,8 @@ settings_title: 'Settings',
       vibrancy_label: 'Translucent glass (experimental)',
       vibrancy_hint: 'Unstable on macOS Tahoe — off by default. Restart the app to apply.',
       vibrancy_restart_hint: 'Restart the app to apply.',
+      island_label: 'Dynamic island',
+      island_hint: 'Session LEDs around the notch, expands on hover (notched Macs only)',
 
       // Settings — notifications
       volume_label: 'Volume',

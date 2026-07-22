@@ -130,6 +130,16 @@ test('setter coerces to bool', () => {
   assertEq(config.get().backgroundSectionCollapsed, false);
 });
 
+console.log('\nislandEnabled:');
+test('islandEnabled defaults to true and toggles', () => {
+  const c = config.get();
+  assertEq(c.islandEnabled, true);
+  config.setIslandEnabled(false);
+  assertEq(config.get().islandEnabled, false);
+  config.setIslandEnabled(true);
+  assertEq(config.get().islandEnabled, true);
+});
+
 // Cleanup
 try { fs.rmSync(testDir, { recursive: true, force: true }); } catch {}
 

@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('api', {
   setSoundTheme: (theme) => ipcRenderer.invoke('set-sound-theme', theme),
   setNotifPosition: (value) => ipcRenderer.invoke('set-notif-position', value),
   setAutoLaunch: (value) => ipcRenderer.invoke('set-auto-launch', value),
+  setIslandEnabled: (value) => ipcRenderer.invoke('set-island-enabled', value),
   checkUpdates: (force) => ipcRenderer.invoke('check-updates', force),
   downloadUpdate: (release) => ipcRenderer.invoke('download-update', release),
   abortUpdate: () => ipcRenderer.invoke('abort-update'),

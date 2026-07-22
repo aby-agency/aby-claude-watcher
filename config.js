@@ -27,6 +27,7 @@ let config = {
   sessionOrder: [],     // [sessionId, sessionId, ...] — user-defined order
   customNames: {},      // { [sessionId]: "Custom name" }
   backgroundSectionCollapsed: false, // "Background" section folded in the session list
+  islandEnabled: true,  // dynamic island sur l'encoche (macOS à encoche uniquement)
 };
 
 function load() {
@@ -84,6 +85,11 @@ function setCompactMode(value) {
 
 function setBackgroundSectionCollapsed(value) {
   config.backgroundSectionCollapsed = !!value;
+  save();
+}
+
+function setIslandEnabled(value) {
+  config.islandEnabled = !!value;
   save();
 }
 
@@ -219,6 +225,7 @@ module.exports = {
   setViewMode,
   setCompactMode,
   setBackgroundSectionCollapsed,
+  setIslandEnabled,
   setAlwaysOnTop,
   setVolume,
   setWindowTransparencyEnabled,

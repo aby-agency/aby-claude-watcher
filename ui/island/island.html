@@ -3,7 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <title>Aby Claude Watcher — Island</title>
-  <style>body { margin: 0; background: transparent; } .probe { width: 220px; height: 32px; background: #000; border-radius: 0 0 12px 12px; margin: 0 auto; }</style>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="island.css">
 </head>
-<body><div class="probe"></div></body>
+<body>
+  <div class="island">
+    <div class="pill" id="pill">
+      <div class="wing wing-left" id="wingLeft"></div>
+      <div class="notch-gap"></div>
+      <div class="wing wing-right" id="wingRight"></div>
+    </div>
+    <div class="panel" id="panel">
+      <div class="panel-inner">
+        <div class="rows" id="rows"></div>
+        <div class="rows rows-bg" id="rowsBg"></div>
+        <div class="gauge-block" id="gaugeBlock" style="display:none;">
+          <div class="gauge"><div class="gauge-fill" id="gaugeFill"></div></div>
+          <div class="gauge-label"><span id="gaugeLeft"></span><span id="gaugeRight"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="../../i18n.js"></script>
+  <script src="../../island-model.js"></script>
+  <script src="island.js"></script>
+</body>
 </html>

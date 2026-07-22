@@ -1,0 +1,82 @@
+/* Island — overrides styles.css body, keeps --state-* single-sourced there. */
+body {
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.island { display: flex; flex-direction: column; align-items: center; }
+
+/* Collapsed pill: fused with the physical notch (same black, bottom radius).
+   .notch-gap reserves the zone hidden by the hardware notch — never put
+   content there. */
+.pill {
+  display: flex;
+  align-items: center;
+  background: #000;
+  border-radius: 0 0 12px 12px;
+  height: 34px;
+  padding: 0 14px;
+}
+.notch-gap { width: 180px; flex: none; }
+.wing { display: flex; align-items: center; gap: 6px; min-width: 20px; }
+.wing-left { justify-content: flex-end; }
+
+.led {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: var(--led, #555);
+  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--led, #555) 55%, transparent);
+}
+.led[data-state="thinking"] { --led: var(--state-thinking); }
+.led[data-state="running"]  { --led: var(--state-running); }
+.led[data-state="waiting"]  { --led: var(--state-waiting); }
+.led[data-state="pending"]  { --led: var(--state-pending); }
+.led[data-state="error"]    { --led: var(--state-error); }
+/* Headless: smaller, dimmer, no glow. */
+.led.bg { width: 6px; height: 6px; opacity: .55; box-shadow: none; }
+/* Attention pulse — the ONLY autonomous motion of the island. */
+.led[data-state="pending"], .led[data-state="error"] {
+  animation: led-pulse 1.2s ease-in-out infinite;
+}
+@keyframes led-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: .7; }
+}
+.more { color: #6b7385; font-size: 9px; font-family: var(--font-mono); }
+
+/* Expanded panel below the pill. max-height transition = fold animation. */
+.panel {
+  width: 340px;
+  background: #000;
+  border-radius: 0 0 16px 16px;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height .22s ease;
+}
+body.expanded .panel { max-height: 300px; }
+.panel-inner { padding: 6px 14px 12px; }
+.rows { max-height: 190px; overflow-y: auto; }
+.rows::-webkit-scrollbar { width: 4px; }
+.rows::-webkit-scrollbar-thumb { background: #333c50; border-radius: 2px; }
+.row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0;
+  font-size: 12px; color: #e8eaf0;
+  cursor: pointer;
+}
+.row:hover { color: #fff; }
+.row .r-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .r-state { margin-left: auto; flex: none; color: #6b7385; font-size: 11px; font-family: var(--font-mono); }
+.rows-bg { border-top: 1px solid #1d2330; margin-top: 4px; padding-top: 4px; }
+.rows-bg:empty { display: none; border: none; margin: 0; padding: 0; }
+.rows-bg .row { cursor: default; opacity: .65; }
+.island-empty { padding: 10px 0; text-align: center; color: #6b7385; font-size: 11px; }
+
+.gauge-block { margin-top: 8px; }
+.gauge { height: 4px; border-radius: 2px; background: #1d2330; overflow: hidden; }
+.gauge-fill { height: 100%; border-radius: 2px; background: var(--state-waiting); transition: width .3s ease; }
+.gauge-fill.warn { background: var(--state-pending); }
+.gauge-fill.hot { background: var(--state-error); }
+.gauge-label { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; color: #6b7385; font-family: var(--font-mono); }

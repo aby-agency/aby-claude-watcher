@@ -132,6 +132,10 @@ settings_title: 'Paramètres',
       popover_quit: 'Quitter',
       popover_quit_title: 'Quitter Aby Claude Watcher',
 
+      // Island
+      island_empty: 'aucune session',
+      island_reste: 'reste {t}',
+
       // Status bar
       status_active: '{n} active{s}',
       status_waiting: '{n} en attente',
@@ -287,6 +291,10 @@ settings_title: 'Settings',
       popover_open: 'Open',
       popover_quit: 'Quit',
       popover_quit_title: 'Quit Aby Claude Watcher',
+
+      // Island
+      island_empty: 'no sessions',
+      island_reste: '{t} left',
 
       // Status bar
       status_active: '{n} active',

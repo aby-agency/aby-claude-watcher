@@ -112,9 +112,9 @@ test('invalid measurement (width <= 0, negative left) → fallback', () => {
   assertEq(islandLayout(d, { left: 771, width: 0 }, 460), { x: 634, gapPx: 180 });
   assertEq(islandLayout(d, { left: -5, width: 185 }, 460), { x: 634, gapPx: 180 });
 });
-test('display sans encoche (docké) → centré, gap 0', () => {
+test('display sans encoche (docké) → centré, fausse encoche 180', () => {
   const d = { internal: false, bounds: { x: 0, y: 0, width: 3440, height: 1440 }, workArea: { x: 0, y: 31, width: 3440, height: 1409 } };
-  assertEq(islandLayout(d, null, 460), { x: 1490, gapPx: 0 });
+  assertEq(islandLayout(d, null, 460), { x: 1490, gapPx: 180 });
 });
 test('isNotchedDisplay : externe à barre 31px → false, interne encoché → true', () => {
   const ext = { internal: false, bounds: { x: 0, y: 0, width: 3440, height: 1440 }, workArea: { x: 0, y: 31, width: 3440, height: 1409 } };

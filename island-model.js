@@ -39,9 +39,10 @@ function islandLayout(display, notch, winW) {
   }
   return {
     x: Math.round(display.bounds.x + (display.bounds.width - winW) / 2),
-    // Display à encoche mais mesure indisponible → largeur prudente ;
-    // display sans encoche (mode docké) → pilule compacte.
-    gapPx: isNotchedDisplay(display) ? NOTCH_GAP_FALLBACK : 0,
+    // Sans mesure, même gap partout : display à encoche → largeur prudente ;
+    // display sans encoche (docké) → FAUSSE encoche aux dimensions de la
+    // vraie (pilule compacte essayée puis écartée : « tout petit » sur 34").
+    gapPx: NOTCH_GAP_FALLBACK,
   };
 }
 

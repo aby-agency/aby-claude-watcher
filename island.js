@@ -31,6 +31,10 @@ function create(display) {
     skipTaskbar: true,
     hasShadow: false,
     alwaysOnTop: true,
+    // Sans ce flag, macOS clampe toute fenêtre VISIBLE sous la barre de menu
+    // (constrainFrameRect) — y:0 devenait y:34 à l'affichage, même à niveau
+    // screen-saver. Seul flag qui l'exempte (type:'panel' ne suffit pas).
+    enableLargerThanScreen: true,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload-island.js'),

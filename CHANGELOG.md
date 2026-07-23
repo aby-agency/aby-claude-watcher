@@ -4,6 +4,47 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] — 2026-07-23
+
+### Added
+- **Pilule adaptative.** La largeur de l'île suit son contenu, pastille par
+  pastille : chaque aile fait exactement la largeur de ce qu'elle porte, une
+  aile vide se replie entièrement (plus de noir mort au-delà de l'encoche),
+  et l'île vide se réduit à l'encoche seule. Chaque changement s'anime avec
+  un léger rebond façon Dynamic Island ; les pastilles apparaissent d'un pop
+  et se révèlent pendant l'étirement. Au survol, l'île redevient symétrique
+  le temps du volet.
+- **Bannières systématiques.** Les bannières « besoin de toi » de l'île
+  s'affichent désormais que les notifications soient activées ou non ; le
+  réglage par session ne gouverne plus que le son. Report de 5 s du pending,
+  mode Focus et anti-spam conservés ; les sessions headless sans cloche
+  restent silencieuses, comme avant.
+
+### Changed
+- Pastilles unifiées : même taille (14 px) et même éclat sur les deux ailes —
+  la distinction headless vit dans le volet (section à part, non cliquable).
+- La bannière prend la largeur et la position exactes de l'île au moment où
+  elle descend, au lieu de faire grossir l'île pour s'aligner.
+- Volet compacté : typographie resserrée, durée « · N min » retirée des
+  lignes de session ; le volet fait toujours exactement la largeur de l'île.
+
+### Fixed
+- Au retour du mode docké (undock), l'île pouvait rester calée sur la
+  fausse encoche par défaut — pastilles rognées sous la vraie encoche.
+  La mesure AppKit n'est plus conditionnée à l'heuristique de barre de menu
+  (transitoirement fausse pendant la bascule), un échec de mesure n'est plus
+  mis en cache, et un re-contrôle part 1,5 s après chaque événement d'écran.
+- Avec trois états simultanés sur une aile, la pastille la plus proche du
+  centre passait entièrement sous l'encoche physique (déséquilibre des
+  ailes qui décalait la zone réservée) — géométrie refaite en grille à
+  colonnes toujours égales.
+- Un rechargement du renderer de l'île repartait sans la géométrie mesurée
+  de l'encoche.
+- Un sous-agent silencieux plus de 30 s (longue lecture, longue réflexion)
+  était déclaré mort et disparaissait de la liste alors qu'il travaillait —
+  il reste désormais affiché jusqu'à 5 min de silence, sans pour autant
+  bloquer les notifications de sa session parente.
+
 ## [2.0.0] — 2026-07-22
 
 ### Added

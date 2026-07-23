@@ -26,12 +26,12 @@ function sess(state, opts = {}) {
 
 console.log('\nbuildIsland:');
 test('splits interactive (left) and background (right)', () => {
-  const m = buildIsland([sess('running'), sess('waiting', { bg: true })], {}, NOW);
+  const m = buildIsland([sess('running'), sess('waiting', { bg: true })], {});
   assertEq(m.left.leds.length, 1);
   assertEq(m.right.leds.length, 1);
 });
 test('wings aggregate per state with counts, urgent states first', () => {
-  const m = buildIsland([sess('running'), sess('running'), sess('waiting'), sess('pending'), sess('running')], {}, NOW);
+  const m = buildIsland([sess('running'), sess('running'), sess('waiting'), sess('pending'), sess('running')], {});
   assertEq(m.left.leds, [
     { state: 'pending', count: 1 },
     { state: 'waiting', count: 1 },
@@ -40,21 +40,21 @@ test('wings aggregate per state with counts, urgent states first', () => {
 });
 test('no cap: many sessions collapse into one led per state', () => {
   const many = Array.from({ length: 9 }, () => sess('running'));
-  assertEq(buildIsland(many, {}, NOW).left.leds, [{ state: 'running', count: 9 }]);
+  assertEq(buildIsland(many, {}).left.leds, [{ state: 'running', count: 9 }]);
 });
 test('sessionOrder from config wins, then newest first', () => {
   const a = sess('running', { id: 'a', age: 10 });
   const b = sess('running', { id: 'b', age: 1 });
   const c = sess('running', { id: 'c', age: 5 });
-  const m = buildIsland([a, b, c], { sessionOrder: ['c'] }, NOW);
+  const m = buildIsland([a, b, c], { sessionOrder: ["c"] });
   assertEq(m.rows.map(r => r.sessionId), ['c', 'b', 'a']);
 });
 test('row name prefers customName over projectName', () => {
-  const m = buildIsland([sess('running', { name: 'proj', customName: 'mon-nom' })], {}, NOW);
+  const m = buildIsland([sess('running', { name: 'proj', customName: 'mon-nom' })], {});
   assertEq(m.rows[0].name, 'mon-nom');
 });
 test('backgroundRows flagged isBackground', () => {
-  const m = buildIsland([sess('running', { bg: true })], {}, NOW);
+  const m = buildIsland([sess('running', { bg: true })], {});
   assertEq(m.rows.length, 0);
   assertEq(m.backgroundRows[0].isBackground, true);
 });
@@ -66,12 +66,12 @@ test('rows carry subagents (label fallback desc→type→subagent) and workflows
     { agentId: 'a3' },
   ];
   s.workflows = [{ runId: 'wf_x', name: 'review-changes', started: 7, done: 3, running: 2 }];
-  const r = buildIsland([s], {}, NOW).rows[0];
+  const r = buildIsland([s], {}).rows[0];
   assertEq(r.subagents, [{ label: 'Review Task 2' }, { label: 'Explore' }, { label: 'subagent' }]);
   assertEq(r.workflows, [{ name: 'review-changes', started: 7, done: 3, running: 2 }]);
 });
 test('rows default to empty subagents/workflows when absent', () => {
-  const r = buildIsland([sess('running')], {}, NOW).rows[0];
+  const r = buildIsland([sess('running')], {}).rows[0];
   assertEq(r.subagents, []);
   assertEq(r.workflows, []);
 });

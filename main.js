@@ -60,12 +60,12 @@ const notifiedWorkflowRuns = new Map(); // sessionId → Set(runId) déjà notif
 // Permissions get approved within seconds when the user is already at the
 // keyboard — defer the pending alert (sound AND banner) and only fire if the
 // session is still blocked when the timer fires. The toast stays immediate
-// (visual is cheap). withSound = prefs.sound at schedule time : la bannière
-// part toujours, le son reste soumis au réglage.
+// (visual is cheap). La bannière part toujours ; le son reste soumis au
+// réglage, RELU au tir (un toggle pendant les 5 s doit compter).
 const PENDING_SOUND_DELAY = 5000;
 const pendingAlertTimers = new Map(); // sessionId → timeout
 
-function schedulePendingAlert(sessionId, withSound) {
+function schedulePendingAlert(sessionId) {
   const prev = pendingAlertTimers.get(sessionId);
   if (prev) clearTimeout(prev);
   const timer = setTimeout(() => {
@@ -82,6 +82,7 @@ function schedulePendingAlert(sessionId, withSound) {
       return;
     }
     if (!isFocusActive()) {
+      const withSound = config.getNotificationPrefs(sessionId).sound;
       log.info(`[notif] banner for ${sessionId.slice(0, 8)} — kind=pending (deferred) sound=${withSound ? 'on' : 'off'}`);
       if (withSound) sendToRenderer('play-sound', { kind: 'pending', sessionId });
       emitIslandBanner(sessionId);
@@ -340,7 +341,7 @@ function setupWatcher() {
     });
     // Bannière toujours (indépendante de prefs.sound), son gaté par le réglage.
     if (kind === 'pending') {
-      schedulePendingAlert(session.sessionId, prefs.sound);
+      schedulePendingAlert(session.sessionId);
     } else if (!isFocusActive()) {
       log.info(`[notif] banner for ${session.sessionId.slice(0, 8)} — kind=${kind} sound=${prefs.sound ? 'on' : 'off'}`);
       if (prefs.sound) sendToRenderer('play-sound', { kind, sessionId: session.sessionId });

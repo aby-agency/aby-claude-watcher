@@ -33,10 +33,6 @@ function fmtRemaining(resetsAt) {
   return fmtMin(min);
 }
 
-function ledHtml(led, bg) {
-  return `<span class="led${bg ? ' bg' : ''}" data-state="${escAttr(led.state)}"></span>`;
-}
-
 function wingHtml(wing) {
   // Badge par état : pastille couleur d'état, chiffre dedans, anneau rotatif
   // autour pour les actifs (CSS). Même rendu sur les deux ailes — headless

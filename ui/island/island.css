@@ -55,7 +55,12 @@ body {
 /* Bannière visible → la PILULE NE BOUGE PAS (une notif qui fait grossir la
    pilule lisait comme un mouvement parasite — retour Paul) : juste le
    raccord carré ; c'est la bannière qui épouse largeur ET décalage de la
-   pilule telle quelle (--pill-w + même translateX, voir .banner). */
+   pilule telle quelle (--pill-w + même translateX, voir .banner).
+   ATTENTION spécificité : cette règle (0-3-1) bat body.expanded .pill
+   (0-2-1). Le JS garantit l'exclusion (onBanner early-return si expanded,
+   hideBanner à l'ouverture du panneau) — si un refactor laisse coexister
+   .visible et .expanded ne serait-ce qu'une frame, la pilule resterait
+   asymétrique sous un panneau qui l'attend symétrique. */
 body:has(.banner.visible) .pill {
   border-radius: 0;
   transition:
@@ -85,11 +90,10 @@ body.expanded .pill {
     padding .3s cubic-bezier(.34, 1.3, .42, 1),
     border-radius 0s;
 }
-/* La largeur du gap vit sur la colonne de grille de .pill ; le main pousse la
-   largeur MESURÉE de l'encoche (AppKit) via island-geometry → var --notch-gap.
-   Le div ne fait qu'occuper la colonne centrale (zone cachée par l'encoche —
-   jamais de contenu dedans). */
-.notch-gap { }
+/* .notch-gap (div sans style propre) occupe la colonne centrale de la grille
+   .pill — la zone cachée par l'encoche, jamais de contenu dedans. Sa largeur
+   vit sur la colonne : le main pousse la largeur MESURÉE de l'encoche
+   (AppKit) via island-geometry → var --notch-gap. */
 /* 12px : l'anneau des badges actifs déborde de 4px de chaque côté — à 6px
    deux anneaux voisins se touchaient presque. */
 .wing { display: flex; align-items: center; gap: 12px; }

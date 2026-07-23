@@ -49,15 +49,17 @@ function measureNotch(display) {
   return new Promise((resolve) => {
     execFile('osascript', ['-l', 'JavaScript', '-e', NOTCH_SCRIPT], { timeout: 3000 }, (err, stdout) => {
       let value = null;
-      if (!err) {
-        try {
+      let measured = false; // script exécuté ET parsé — un [] est une mesure
+      if (!err) {           // légitime (interne SANS encoche), cachable : sinon
+        try {               // on respawnerait osascript à chaque refresh à vie.
           const screens = JSON.parse(String(stdout).trim());
           const m = screens.find((s) => s.width === display.bounds.width) || screens[0];
           if (m) value = { left: m.left, width: m.width - m.left - m.right };
-        } catch (_) { /* mesure indisponible → fallback islandLayout */ }
+          measured = true;
+        } catch (_) { /* sortie illisible → échec, pas de cache */ }
       }
-      if (value) notchCache = { key, value };
-      else log.info(`[island] notch measure failed for ${key} (err=${err ? err.code || 1 : 'empty'}) — fallback, will retry`);
+      if (measured) notchCache = { key, value };
+      else log.info(`[island] notch measure failed for ${key} (err=${err ? err.code || 1 : 'parse'}) — fallback, will retry`);
       resolve(value);
     });
   });

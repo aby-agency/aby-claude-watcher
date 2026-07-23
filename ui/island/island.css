@@ -98,15 +98,18 @@ body:has(.banner.visible) .pill {
 /* Badge d'état (ailes de la pilule) : pastille couleur d'état, chiffre
    sombre centré dedans, façon badge iOS. */
 .state-badge {
-  /* Géométrie ENTIÈRE et paire (16/−4/2) : sur écran 1x, les demi-pixels
+  /* Géométrie ENTIÈRE et paire (14/−4/2) : sur écran 1x, les demi-pixels
      (15px, inset -3, bordure 1.5) s'arrondissent de travers — chiffre
-     décadré, anneau bancal (constaté par Paul sur l'ultrawide). */
-  min-width: 16px; height: 16px;
+     décadré, anneau bancal (constaté par Paul sur l'ultrawide).
+     14px = la taille ex-headless (≈16×.8) généralisée aux DEUX ailes en
+     vraie géométrie, pas en transform : un scale aurait cassé led-pulse
+     (qui anime transform) et gonflé les espacements visuels. */
+  min-width: 14px; height: 14px;
   padding: 1px 4px 0; /* +1px haut : correction optique, le chiffre siégeait trop haut */
   border-radius: 999px;
   background: var(--led, #555);
   color: rgba(0, 0, 0, .78);
-  font-size: 10px; font-weight: 700; font-family: var(--font-mono); line-height: 16px;
+  font-size: 9px; font-weight: 700; font-family: var(--font-mono); line-height: 14px;
   display: inline-flex; align-items: center; justify-content: center;
   box-sizing: border-box;
   box-shadow: 0 0 6px 1px color-mix(in srgb, var(--led, #555) 45%, transparent);

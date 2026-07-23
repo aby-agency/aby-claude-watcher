@@ -13,14 +13,16 @@ body {
    .notch-gap reserves the zone hidden by the hardware notch — never put
    content there. */
 .pill {
-  /* Grid 1fr | gap | 1fr : les deux colonnes latérales sont TOUJOURS égales
-     (chaque fr se dimensionne au max des deux contenus) → le gap reste centré
-     sur l'encoche quel que soit le déséquilibre des ailes. En flex:1, dès que
-     le contenu dépassait la min-width, chaque aile retombait à son propre
+  /* Grid symétrique | gap | symétrique : le gap reste centré sur l'encoche
+     quel que soit le déséquilibre des ailes. En flex:1, dès que le contenu
+     dépassait la largeur de repos, chaque aile retombait à son propre
      min-content : 3 badges à gauche vs 1 headless à droite décalaient le gap
-     de 28px → le 3e badge passait ENTIER sous l'encoche physique (mesuré). */
+     de 28px → le 3e badge passait ENTIER sous l'encoche physique (mesuré).
+     minmax(0, 1fr) (pas 1fr) : pendant l'animation de largeur, les colonnes
+     DOIVENT pouvoir descendre sous leur min-content en restant égales —
+     sinon le contenu ré-ancre le gap hors centre en transit. */
   display: grid;
-  grid-template-columns: 1fr var(--notch-gap, 180px) 1fr;
+  grid-template-columns: minmax(0, 1fr) var(--notch-gap, 180px) minmax(0, 1fr);
   align-items: center;
   background: #000;
   border-radius: 0 0 12px 12px;
@@ -28,20 +30,29 @@ body {
   padding: 0 14px;
   position: relative;
   z-index: 2;
-  /* C'est la PILULE qui porte la largeur minimale — bannière et panneau la
-     suivent à l'identique (--pill-w) : trois largeurs toujours égales, zéro
-     marche. */
   box-sizing: border-box;
-  min-width: 320px;
+  /* Pilule ADAPTATIVE : largeur = contenu des ailes (symétriques = max des
+     deux, posé par le JS via --wing-w) + encoche + padding, animée avec un
+     léger rebond façon Dynamic Island. overflow:hidden : pendant le stretch,
+     le contenu qui n'a pas encore sa place est CLIPPÉ (effet reveal) au lieu
+     de flotter hors du noir. Le minimum 320px ne s'applique plus qu'OUVERTE
+     (panneau/bannière — lisibilité), voir plus bas. */
+  width: calc(2 * var(--wing-w, 46px) + var(--notch-gap, 180px) + 28px);
+  overflow: hidden;
   /* Fermeture : les coins ne se re-arrondissent qu'APRÈS la fin du pli
      (délai .2s), sinon pincement fugace pendant que le drop se replie. */
-  transition: border-radius .12s ease .2s;
+  transition: width .3s cubic-bezier(.34, 1.3, .42, 1), border-radius .12s ease .2s;
 }
 /* Quelque chose d'ouvert dessous (panneau ou bannière) → raccord net,
-   coins bas à 0 INSTANTANÉMENT (transition: none — un fondu à l'ouverture
-   laissait voir le pincement). */
+   coins bas à 0 INSTANTANÉMENT (border-radius 0s — un fondu à l'ouverture
+   laissait voir le pincement ; la transition de width, elle, reste), et
+   largeur de confort 320 mini pour le drop qui suit (--pill-w). */
 body.expanded .pill,
-body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
+body:has(.banner.visible) .pill {
+  border-radius: 0;
+  width: max(calc(2 * var(--wing-w, 46px) + var(--notch-gap, 180px) + 28px), 320px);
+  transition: width .3s cubic-bezier(.34, 1.3, .42, 1), border-radius 0s;
+}
 /* La largeur du gap vit sur la colonne de grille de .pill ; le main pousse la
    largeur MESURÉE de l'encoche (AppKit) via island-geometry → var --notch-gap.
    Le div ne fait qu'occuper la colonne centrale (zone cachée par l'encoche —
@@ -108,6 +119,20 @@ body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
 .state-badge[data-state="pending"]  { --led: var(--state-pending); }
 .state-badge[data-state="error"]    { --led: var(--state-error); }
 .state-badge.bg { transform: scale(.8); opacity: .6; box-shadow: none; }
+/* Apparition d'un badge : pop discret, synchronisé avec le stretch de la
+   pilule. Ne joue que sur VRAI changement d'aile (le renderer ne réassigne
+   pas l'innerHTML à l'identique, sinon chaque tick 30s rejouerait tout). */
+@keyframes badge-in {
+  from { transform: scale(.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.wing .state-badge { animation: badge-in .25s cubic-bezier(.34, 1.4, .5, 1) backwards; }
+.wing .state-badge.bg { animation-name: badge-in-bg; }
+/* Les .bg gardent leur scale(.8)/opacity .6 comme état final. */
+@keyframes badge-in-bg {
+  from { transform: scale(.4); opacity: 0; }
+  to { transform: scale(.8); opacity: .6; }
+}
 .state-badge[data-state="pending"], .state-badge[data-state="error"] {
   animation: led-pulse 1.2s ease-in-out infinite;
 }

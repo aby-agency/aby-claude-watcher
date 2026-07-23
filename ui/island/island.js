@@ -67,6 +67,35 @@ function rowHtml(row) {
     </div>${subs}`;
 }
 
+// Ne réassigner l'innerHTML d'une aile que s'il change : l'animation
+// d'apparition des badges (badge-in) joue à l'insertion des nœuds — un
+// réassignement à l'identique la rejouerait à chaque tick 30s.
+function setWing(id, html) {
+  const el = document.getElementById(id);
+  if (el._html === html) return;
+  el._html = html;
+  el.innerHTML = html;
+}
+
+// Pilule adaptative : pousse dans --wing-w la largeur du contenu d'aile le
+// plus large (les colonnes grid sont symétriques = max des deux). Le CSS en
+// dérive la largeur de la pilule et l'anime (léger rebond). Mesure en
+// offsetLeft/offsetWidth (boîtes de layout) et PAS getBoundingClientRect :
+// les rects suivent les transforms — badge-in en cours (scale .4) ou badges
+// headless (scale .8) fausseraient la mesure, alors que le layout réserve
+// la boîte pleine. Insensible aussi à la largeur de colonne courante
+// (flex-end/flex-start), donc stable en pleine animation de la pilule.
+function fitPill() {
+  const content = (id) => {
+    const k = document.getElementById(id).children;
+    if (!k.length) return 0;
+    const first = k[0], last = k[k.length - 1];
+    return last.offsetLeft + last.offsetWidth - first.offsetLeft;
+  };
+  const wingW = Math.max(content('wingLeft'), content('wingRight'));
+  document.documentElement.style.setProperty('--wing-w', `${Math.ceil(wingW)}px`);
+}
+
 let refreshSeq = 0;
 async function refresh() {
   const myId = ++refreshSeq;
@@ -80,8 +109,9 @@ async function refresh() {
   window.i18n.setLanguage(config.language || window.i18n.detectSystemLanguage());
 
   const m = window.islandModel.buildIsland(sessions, config);
-  document.getElementById('wingLeft').innerHTML = wingHtml(m.left, false);
-  document.getElementById('wingRight').innerHTML = wingHtml(m.right, true);
+  setWing('wingLeft', wingHtml(m.left, false));
+  setWing('wingRight', wingHtml(m.right, true));
+  fitPill();
 
   const $rows = document.getElementById('rows');
   $rows.innerHTML = m.rows.length

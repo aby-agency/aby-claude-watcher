@@ -186,22 +186,6 @@ function applyWindowOpacity() {
   mainWindow.setOpacity(active ? 1 : (conf.windowOpacity ?? 0.85));
 }
 
-// EXPERIMENTAL: real macOS vibrancy ("Liquid Glass"). Off by default — known
-// unstable on macOS Tahoe. Applied only at window creation (no hot recreate);
-// toggling the setting requires an app restart to take effect. When the flag
-// is false, `base` is returned untouched — the nominal opaque path never
-// changes shape because of this feature's existence.
-function windowOptsForVibrancy(base) {
-  if (!config.get().vibrancyExperimental) return base;
-  return {
-    ...base,
-    vibrancy: 'hud',
-    visualEffectState: 'active',
-    transparent: true,
-    backgroundColor: '#00000000',
-  };
-}
-
 function createWindow() {
   const conf = config.get();
   const initialMicro = (conf.viewMode === 'micro');
@@ -241,7 +225,7 @@ function createWindow() {
     opts.height = bounds.height;
   }
 
-  mainWindow = new BrowserWindow(windowOptsForVibrancy(opts));
+  mainWindow = new BrowserWindow(opts);
 
   mainWindow.loadFile(path.join(__dirname, 'ui', 'index.html'));
 
@@ -495,13 +479,6 @@ function setupIPC() {
     if (mainWindow && !mainWindow.isDestroyed() && config.get().windowTransparencyEnabled) {
       mainWindow.setOpacity(config.get().windowOpacity);
     }
-  });
-
-  ipcMain.handle('set-vibrancy-experimental', (_, value) => {
-    config.setVibrancyExperimental(value);
-    // Window material can't be swapped at runtime without a risky destroy/
-    // recreate cycle — the new setting takes effect on the next launch.
-    return { restartRequired: true };
   });
 
   ipcMain.handle('window-hover', (_, hovering) => {

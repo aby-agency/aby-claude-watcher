@@ -22,7 +22,6 @@ contextBridge.exposeInMainWorld('api', {
   setAlwaysOnTop: (value) => ipcRenderer.invoke('set-always-on-top', value),
   setWindowTransparencyEnabled: (value) => ipcRenderer.invoke('set-window-transparency-enabled', value),
   setWindowOpacity: (value) => ipcRenderer.invoke('set-window-opacity', value),
-  setVibrancyExperimental: (value) => ipcRenderer.invoke('set-vibrancy-experimental', value),
   notifyHover: (hovering) => ipcRenderer.invoke('window-hover', hovering),
   setNotificationPrefs: (sessionId, prefs) => ipcRenderer.invoke('set-notification-prefs', sessionId, prefs),
   getNotificationPrefs: (sessionId) => ipcRenderer.invoke('get-notification-prefs', sessionId),

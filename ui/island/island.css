@@ -13,7 +13,14 @@ body {
    .notch-gap reserves the zone hidden by the hardware notch — never put
    content there. */
 .pill {
-  display: flex;
+  /* Grid 1fr | gap | 1fr : les deux colonnes latérales sont TOUJOURS égales
+     (chaque fr se dimensionne au max des deux contenus) → le gap reste centré
+     sur l'encoche quel que soit le déséquilibre des ailes. En flex:1, dès que
+     le contenu dépassait la min-width, chaque aile retombait à son propre
+     min-content : 3 badges à gauche vs 1 headless à droite décalaient le gap
+     de 28px → le 3e badge passait ENTIER sous l'encoche physique (mesuré). */
+  display: grid;
+  grid-template-columns: 1fr var(--notch-gap, 180px) 1fr;
   align-items: center;
   background: #000;
   border-radius: 0 0 12px 12px;
@@ -23,7 +30,7 @@ body {
   z-index: 2;
   /* C'est la PILULE qui porte la largeur minimale — bannière et panneau la
      suivent à l'identique (--pill-w) : trois largeurs toujours égales, zéro
-     marche. Les ailes flex:1 absorbent le surplus symétriquement. */
+     marche. */
   box-sizing: border-box;
   min-width: 320px;
   /* Fermeture : les coins ne se re-arrondissent qu'APRÈS la fin du pli
@@ -35,12 +42,14 @@ body {
    laissait voir le pincement). */
 body.expanded .pill,
 body:has(.banner.visible) .pill { border-radius: 0; transition: none; }
-/* Largeur par défaut = fallback ; le main pousse la largeur MESURÉE de
-   l'encoche (AppKit) via island-geometry → var --notch-gap. */
-.notch-gap { width: var(--notch-gap, 180px); flex: none; }
+/* La largeur du gap vit sur la colonne de grille de .pill ; le main pousse la
+   largeur MESURÉE de l'encoche (AppKit) via island-geometry → var --notch-gap.
+   Le div ne fait qu'occuper la colonne centrale (zone cachée par l'encoche —
+   jamais de contenu dedans). */
+.notch-gap { }
 /* 12px : l'anneau des badges actifs déborde de 4px de chaque côté — à 6px
    deux anneaux voisins se touchaient presque. */
-.wing { display: flex; align-items: center; gap: 12px; flex: 1; }
+.wing { display: flex; align-items: center; gap: 12px; }
 .wing-left { justify-content: flex-end; }
 
 .led {

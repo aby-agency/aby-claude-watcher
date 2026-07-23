@@ -99,7 +99,9 @@ function create(display) {
   applyBounds(display);
   win.loadFile(path.join(__dirname, 'ui', 'island', 'island.html'));
   win._loaded = false;
-  win.webContents.once('did-finish-load', () => {
+  // .on, pas .once : un reload du renderer (crash, devtools) repartirait sans
+  // --notch-gap ni données — la géométrie doit être re-poussée à chaque load.
+  win.webContents.on('did-finish-load', () => {
     if (!win || win.isDestroyed()) return;
     win._loaded = true;
     win.showInactive();

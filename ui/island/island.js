@@ -94,8 +94,14 @@ function fitPill() {
     return last.offsetLeft + last.offsetWidth - first.offsetLeft;
   };
   const style = document.documentElement.style;
-  style.setProperty('--wing-l', `${Math.ceil(content('wingLeft'))}px`);
-  style.setProperty('--wing-r', `${Math.ceil(content('wingRight'))}px`);
+  const l = Math.ceil(content('wingLeft'));
+  const r = Math.ceil(content('wingRight'));
+  style.setProperty('--wing-l', `${l}px`);
+  style.setProperty('--wing-r', `${r}px`);
+  // Aile vide → padding de ce côté à zéro : la pilule s'arrête à la marge
+  // de l'encoche au lieu de traîner 14px de noir mort.
+  style.setProperty('--pad-l', l ? '14px' : '0px');
+  style.setProperty('--pad-r', r ? '14px' : '0px');
 }
 
 let refreshSeq = 0;

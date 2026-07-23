@@ -24,18 +24,24 @@ body {
      place est CLIPPÉ (effet reveal) au lieu de flotter hors du noir. */
   --wl: var(--wing-l, 46px);
   --wr: var(--wing-r, 46px);
+  /* Padding par côté, posé par le JS : 14px avec du contenu, 0 aile vide —
+     sinon la pilule traînait 14px de noir mort au-delà de l'encoche côté
+     vide (la marge du gap, ~12px, reste : elle porte l'arrondi et absorbe
+     l'imprécision de mesure de l'encoche). */
+  --pl: var(--pad-l, 14px);
+  --pr: var(--pad-r, 14px);
   display: grid;
   grid-template-columns: var(--wl) var(--notch-gap, 180px) var(--wr);
   align-items: center;
   background: #000;
   border-radius: 0 0 12px 12px;
   height: 34px;
-  padding: 0 14px;
+  padding: 0 var(--pr) 0 var(--pl);
   position: relative;
   z-index: 2;
   box-sizing: border-box;
-  width: calc(var(--wl) + var(--wr) + var(--notch-gap, 180px) + 28px);
-  transform: translateX(calc((var(--wr) - var(--wl)) / 2));
+  width: calc(var(--wl) + var(--wr) + var(--notch-gap, 180px) + var(--pl) + var(--pr));
+  transform: translateX(calc((var(--wr) + var(--pr) - var(--wl) - var(--pl)) / 2));
   overflow: hidden;
   /* Fermeture : les coins ne se re-arrondissent qu'APRÈS la fin du pli
      (délai .2s), sinon pincement fugace pendant que le drop se replie. */
@@ -43,6 +49,7 @@ body {
     width .3s cubic-bezier(.34, 1.3, .42, 1),
     transform .3s cubic-bezier(.34, 1.3, .42, 1),
     grid-template-columns .3s cubic-bezier(.34, 1.3, .42, 1),
+    padding .3s cubic-bezier(.34, 1.3, .42, 1),
     border-radius .12s ease .2s;
 }
 /* Quelque chose d'ouvert dessous (panneau ou bannière) → la pilule redevient
@@ -56,12 +63,14 @@ body:has(.banner.visible) .pill {
   --w: max(var(--wing-l, 46px), var(--wing-r, 46px));
   border-radius: 0;
   grid-template-columns: var(--w) var(--notch-gap, 180px) var(--w);
+  padding: 0 14px;
   width: calc(2 * var(--w) + var(--notch-gap, 180px) + 28px);
   transform: none;
   transition:
     width .3s cubic-bezier(.34, 1.3, .42, 1),
     transform .3s cubic-bezier(.34, 1.3, .42, 1),
     grid-template-columns .3s cubic-bezier(.34, 1.3, .42, 1),
+    padding .3s cubic-bezier(.34, 1.3, .42, 1),
     border-radius 0s;
 }
 /* La largeur du gap vit sur la colonne de grille de .pill ; le main pousse la

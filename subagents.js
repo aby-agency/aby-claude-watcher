@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 const TAIL_BYTES = 64 * 1024;
-const ERROR_TIMEOUT_MS = 30000;
+const ERROR_TIMEOUT_MS = 30000; // silence → 'stale' (affiché, non bloquant)
+const STALE_ERROR_MS = 5 * 60 * 1000; // silence → 'error' (retiré du volet)
 
 function readMeta(metaPath) {
   try {
@@ -49,7 +50,14 @@ function deriveState(lastEvent, mtimeMs, nowMs = Date.now()) {
   const ageMs = nowMs - mtimeMs;
 
   if (stopReason === 'end_turn') return 'completed';
-  if (stopReason == null && ageMs > ERROR_TIMEOUT_MS) return 'error';
+  // Silence sans stop_reason : un agent qui lit un gros diff ou réfléchit
+  // longuement n'écrit RIEN dans son JSONL pendant des minutes (constaté en
+  // live : reviewer disparu du volet en pleine review). 30s–5min = 'stale' :
+  // toujours affiché dans la fleet view, mais ne compte plus comme agent
+  // foreground bloquant (un agent douteux ne doit pas masquer un pending ni
+  // supprimer une notif). Au-delà de 5 min sans écriture : mort probable.
+  if (stopReason == null && ageMs > STALE_ERROR_MS) return 'error';
+  if (stopReason == null && ageMs > ERROR_TIMEOUT_MS) return 'stale';
   return 'running';
 }
 
@@ -197,11 +205,12 @@ class SubagentTracker {
   }
 
   snapshotForSession(sessionDir, dispatches) {
-    // Show every running agent — foreground and background alike (the "fleet"
-    // view). Background agents run detached (easy to forget); foreground ones
-    // are the active team. Completed/errored agents are still excluded.
+    // Show every live agent — foreground and background alike (the "fleet"
+    // view). 'stale' (silence 30s–5min, long thinking) reste affiché : seul
+    // hasBlockingForegroundAgent exige du 'running' frais.
+    // Completed/errored agents are still excluded.
     return scanSession(sessionDir, dispatches)
-      .filter(sa => sa.state === 'running');
+      .filter(sa => sa.state === 'running' || sa.state === 'stale');
   }
 
   // Tous les runs de workflow (terminés inclus — main.js détecte les

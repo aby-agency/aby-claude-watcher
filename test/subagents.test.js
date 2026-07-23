@@ -140,12 +140,27 @@ test('null stop_reason + recent mtime ⇒ running', () => {
   if (state !== 'running') throw new Error(`expected running, got ${state}`);
 });
 
-test('null stop_reason + mtime > 30s ⇒ error', () => {
+test('null stop_reason + mtime > 30s ⇒ stale (long thinking, pas mort)', () => {
   const state = deriveState(
     { type: 'assistant', message: { stop_reason: null } },
     Date.now() - 60_000
   );
+  if (state !== 'stale') throw new Error(`expected stale, got ${state}`);
+});
+
+test('null stop_reason + mtime > 5min ⇒ error', () => {
+  const state = deriveState(
+    { type: 'assistant', message: { stop_reason: null } },
+    Date.now() - 6 * 60_000
+  );
   if (state !== 'error') throw new Error(`expected error, got ${state}`);
+});
+
+test('hasBlockingForegroundAgent : stale foreground ne bloque pas', () => {
+  const blocking = hasBlockingForegroundAgent([
+    { state: 'stale', runInBackground: false },
+  ]);
+  if (blocking !== false) throw new Error(`expected false, got ${blocking}`);
 });
 
 test('null lastEvent ⇒ error', () => {

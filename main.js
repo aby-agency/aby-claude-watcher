@@ -58,16 +58,18 @@ const workflowActive = new Map();
 const notifiedWorkflowRuns = new Map(); // sessionId → Set(runId) déjà notifiés
 
 // Permissions get approved within seconds when the user is already at the
-// keyboard — defer the pending sound and only ring if the session is still
-// blocked when the timer fires. The toast stays immediate (visual is cheap).
+// keyboard — defer the pending alert (sound AND banner) and only fire if the
+// session is still blocked when the timer fires. The toast stays immediate
+// (visual is cheap). withSound = prefs.sound at schedule time : la bannière
+// part toujours, le son reste soumis au réglage.
 const PENDING_SOUND_DELAY = 5000;
-const pendingSoundTimers = new Map(); // sessionId → timeout
+const pendingAlertTimers = new Map(); // sessionId → timeout
 
-function schedulePendingSound(sessionId) {
-  const prev = pendingSoundTimers.get(sessionId);
+function schedulePendingAlert(sessionId, withSound) {
+  const prev = pendingAlertTimers.get(sessionId);
   if (prev) clearTimeout(prev);
   const timer = setTimeout(() => {
-    pendingSoundTimers.delete(sessionId);
+    pendingAlertTimers.delete(sessionId);
     // L'état pollé retarde de ~300ms sur le clic réel (flush JSONL + poll
     // 250ms) — relire le JSONL maintenant pour qu'une permission approuvée
     // juste avant le tir ne fasse pas sonner sur un état périmé.
@@ -76,24 +78,26 @@ function schedulePendingSound(sessionId) {
     const name = s && s.state && s.state.name;
     // waiting still needs the user (pending can collapse into end-of-turn)
     if ((name !== 'pending' && name !== 'waiting') || (s && blockingForegroundAgent(s))) {
-      log.info(`[notif] sound skipped for ${sessionId.slice(0, 8)} — pending resolved in <${PENDING_SOUND_DELAY / 1000}s`);
+      log.info(`[notif] alert skipped for ${sessionId.slice(0, 8)} — pending resolved in <${PENDING_SOUND_DELAY / 1000}s`);
       return;
     }
-    log.info(`[notif] sound for ${sessionId.slice(0, 8)} — kind=pending (deferred)`);
     if (!isFocusActive()) {
-      sendToRenderer('play-sound', { kind: 'pending', sessionId });
+      log.info(`[notif] banner for ${sessionId.slice(0, 8)} — kind=pending (deferred) sound=${withSound ? 'on' : 'off'}`);
+      if (withSound) sendToRenderer('play-sound', { kind: 'pending', sessionId });
       emitIslandBanner(sessionId);
     } else {
       log.info(`[notif] suppressed sound/banner for ${sessionId.slice(0, 8)} — Focus active`);
     }
   }, PENDING_SOUND_DELAY);
-  pendingSoundTimers.set(sessionId, timer);
+  pendingAlertTimers.set(sessionId, timer);
 }
 
 // Bannière d'île — remplace l'ex-notification macOS (supprimée sans fallback,
-// décision Paul 2026-07-22) : mêmes points d'appel, donc mêmes gardes
-// (prefs.sound, defer 5s du pending, Focus). Re-lit la session par id pour
-// ne jamais émettre depuis un objet périmé. Clic-bannière = focus, côté renderer.
+// décision Paul 2026-07-22). Gardes : defer 5s du pending, Focus, cooldown 30s
+// amont — mais PAS prefs.sound (décision Paul 2026-07-23) : la bannière part
+// que la notif soit activée ou non, le réglage ne gouverne plus que le son.
+// Re-lit la session par id pour ne jamais émettre depuis un objet périmé.
+// Clic-bannière = focus, côté renderer.
 function emitIslandBanner(sessionId) {
   const s = watcher.getSessions().find(x => x.sessionId === sessionId);
   if (!s) return;
@@ -334,18 +338,15 @@ function setupWatcher() {
       slug: session.slug,
       kind,
     });
-    if (prefs.sound) {
-      if (kind === 'pending') {
-        schedulePendingSound(session.sessionId);
-      } else {
-        log.info(`[notif] sound for ${session.sessionId.slice(0, 8)} — kind=${kind}`);
-        if (!isFocusActive()) {
-          sendToRenderer('play-sound', { kind, sessionId: session.sessionId });
-          emitIslandBanner(session.sessionId);
-        } else {
-          log.info(`[notif] suppressed sound/banner for ${session.sessionId.slice(0, 8)} — Focus active`);
-        }
-      }
+    // Bannière toujours (indépendante de prefs.sound), son gaté par le réglage.
+    if (kind === 'pending') {
+      schedulePendingAlert(session.sessionId, prefs.sound);
+    } else if (!isFocusActive()) {
+      log.info(`[notif] banner for ${session.sessionId.slice(0, 8)} — kind=${kind} sound=${prefs.sound ? 'on' : 'off'}`);
+      if (prefs.sound) sendToRenderer('play-sound', { kind, sessionId: session.sessionId });
+      emitIslandBanner(session.sessionId);
+    } else {
+      log.info(`[notif] suppressed sound/banner for ${session.sessionId.slice(0, 8)} — Focus active`);
     }
   });
 
@@ -353,8 +354,8 @@ function setupWatcher() {
     // Session partie → ses runs de workflow sont morts, on purge le suivi
     workflowActive.delete(sessionId);
     notifiedWorkflowRuns.delete(sessionId);
-    const t = pendingSoundTimers.get(sessionId);
-    if (t) { clearTimeout(t); pendingSoundTimers.delete(sessionId); }
+    const t = pendingAlertTimers.get(sessionId);
+    if (t) { clearTimeout(t); pendingAlertTimers.delete(sessionId); }
     sendToRenderer('session-removed', sessionId);
   });
 

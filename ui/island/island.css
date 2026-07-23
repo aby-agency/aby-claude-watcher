@@ -118,21 +118,17 @@ body:has(.banner.visible) .pill {
 .state-badge[data-state="waiting"]  { --led: var(--state-waiting); }
 .state-badge[data-state="pending"]  { --led: var(--state-pending); }
 .state-badge[data-state="error"]    { --led: var(--state-error); }
-.state-badge.bg { transform: scale(.8); opacity: .6; box-shadow: none; }
 /* Apparition d'un badge : pop discret, synchronisé avec le stretch de la
    pilule. Ne joue que sur VRAI changement d'aile (le renderer ne réassigne
-   pas l'innerHTML à l'identique, sinon chaque tick 30s rejouerait tout). */
+   pas l'innerHTML à l'identique, sinon chaque tick 30s rejouerait tout).
+   Même rendu des deux ailes : l'ex-réduction headless (scale .8, terne) a
+   été abandonnée avec la pilule adaptative — la distinction headless vit
+   dans le panneau (section à part, non cliquable), pas sur la pilule. */
 @keyframes badge-in {
   from { transform: scale(.4); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
 .wing .state-badge { animation: badge-in .25s cubic-bezier(.34, 1.4, .5, 1) backwards; }
-.wing .state-badge.bg { animation-name: badge-in-bg; }
-/* Les .bg gardent leur scale(.8)/opacity .6 comme état final. */
-@keyframes badge-in-bg {
-  from { transform: scale(.4); opacity: 0; }
-  to { transform: scale(.8); opacity: .6; }
-}
 .state-badge[data-state="pending"], .state-badge[data-state="error"] {
   animation: led-pulse 1.2s ease-in-out infinite;
 }

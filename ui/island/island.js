@@ -37,11 +37,12 @@ function ledHtml(led, bg) {
   return `<span class="led${bg ? ' bg' : ''}" data-state="${escAttr(led.state)}"></span>`;
 }
 
-function wingHtml(wing, bg) {
+function wingHtml(wing) {
   // Badge par état : pastille couleur d'état, chiffre dedans, anneau rotatif
-  // autour pour les actifs (CSS). Les rangées gardent leur LED par session.
+  // autour pour les actifs (CSS). Même rendu sur les deux ailes — headless
+  // compris. Les rangées gardent leur LED par session.
   return wing.leds.map((l) =>
-    `<span class="state-badge${bg ? ' bg' : ''}" data-state="${escAttr(l.state)}">${l.count}</span>`
+    `<span class="state-badge" data-state="${escAttr(l.state)}">${l.count}</span>`
   ).join('');
 }
 
@@ -81,9 +82,8 @@ function setWing(id, html) {
 // plus large (les colonnes grid sont symétriques = max des deux). Le CSS en
 // dérive la largeur de la pilule et l'anime (léger rebond). Mesure en
 // offsetLeft/offsetWidth (boîtes de layout) et PAS getBoundingClientRect :
-// les rects suivent les transforms — badge-in en cours (scale .4) ou badges
-// headless (scale .8) fausseraient la mesure, alors que le layout réserve
-// la boîte pleine. Insensible aussi à la largeur de colonne courante
+// les rects suivent les transforms — un badge-in en cours (scale .4)
+// fausserait la mesure, alors que le layout réserve la boîte pleine. Insensible aussi à la largeur de colonne courante
 // (flex-end/flex-start), donc stable en pleine animation de la pilule.
 function fitPill() {
   const content = (id) => {
@@ -109,8 +109,8 @@ async function refresh() {
   window.i18n.setLanguage(config.language || window.i18n.detectSystemLanguage());
 
   const m = window.islandModel.buildIsland(sessions, config);
-  setWing('wingLeft', wingHtml(m.left, false));
-  setWing('wingRight', wingHtml(m.right, true));
+  setWing('wingLeft', wingHtml(m.left));
+  setWing('wingRight', wingHtml(m.right));
   fitPill();
 
   const $rows = document.getElementById('rows');

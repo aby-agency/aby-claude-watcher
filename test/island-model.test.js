@@ -53,18 +53,6 @@ test('row name prefers customName over projectName', () => {
   const m = buildIsland([sess('running', { name: 'proj', customName: 'mon-nom' })], {}, NOW);
   assertEq(m.rows[0].name, 'mon-nom');
 });
-test('minutes set for attention states (pending/error/waiting), null otherwise', () => {
-  const m = buildIsland([
-    sess('pending', { lastEventTime: NOW - 120000 }),
-    sess('running', { lastEventTime: NOW - 120000 }),
-  ], {}, NOW);
-  assertEq(m.rows[0].minutes, 2);
-  assertEq(m.rows[1].minutes, null);
-});
-test('minutes null when lastEventTime missing', () => {
-  const m = buildIsland([sess('waiting', { lastEventTime: null })], {}, NOW);
-  assertEq(m.rows[0].minutes, null);
-});
 test('backgroundRows flagged isBackground', () => {
   const m = buildIsland([sess('running', { bg: true })], {}, NOW);
   assertEq(m.rows.length, 0);

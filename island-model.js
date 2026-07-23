@@ -52,10 +52,9 @@ function sortSessions(sessions, sessionOrder) {
   });
 }
 
-const ATTENTION = ['pending', 'error', 'waiting'];
 const LED_ORDER = ['pending', 'error', 'waiting', 'thinking', 'running'];
 
-function buildIsland(sessions, config, now = Date.now()) {
+function buildIsland(sessions, config) {
   const order = (config && config.sessionOrder) || [];
   const sorted = sortSessions(sessions || [], order);
   const interactive = sorted.filter((s) => !s.isBackground);
@@ -79,9 +78,6 @@ function buildIsland(sessions, config, now = Date.now()) {
     sessionId: s.sessionId,
     name: s.customName || s.projectName,
     state: s.state.name,
-    minutes: ATTENTION.includes(s.state.name) && s.lastEventTime
-      ? Math.max(0, Math.floor((now - s.lastEventTime) / 60000))
-      : null,
     isBackground: !!s.isBackground,
     // Sous-lignes : subagents actifs + runs de workflow (déjà filtrés
     // « running » par serializeSession).

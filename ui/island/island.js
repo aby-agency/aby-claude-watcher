@@ -47,7 +47,6 @@ function wingHtml(wing) {
 }
 
 function rowHtml(row) {
-  const dur = row.minutes !== null ? ` · ${fmtMin(row.minutes)}` : '';
   // Sous-lignes indentées : workflows (deep research, violet) d'abord puis
   // subagents — non cliquables, le focus passe par la ligne parente.
   const subs = row.workflows.map((w) => `
@@ -64,7 +63,7 @@ function rowHtml(row) {
     <div class="row" data-session="${escAttr(row.sessionId)}" data-bg="${row.isBackground ? '1' : ''}">
       <span class="led${row.isBackground ? ' bg' : ''}" data-state="${escAttr(row.state)}"></span>
       <span class="r-name">${esc(row.name)}</span>
-      <span class="r-state">${esc(window.i18n.t('state_' + row.state))}${esc(dur)}</span>
+      <span class="r-state">${esc(window.i18n.t('state_' + row.state))}</span>
     </div>${subs}`;
 }
 
@@ -78,12 +77,14 @@ function setWing(id, html) {
   el.innerHTML = html;
 }
 
-// Pilule adaptative : pousse dans --wing-w la largeur du contenu d'aile le
-// plus large (les colonnes grid sont symétriques = max des deux). Le CSS en
-// dérive la largeur de la pilule et l'anime (léger rebond). Mesure en
-// offsetLeft/offsetWidth (boîtes de layout) et PAS getBoundingClientRect :
-// les rects suivent les transforms — un badge-in en cours (scale .4)
-// fausserait la mesure, alors que le layout réserve la boîte pleine. Insensible aussi à la largeur de colonne courante
+// Pilule adaptative : pousse dans --wing-l/--wing-r la largeur du contenu de
+// CHAQUE aile — au repos la pilule est asymétrique (une aile vide se replie
+// à zéro), le CSS compense par un translateX pour garder le gap sur
+// l'encoche ; ouverte (panneau/bannière), elle redevient symétrique pour que
+// le drop centré s'aligne. Mesure en offsetLeft/offsetWidth (boîtes de
+// layout) et PAS getBoundingClientRect : les rects suivent les transforms —
+// un badge-in en cours (scale .4) fausserait la mesure, alors que le layout
+// réserve la boîte pleine. Insensible aussi à la largeur de colonne courante
 // (flex-end/flex-start), donc stable en pleine animation de la pilule.
 function fitPill() {
   const content = (id) => {
@@ -92,8 +93,9 @@ function fitPill() {
     const first = k[0], last = k[k.length - 1];
     return last.offsetLeft + last.offsetWidth - first.offsetLeft;
   };
-  const wingW = Math.max(content('wingLeft'), content('wingRight'));
-  document.documentElement.style.setProperty('--wing-w', `${Math.ceil(wingW)}px`);
+  const style = document.documentElement.style;
+  style.setProperty('--wing-l', `${Math.ceil(content('wingLeft'))}px`);
+  style.setProperty('--wing-r', `${Math.ceil(content('wingRight'))}px`);
 }
 
 let refreshSeq = 0;
@@ -246,6 +248,6 @@ new ResizeObserver(() => {
   document.documentElement.style.setProperty('--pill-w', `${$pill.offsetWidth}px`);
   document.documentElement.style.setProperty('--pill-h', `${$pill.offsetHeight}px`);
 }).observe($pill);
-// Re-render every 30s so the "· N min" durations tick without session events.
+// Re-render every 30s so the gauges' "reste X" countdown ticks without events.
 setInterval(scheduleRefresh, 30000);
 refresh();

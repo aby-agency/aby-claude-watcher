@@ -4,6 +4,15 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] — 2026-07-23
+
+### Removed
+- Le réglage expérimental « Verre translucide » (vibrancy macOS) est retiré
+  du projet : jamais sorti du stade expérimental, désactivé par défaut,
+  instable sur macOS Tahoe. L'application reste sur sa matière opaque.
+  Une clé `vibrancyExperimental` résiduelle dans une configuration
+  existante est ignorée.
+
 ## [2.1.0] — 2026-07-23
 
 ### Added

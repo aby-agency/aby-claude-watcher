@@ -1,5 +1,5 @@
 // Tests for island-model.js. Run: node test/island-model.test.js
-const { buildIsland, islandLayout, isNotchedDisplay, bannerPayload } = require('../island-model.js');
+const { buildIsland, islandLayout, bannerPayload } = require('../island-model.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -7,11 +7,6 @@ function test(name, fn) {
   catch (e) { console.error(`  ✗ ${name}: ${e.message}`); failed++; }
 }
 function assertEq(a, b) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
-
-// Display helpers — shapes mirror Electron's screen.getAllDisplays()
-const notched = { internal: true, bounds: { x: 0, y: 0, width: 1512, height: 982 }, workArea: { x: 0, y: 37, width: 1512, height: 945 } };
-const plain = { internal: true, bounds: { x: 0, y: 0, width: 1440, height: 900 }, workArea: { x: 0, y: 25, width: 1440, height: 875 } };
-const external = { internal: false, bounds: { x: 1512, y: 0, width: 2560, height: 1440 }, workArea: { x: 1512, y: 25, width: 2560, height: 1415 } };
 
 // Session factory
 const NOW = 1_000_000_000_000;
@@ -118,13 +113,6 @@ test('display sans encoche (docké) → centré, fausse encoche 180', () => {
   const d = { internal: false, bounds: { x: 0, y: 0, width: 3440, height: 1440 }, workArea: { x: 0, y: 31, width: 3440, height: 1409 } };
   assertEq(islandLayout(d, null, 460), { x: 1490, gapPx: 180 });
 });
-test('isNotchedDisplay : externe à barre 31px → false, interne encoché → true', () => {
-  const ext = { internal: false, bounds: { x: 0, y: 0, width: 3440, height: 1440 }, workArea: { x: 0, y: 31, width: 3440, height: 1409 } };
-  const mbp = { internal: true, bounds: { x: 0, y: 0, width: 1728, height: 1117 }, workArea: { x: 0, y: 34, width: 1728, height: 1083 } };
-  assertEq(isNotchedDisplay(ext), false);
-  assertEq(isNotchedDisplay(mbp), true);
-});
-
 console.log('\nbannerPayload:');
 test('customName prioritaire, puis projectName, puis fallback', () => {
   const s = { sessionId: 'x', projectName: 'proj', state: { name: 'waiting' } };

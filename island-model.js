@@ -3,18 +3,6 @@
 // Dual export: module.exports (main process, tests) + window.islandModel
 // (island renderer, loaded via <script> like i18n.js).
 
-// Menu bar is ~37px on notched MacBooks vs ~25px otherwise. No public API
-// exposes the notch — this heuristic is the standard technique.
-const NOTCH_MENUBAR_MIN = 30;
-
-function menuBarHeight(display) {
-  return display.workArea.y - display.bounds.y;
-}
-
-function isNotchedDisplay(d) {
-  return !!d.internal && menuBarHeight(d) >= NOTCH_MENUBAR_MIN;
-}
-
 // Position horizontale de la fenêtre + largeur du gap central (zone encoche).
 // `notch` = mesure AppKit {left, width} en pt relative au display, ou null.
 // Mesuré : fenêtre centrée sur le CENTRE RÉEL de l'encoche (elle peut être
@@ -113,6 +101,6 @@ function buildIsland(sessions, config, now = Date.now()) {
   };
 }
 
-const api = { buildIsland, menuBarHeight, isNotchedDisplay, islandLayout, bannerPayload };
+const api = { buildIsland, islandLayout, bannerPayload };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.islandModel = api;

@@ -7,7 +7,8 @@
 const { BrowserWindow, screen } = require('electron');
 const { execFile } = require('child_process');
 const path = require('path');
-const { isNotchedDisplay, islandLayout } = require('./island-model');
+const { log } = require('./logger');
+const { islandLayout } = require('./island-model');
 
 const WIN_W = 460;
 const WIN_H = 340;
@@ -38,7 +39,10 @@ JSON.stringify(out);
 // Mesure {left, width} de l'encoche en pt, relative au display — null si
 // indisponible (permission, pas d'écran à encoche, parse). Cachée par
 // géométrie de display : l'encoche ne bouge pas sans changement de résolution.
-let notchCache = null; // { key, value }
+// Un échec n'est JAMAIS caché : pendant une bascule dock/undock, AppKit peut
+// répondre à vide un court instant — cacher ce null figeait le fallback 180
+// (< encoche réelle 185) pour toute la vie du process, badges rognés.
+let notchCache = null; // { key, value } — succès uniquement
 function measureNotch(display) {
   const key = `${display.bounds.width}x${display.bounds.height}`;
   if (notchCache && notchCache.key === key) return Promise.resolve(notchCache.value);
@@ -52,7 +56,8 @@ function measureNotch(display) {
           if (m) value = { left: m.left, width: m.width - m.left - m.right };
         } catch (_) { /* mesure indisponible → fallback islandLayout */ }
       }
-      notchCache = { key, value };
+      if (value) notchCache = { key, value };
+      else log.info(`[island] notch measure failed for ${key} (err=${err ? err.code || 1 : 'empty'}) — fallback, will retry`);
       resolve(value);
     });
   });
@@ -114,15 +119,36 @@ function destroy() {
 // screen event, and when the setting toggles. L'île suit l'écran PRINCIPAL
 // (barre de menu), encoche ou non — mode docké compris. La mesure est async :
 // on re-lit le primary après coup.
+// La mesure AppKit part dès que le primary est l'écran INTERNE — plus de gate
+// sur l'heuristique workArea (menuBarHeight ≥ 30) : pendant la bascule
+// dock/undock, Electron rend un workArea transitoire → l'heuristique disait
+// « pas d'encoche », l'île restait en fallback 180 sous une encoche de 185,
+// badges rognés (constaté au premier undock post-v2.0.0). AppKit sait ; un
+// interne sans encoche répond juste [] → fallback, comme avant. Cela supprime
+// aussi le piège « barre de menu auto-masquée → fausse encoche ».
+let refreshSeq = 0; // la mesure d'un refresh dépassé ne s'applique jamais
+let settleTimer = null;
 function refresh(enabled) {
+  doRefresh(enabled);
+  // Re-check après stabilisation : les événements screen d'une bascule
+  // arrivent en rafale sur des états transitoires ; si le DERNIER tombe
+  // pendant la transition, rien ne corrigeait jamais (l'île attendait un
+  // event fortuit — True Tone…). Un seul re-check différé suffit.
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => doRefresh(enabled), 1500);
+}
+function doRefresh(enabled) {
   if (!enabled) return destroy();
   const display = screen.getPrimaryDisplay();
   if (!display) return destroy();
-  const measure = isNotchedDisplay(display) ? measureNotch(display) : Promise.resolve(null);
+  const seq = ++refreshSeq;
+  const measure = display.internal ? measureNotch(display) : Promise.resolve(null);
   measure.then((notch) => {
+    if (seq !== refreshSeq) return; // un refresh plus récent est en vol
     const still = screen.getPrimaryDisplay();
     if (!still) return destroy();
     lastLayout = islandLayout(still, notch, WIN_W);
+    log.info(`[island] layout x=${lastLayout.x} gap=${lastLayout.gapPx} display=${still.bounds.width}x${still.bounds.height}${still.internal ? ' internal' : ''} notch=${notch ? `${notch.left}+${notch.width}` : 'none'}`);
     if (!win || win.isDestroyed()) return create(still);
     applyBounds(still);
     sendGeometry();

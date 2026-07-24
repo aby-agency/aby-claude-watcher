@@ -103,6 +103,9 @@ function schedulePendingAlert(sessionId) {
 function emitIslandBanner(sessionId) {
   const s = watcher.getSessions().find(x => x.sessionId === sessionId);
   if (!s) return;
+  // Headless masqués dans l'île → pas de bannière headless non plus (cohérence :
+  // qui ne veut pas les voir ne doit pas les voir surgir). Cf. buildIsland.
+  if (s.isBackground && config.get().islandShowHeadless === false) return;
   island.sendBanner(bannerPayload(s, config.getCustomName(sessionId)));
 }
 
@@ -555,6 +558,16 @@ ipcMain.handle('set-session-order', (_, order) => {
     island.refresh(!!config.get().islandEnabled);
   });
 
+  ipcMain.handle('set-island-show-headless', (_, value) => {
+    config.setIslandShowHeadless(value);
+    island.sendUpdate(); // re-render seul : la géométrie ne change pas
+  });
+
+  ipcMain.handle('set-tray-popover-enabled', (_, value) => {
+    config.setTrayPopoverEnabled(value);
+    if (!value) popover.hide(); // coupé pendant qu'il est ouvert → on le referme
+  });
+
   ipcMain.handle('set-language', (_, lang) => {
     config.setLanguage(lang);
     applyLanguage();
@@ -786,10 +799,15 @@ function setupTray() {
   tray = new Tray(icon);
   tray.setToolTip('Aby Claude Watcher');
 
-  // Clic (gauche/droit) → popover sous l'item du tray. Le dashboard reste
-  // accessible via le bouton « Ouvrir » du popover et l'icône du Dock.
-  tray.on('click', () => popover.toggle(tray.getBounds()));
-  tray.on('right-click', () => popover.toggle(tray.getBounds()));
+  // Clic (gauche/droit) → popover sous l'item du tray, SAUF si l'utilisateur a
+  // coupé le popover (réglage « île seule ») : le clic ouvre alors le dashboard
+  // directement (comportement pré-v2.2.0). Flag relu AU CLIC → bascule à chaud.
+  const onTrayClick = () => {
+    if (config.get().trayPopoverEnabled === false) showMainWindow();
+    else popover.toggle(tray.getBounds());
+  };
+  tray.on('click', onTrayClick);
+  tray.on('right-click', onTrayClick);
 
   updateTrayMenu();
   refreshTrayGlance();

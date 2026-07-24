@@ -68,6 +68,10 @@ settings_title: 'Paramètres',
       transparency_hint: 'Rendre la fenêtre translucide au repos, opaque au survol ou au focus',
       island_label: 'Dynamic island',
       island_hint: "LEDs des sessions autour de l'encoche, se déplie au survol (Mac à encoche uniquement)",
+      island_headless_label: "Sessions headless dans l'île",
+      island_headless_hint: "Affiche les sessions en arrière-plan (headless) dans l'aile droite et le volet de l'île",
+      tray_popover_label: 'Popover du tray',
+      tray_popover_hint: 'Clic sur le tray = mini-panneau ; désactivé, le clic ouvre directement le dashboard',
 
       // Settings — notifications
       volume_label: 'Volume',
@@ -221,6 +225,10 @@ settings_title: 'Settings',
       transparency_hint: 'Make the window translucent when idle, opaque on hover or focus',
       island_label: 'Dynamic island',
       island_hint: 'Session LEDs around the notch, expands on hover (notched Macs only)',
+      island_headless_label: 'Headless sessions in the island',
+      island_headless_hint: "Show background (headless) sessions in the island's right wing and panel",
+      tray_popover_label: 'Tray popover',
+      tray_popover_hint: 'Click the tray to open the mini panel; off opens the dashboard directly',
 
       // Settings — notifications
       volume_label: 'Volume',

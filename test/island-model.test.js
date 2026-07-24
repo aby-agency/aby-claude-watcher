@@ -25,22 +25,32 @@ function sess(state, opts = {}) {
 }
 
 console.log('\nbuildIsland:');
-test('splits interactive (left) and background (right)', () => {
-  const m = buildIsland([sess('running'), sess('waiting', { bg: true })], {});
-  assertEq(m.left.leds.length, 1);
-  assertEq(m.right.leds.length, 1);
+// Pilule binaire (décision Paul/Etienne) : DROITE = ça bosse, GAUCHE = ça
+// attend. Une pastille agrégée + compteur par aile, deux « états » de groupe.
+test('right wing = busy (running/thinking), left wing = idle (waiting/pending/error)', () => {
+  const m = buildIsland([sess('running'), sess('waiting')], {});
+  assertEq(m.right.leds, [{ state: 'busy', count: 1 }]);
+  assertEq(m.left.leds, [{ state: 'idle', count: 1 }]);
 });
-test('wings aggregate per state with counts, urgent states first', () => {
-  const m = buildIsland([sess('running'), sess('running'), sess('waiting'), sess('pending'), sess('running')], {});
-  assertEq(m.left.leds, [
-    { state: 'pending', count: 1 },
-    { state: 'waiting', count: 1 },
-    { state: 'running', count: 3 },
-  ]);
+test('busy aggregates running+thinking; idle aggregates waiting+pending+error', () => {
+  const m = buildIsland([sess('running'), sess('running'), sess('thinking'), sess('waiting'), sess('pending'), sess('error')], {});
+  assertEq(m.right.leds, [{ state: 'busy', count: 3 }]);
+  assertEq(m.left.leds, [{ state: 'idle', count: 3 }]);
 });
-test('no cap: many sessions collapse into one led per state', () => {
+test('empty group → empty wing (all working → left empty)', () => {
   const many = Array.from({ length: 9 }, () => sess('running'));
-  assertEq(buildIsland(many, {}).left.leds, [{ state: 'running', count: 9 }]);
+  const m = buildIsland(many, {});
+  assertEq(m.right.leds, [{ state: 'busy', count: 9 }]);
+  assertEq(m.left.leds, []);
+});
+test('unknown state counts as idle (attend), never busy', () => {
+  const m = buildIsland([sess('weird')], {});
+  assertEq(m.right.leds, []);
+  assertEq(m.left.leds, [{ state: 'idle', count: 1 }]);
+});
+test('headless sessions count in the activity wings when shown', () => {
+  const m = buildIsland([sess('running'), sess('running', { bg: true })], {});
+  assertEq(m.right.leds, [{ state: 'busy', count: 2 }]);
 });
 test('sessionOrder from config wins, then newest first', () => {
   const a = sess('running', { id: 'a', age: 10 });
@@ -53,10 +63,22 @@ test('row name prefers customName over projectName', () => {
   const m = buildIsland([sess('running', { name: 'proj', customName: 'mon-nom' })], {});
   assertEq(m.rows[0].name, 'mon-nom');
 });
-test('backgroundRows flagged isBackground', () => {
+test('backgroundRows flagged isBackground (panel keeps type split)', () => {
   const m = buildIsland([sess('running', { bg: true })], {});
   assertEq(m.rows.length, 0);
   assertEq(m.backgroundRows[0].isBackground, true);
+});
+test('islandShowHeadless:false excludes headless from wings and panel, keeps interactive', () => {
+  const m = buildIsland([sess('running'), sess('waiting', { bg: true })], { islandShowHeadless: false });
+  assertEq(m.right.leds, [{ state: 'busy', count: 1 }]);
+  assertEq(m.left.leds, []); // le headless « waiting » est exclu du décompte
+  assertEq(m.backgroundRows.length, 0);
+  assertEq(m.rows.length, 1);
+});
+test('islandShowHeadless defaults to shown when flag absent', () => {
+  const m = buildIsland([sess('waiting', { bg: true })], {});
+  assertEq(m.left.leds, [{ state: 'idle', count: 1 }]);
+  assertEq(m.backgroundRows.length, 1);
 });
 test('rows carry subagents (label fallback desc→type→subagent) and workflows', () => {
   const s = sess('running');

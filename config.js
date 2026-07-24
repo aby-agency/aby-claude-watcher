@@ -27,6 +27,8 @@ let config = {
   customNames: {},      // { [sessionId]: "Custom name" }
   backgroundSectionCollapsed: false, // "Background" section folded in the session list
   islandEnabled: true,  // dynamic island sur l'encoche (macOS à encoche uniquement)
+  islandShowHeadless: true, // afficher les sessions headless (aile droite + volet) dans l'île
+  trayPopoverEnabled: true, // clic tray → popover ; off → clic tray ouvre le dashboard directement
 };
 
 function load() {
@@ -89,6 +91,16 @@ function setBackgroundSectionCollapsed(value) {
 
 function setIslandEnabled(value) {
   config.islandEnabled = !!value;
+  save();
+}
+
+function setIslandShowHeadless(value) {
+  config.islandShowHeadless = !!value;
+  save();
+}
+
+function setTrayPopoverEnabled(value) {
+  config.trayPopoverEnabled = !!value;
   save();
 }
 
@@ -220,6 +232,8 @@ module.exports = {
   setCompactMode,
   setBackgroundSectionCollapsed,
   setIslandEnabled,
+  setIslandShowHeadless,
+  setTrayPopoverEnabled,
   setAlwaysOnTop,
   setVolume,
   setWindowTransparencyEnabled,

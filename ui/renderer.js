@@ -31,6 +31,8 @@ let volume = 0.7;
 let notifPosition = 'top-right';
 let autoLaunch = false;
 let islandEnabled = true;
+let islandShowHeadless = true;
+let trayPopoverEnabled = true;
 let windowTransparencyEnabled = false;
 let windowOpacity = 0.85;
 let searchQuery = '';
@@ -84,6 +86,8 @@ async function init() {
   notifPosition = config.notifPosition || 'top-right';
   autoLaunch = !!config.autoLaunch;
   islandEnabled = config.islandEnabled !== false;
+  islandShowHeadless = config.islandShowHeadless !== false;
+  trayPopoverEnabled = config.trayPopoverEnabled !== false;
   windowTransparencyEnabled = !!config.windowTransparencyEnabled;
   windowOpacity = config.windowOpacity ?? 0.85;
   sessionOrder = config.sessionOrder || [];
@@ -99,6 +103,8 @@ async function init() {
   updateNotifPosition();
   updateAutoLaunchToggle();
   updateIslandToggle();
+  updateIslandHeadlessToggle();
+  updateTrayPopoverToggle();
   $volumeSlider.value = Math.round(volume * 100);
   $volumeValue.textContent = `${Math.round(volume * 100)}%`;
   updateTransparencyControls();
@@ -211,6 +217,12 @@ async function init() {
   // Dynamic island toggle
   const islandBtn = document.getElementById('islandToggle');
   if (islandBtn) islandBtn.addEventListener('click', toggleIsland);
+
+  const islandHeadlessBtn = document.getElementById('islandHeadlessToggle');
+  if (islandHeadlessBtn) islandHeadlessBtn.addEventListener('click', toggleIslandHeadless);
+
+  const trayPopoverBtn = document.getElementById('trayPopoverToggle');
+  if (trayPopoverBtn) trayPopoverBtn.addEventListener('click', toggleTrayPopover);
 
   // Language picker
   document.querySelectorAll('.language-btn').forEach(btn => {
@@ -455,6 +467,34 @@ function toggleIsland() {
   islandEnabled = !islandEnabled;
   window.api.setIslandEnabled(islandEnabled);
   updateIslandToggle();
+}
+
+function updateIslandHeadlessToggle() {
+  const btn = document.getElementById('islandHeadlessToggle');
+  if (btn) {
+    btn.classList.toggle('on', islandShowHeadless);
+    btn.setAttribute('aria-checked', String(islandShowHeadless));
+  }
+}
+
+function toggleIslandHeadless() {
+  islandShowHeadless = !islandShowHeadless;
+  window.api.setIslandShowHeadless(islandShowHeadless);
+  updateIslandHeadlessToggle();
+}
+
+function updateTrayPopoverToggle() {
+  const btn = document.getElementById('trayPopoverToggle');
+  if (btn) {
+    btn.classList.toggle('on', trayPopoverEnabled);
+    btn.setAttribute('aria-checked', String(trayPopoverEnabled));
+  }
+}
+
+function toggleTrayPopover() {
+  trayPopoverEnabled = !trayPopoverEnabled;
+  window.api.setTrayPopoverEnabled(trayPopoverEnabled);
+  updateTrayPopoverToggle();
 }
 
 function updateTransparencyControls() {
@@ -1603,39 +1643,22 @@ function renderUsage(data) {
   group.style.display = '';
   if (fallback) fallback.style.display = 'none';
 
-  const set = (barId, pctId, win) => {
-    const bar = document.getElementById(barId);
-    const pct = document.getElementById(pctId);
-    if (!bar || !pct) return;
-    if (!win || typeof win.utilization !== 'number') {
-      bar.style.width = '0%';
-      bar.classList.remove('warn', 'danger');
-      pct.textContent = '—';
-      return;
-    }
-    const u = Math.max(0, Math.min(100, win.utilization));
-    bar.style.width = `${u}%`;
-    bar.classList.toggle('warn', u >= 70 && u < 90);
-    bar.classList.toggle('danger', u >= 90);
-    pct.textContent = `${Math.round(u)}%`;
+  // Anneaux : 5H, 7J, puis chaque limite scopée (ex. « 7J FABLE ») — même
+  // recette que le popover et l'île, via le composant partagé usage-ring.
+  const rings = [];
+  const add = (label, win) => {
+    if (!win || typeof win.utilization !== 'number') return;
+    const rem = win.resetsAt ? formatResetTime(win.resetsAt) : '';
+    rings.push(window.usageGauge.usageRing(label, Math.round(win.utilization), rem));
   };
-
-  set('usageBar5h', 'usagePct5h', data.fiveHour);
-  set('usageBar7d', 'usagePct7d', data.sevenDay);
-
-  const renderReset = (el, win) => {
-    if (!el) return;
-    const next = win && win.resetsAt;
-    const txt = el.querySelector('.usage-reset-text');
-    if (next) {
-      el.style.display = '';
-      if (txt) txt.textContent = formatResetTime(next);
-    } else {
-      el.style.display = 'none';
-    }
-  };
-  renderReset(document.getElementById('usageReset'), data.fiveHour);
-  renderReset(document.getElementById('usageReset7d'), data.sevenDay);
+  add('5H', data.fiveHour);
+  add('7J', data.sevenDay);
+  for (const l of data.scopedLimits || []) {
+    const win = l.group === 'session' ? '5H' : '7J';
+    const rem = l.resetsAt ? formatResetTime(l.resetsAt) : '';
+    rings.push(window.usageGauge.usageRing(`${win} ${String(l.model).toUpperCase()}`, Math.round(l.percent), rem));
+  }
+  group.innerHTML = rings.join('');
   group.title = formatUsageTooltip(data);
 }
 

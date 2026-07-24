@@ -152,11 +152,11 @@ body.expanded .pill {
   position: relative;
   flex: none;
 }
-.state-badge[data-state="thinking"] { --led: var(--state-thinking); }
-.state-badge[data-state="running"]  { --led: var(--state-running); }
-.state-badge[data-state="waiting"]  { --led: var(--state-waiting); }
-.state-badge[data-state="pending"]  { --led: var(--state-pending); }
-.state-badge[data-state="error"]    { --led: var(--state-error); }
+/* Pilule binaire : deux groupes, deux couleurs, pas plus. busy = ça bosse
+   (bleu), idle = ça attend (vert). Le détail par état vit dans le panneau
+   (.led ci-dessus), pas sur la pilule. */
+.state-badge[data-state="busy"] { --led: var(--state-running); }
+.state-badge[data-state="idle"] { --led: var(--state-waiting); }
 /* Apparition d'un badge : pop discret, synchronisé avec le stretch de la
    pilule. Ne joue que sur VRAI changement d'aile (le renderer ne réassigne
    pas l'innerHTML à l'identique, sinon chaque tick 30s rejouerait tout).
@@ -168,12 +168,9 @@ body.expanded .pill {
   to { transform: scale(1); opacity: 1; }
 }
 .wing .state-badge { animation: badge-in .25s cubic-bezier(.34, 1.4, .5, 1) backwards; }
-.state-badge[data-state="pending"], .state-badge[data-state="error"] {
-  animation: led-pulse 1.2s ease-in-out infinite;
-}
-/* Actifs : l'anneau tourne AUTOUR du chiffre. */
-.state-badge[data-state="thinking"]::after,
-.state-badge[data-state="running"]::after {
+/* « ça bosse » : l'anneau tourne AUTOUR du chiffre (le mouvement dit le
+   travail). « ça attend » = pastille ambre statique, pas d'animation. */
+.state-badge[data-state="busy"]::after {
   content: '';
   position: absolute; inset: -4px;
   border-radius: 999px;
@@ -277,12 +274,6 @@ body.expanded .panel { max-height: 300px; }
 .rows-bg .row { cursor: default; opacity: .65; }
 .island-empty { padding: 10px 0; text-align: center; color: #6b7385; font-size: 11px; }
 
-.gauge-block { margin: 8px 8px 0; }
-/* Pas de filet entre les deux jauges (retour Paul) — l'air + les labels
-   5H/7J suffisent. */
-#gauge7Block, .gauge-scoped { margin-top: 12px; }
-.gauge { height: 4px; border-radius: 2px; background: #1d2330; overflow: hidden; }
-.gauge-fill { height: 100%; border-radius: 2px; background: var(--state-waiting); transition: width .3s ease; }
-.gauge-fill.warn { background: var(--state-pending); }
-.gauge-fill.hot { background: var(--state-error); }
-.gauge-label { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; color: #6b7385; font-family: var(--font-mono); }
+/* Barres de conso (5H/7J/Fable) — séparées des lignes de session par un filet
+   + de l'air ; l'espacement inter-barres vient de .ubar-col (styles.css). */
+#gauges { margin: 12px 8px 0; padding-top: 12px; border-top: 1px solid #1d2330; }

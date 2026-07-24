@@ -65,14 +65,16 @@ test('coin transparent', () => assertEq(px(dotBitmap(RED, SIZE), 0, 0, SIZE).a, 
 test('color null → centre transparent', () => assertEq(px(dotBitmap(null, SIZE), 8, 8, SIZE).a, 0));
 
 console.log('\ntrayUsageLabel:');
-test('5h présent → "5H 27% · 35m"', () => {
-  assertEq(trayUsageLabel({ fiveHour: { utilization: 27, resetsAt: SEC + 2100 } }, NOW), '5H 27% · 35m');
+// Décision Paul : le titre du tray ne montre plus que le %, sans le temps
+// restant, avec un point séparateur entre « 5H » et le pourcentage.
+test('5h présent → "5H · 27%"', () => {
+  assertEq(trayUsageLabel({ fiveHour: { utilization: 27, resetsAt: SEC + 2100 } }, NOW), '5H · 27%');
 });
 test('arrondi de utilization', () => {
-  assertEq(trayUsageLabel({ fiveHour: { utilization: 26.6, resetsAt: SEC + 2100 } }, NOW), '5H 27% · 35m');
+  assertEq(trayUsageLabel({ fiveHour: { utilization: 26.6, resetsAt: SEC + 2100 } }, NOW), '5H · 27%');
 });
 test('clamp à 100', () => {
-  assertEq(trayUsageLabel({ fiveHour: { utilization: 130, resetsAt: SEC + 2100 } }, NOW), '5H 100% · 35m');
+  assertEq(trayUsageLabel({ fiveHour: { utilization: 130, resetsAt: SEC + 2100 } }, NOW), '5H · 100%');
 });
 test('pas de fiveHour → null', () => assertEq(trayUsageLabel({}, NOW), null));
 test('usage null → null', () => assertEq(trayUsageLabel(null, NOW), null));

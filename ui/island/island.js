@@ -34,9 +34,9 @@ function fmtRemaining(resetsAt) {
 }
 
 function wingHtml(wing) {
-  // Badge par état : pastille couleur d'état, chiffre dedans, anneau rotatif
-  // autour pour les actifs (CSS). Même rendu sur les deux ailes — headless
-  // compris. Les rangées gardent leur LED par session.
+  // Pilule binaire : une pastille agrégée par aile — DROITE « busy » (bleu,
+  // anneau qui tourne = ça bosse), GAUCHE « idle » (vert = ça attend), chiffre
+  // = nombre de sessions. Le détail par état vit dans les rangées du panneau.
   return wing.leds.map((l) =>
     `<span class="state-badge" data-state="${escAttr(l.state)}">${l.count}</span>`
   ).join('');
@@ -130,43 +130,23 @@ async function refresh() {
     item.addEventListener('click', () => window.islandApi.focusSession(item.dataset.session));
   });
 
-  // Jauges 5h + 7j (même recette), séparées par un filet.
-  const renderGauge = (blockId, fillId, leftId, rightId, label, data) => {
-    const $block = document.getElementById(blockId);
-    if (!data || typeof data.utilization !== 'number') {
-      $block.style.display = 'none';
-      return false;
-    }
-    const pct = Math.round(data.utilization);
-    const $fill = document.getElementById(fillId);
-    $fill.style.width = `${Math.min(100, pct)}%`;
-    $fill.className = 'gauge-fill' + (pct > 80 ? ' hot' : pct >= 50 ? ' warn' : '');
-    document.getElementById(leftId).textContent = `${label} · ${pct}%`;
+  // Jauges conso : 5H, 7J, puis chaque limite scopée (ex. « 7J FABLE ») —
+  // anneaux partagés (usage-ring), même recette que la barre du bas et le
+  // popover. reste = temps formaté nu (« 3h20 »).
+  const bars = [];
+  const add = (label, data) => {
+    if (!data || typeof data.utilization !== 'number') return;
     const rem = data.resetsAt ? fmtRemaining(data.resetsAt) : '';
-    document.getElementById(rightId).textContent = rem
-      ? window.i18n.t('island_reste', { t: rem }) : '';
-    $block.style.display = '';
-    return true;
+    bars.push(window.usageGauge.usageBar(label, Math.round(data.utilization), rem));
   };
-  renderGauge('gaugeBlock', 'gaugeFill', 'gaugeLeft', 'gaugeRight', '5H', usage && usage.fiveHour);
-  renderGauge('gauge7Block', 'gauge7Fill', 'gauge7Left', 'gauge7Right', '7J', usage && usage.sevenDay);
-
-  // Limites scopées par modèle (ex. « 7J FABLE ») — une jauge par entrée, même
-  // recette que ci-dessus mais en nombre variable. Lu génériquement depuis
-  // scopedLimits : le libellé suit le display_name renvoyé par l'API.
-  const scoped = (usage && Array.isArray(usage.scopedLimits)) ? usage.scopedLimits : [];
-  document.getElementById('gaugeScoped').innerHTML = scoped.map((l) => {
-    const pct = Math.round(l.percent);
-    const cls = pct > 80 ? ' hot' : pct >= 50 ? ' warn' : '';
+  add('5H', usage && usage.fiveHour);
+  add('7J', usage && usage.sevenDay);
+  for (const l of (usage && Array.isArray(usage.scopedLimits) ? usage.scopedLimits : [])) {
     const win = l.group === 'session' ? '5H' : '7J';
     const rem = l.resetsAt ? fmtRemaining(l.resetsAt) : '';
-    const right = rem ? window.i18n.t('island_reste', { t: rem }) : '';
-    const label = esc(`${win} ${String(l.model).toUpperCase()}`);
-    return `<div class="gauge-block gauge-scoped">`
-      + `<div class="gauge"><div class="gauge-fill${cls}" style="width:${Math.min(100, pct)}%"></div></div>`
-      + `<div class="gauge-label"><span>${label} · ${pct}%</span><span>${esc(right)}</span></div>`
-      + `</div>`;
-  }).join('');
+    bars.push(window.usageGauge.usageBar(`${win} ${String(l.model).toUpperCase()}`, Math.round(l.percent), rem));
+  }
+  document.getElementById('gauges').innerHTML = bars.join('');
 }
 
 // ── Hover machinery ──

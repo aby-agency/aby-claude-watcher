@@ -114,7 +114,10 @@ function trayUsageLabel(usage, nowMs) {
   const fh = usage && usage.fiveHour;
   if (!fh || typeof fh.utilization !== 'number' || !Number.isFinite(fh.utilization)) return null;
   const pct = Math.round(Math.max(0, Math.min(100, fh.utilization)));
-  return `5H ${pct}% · ${formatCountdown(fh.resetsAt, nowMs)}`;
+  // Titre du tray : seulement le % (décision Paul) — le temps restant reste
+  // dispo dans la jauge du panneau déplié de l'île. Point séparateur entre
+  // « 5H » et le pourcentage.
+  return `5H · ${pct}%`;
 }
 
 module.exports = { gaugeColor, formatCountdown, ringBitmap, dotBitmap, trayUsageLabel };

@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('api', {
   setNotifPosition: (value) => ipcRenderer.invoke('set-notif-position', value),
   setAutoLaunch: (value) => ipcRenderer.invoke('set-auto-launch', value),
   setIslandEnabled: (value) => ipcRenderer.invoke('set-island-enabled', value),
+  setIslandShowHeadless: (value) => ipcRenderer.invoke('set-island-show-headless', value),
+  setTrayPopoverEnabled: (value) => ipcRenderer.invoke('set-tray-popover-enabled', value),
   checkUpdates: (force) => ipcRenderer.invoke('check-updates', force),
   downloadUpdate: (release) => ipcRenderer.invoke('download-update', release),
   abortUpdate: () => ipcRenderer.invoke('abort-update'),

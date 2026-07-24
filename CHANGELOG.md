@@ -4,6 +4,35 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] — 2026-07-24
+
+### Added
+- **Pilule binaire « bosse / attend » dans la dynamic island.** Au repos, la
+  pilule ne montre plus un état par couleur mais deux groupes : aile DROITE
+  bleue = ça bosse (running/thinking, anneau qui tourne), aile GAUCHE verte =
+  ça attend (waiting/pending/error). Une pastille + compteur par aile — coup
+  d'œil : les agents tournent ou pas. Le détail par état reste dans le volet.
+- **Réglage « Sessions headless dans l'île ».** Masque les sessions en
+  arrière-plan (headless) de la pilule et du volet (et supprime leurs bannières
+  needs-you). Défaut : affichées. Par-personne (config local).
+- **Réglage « Popover du tray ».** Désactivé, le clic sur l'item du tray ouvre
+  directement le dashboard au lieu du mini-panneau (retour au comportement
+  pré-v2.2.0). Défaut : popover activé. Par-personne.
+- **Jauges de conso partout, avec Fable.** Composant partagé : anneaux dans la
+  barre du bas du dashboard (5H / 7J / 7J Fable), barres dans le popover et le
+  volet de l'île. Fable ajouté à la barre du bas (il y manquait).
+
+### Changed
+- **Titre du tray simplifié en `5H · X%`** — le temps restant y a été retiré
+  (il reste dans les jauges des panneaux).
+- **Badges d'état plus sobres** : le badge « inactif » (vert) ne rayonne plus
+  (halo retiré). Seuls « action requise » / « erreur » gardent le halo d'attention.
+
+### Fixed
+- **Débordement des jauges en fenêtre étroite.** Les jauges tiennent désormais
+  sur une seule ligne quel que soit l'affichage (grid / liste / micro) — plus
+  de coupure de la 3ᵉ valeur (Fable) sous le bord de fenêtre.
+
 ## [2.2.0] — 2026-07-24
 
 ### Added

@@ -99,10 +99,10 @@
     .pop-item[data-state="waiting"] { color: var(--state-waiting); }
     .pop-item[data-state="pending"] { color: var(--state-pending); }
     .pop-item[data-state="error"] { color: var(--state-error); }
-    /* Glow-budget: only pending/waiting/error rows glow (action required).
-       thinking/running stay calm — dot/spinner colored, no tint, no halo. */
+    /* Glow-budget: only pending/error rows glow (action required). waiting rendu
+       sobre (retour Paul) — le vert « en attente » n'appelle aucune action, il
+       ne doit pas rayonner. thinking/running restent calmes aussi. */
     .pop-item[data-state="pending"],
-    .pop-item[data-state="waiting"],
     .pop-item[data-state="error"] {
       background: var(--card-sheen), var(--card-bg), color-mix(in srgb, currentColor 12%, var(--bg-secondary));
       border-color: color-mix(in srgb, currentColor 40%, transparent);
@@ -110,7 +110,6 @@
       box-shadow: var(--card-inset), 0 0 16px -4px color-mix(in srgb, currentColor calc(var(--glow) * 100%), transparent);
     }
     .pop-item[data-state="pending"] .pop-dot,
-    .pop-item[data-state="waiting"] .pop-dot,
     .pop-item[data-state="error"] .pop-dot {
       box-shadow: 0 0 7px 0 color-mix(in srgb, currentColor calc(var(--glow) * 100%), transparent);
     }
@@ -152,12 +151,11 @@
     }
     /* Jauges conso (5H / 7J / Fable) — même recette que l'île, seuils alignés :
        warn ≥50, hot >80. Rendu générique depuis getUsage(). */
+    /* Anneaux de conso — empilés en colonne (popover étroit, 320px) : la mise
+       en forme colonne vient de .uring-col (styles.css). */
     .popover-gauges {
-      padding: 8px 12px 4px;
+      padding: 10px 12px 6px;
       border-top: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
     }
     .popover-gauges:empty { display: none; }
     .pop-gauge-track {
@@ -218,7 +216,7 @@
       </button>
     </div>
     <div class="popover-list" id="popList"></div>
-    <div class="popover-gauges" id="popGauges"></div>
+    <div class="popover-gauges ubar-col" id="popGauges"></div>
     <div class="popover-footer">
       <button class="popover-quit-btn" id="popQuitBtn" data-i18n-title="popover_quit_title" title="Quit Aby Claude Watcher">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -229,6 +227,7 @@
     </div>
   </div>
   <script src="../i18n.js"></script>
+  <script src="usage-ring.js"></script>
   <script src="popover.js"></script>
 </body>
 </html>

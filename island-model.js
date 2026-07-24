@@ -52,27 +52,31 @@ function sortSessions(sessions, sessionOrder) {
   });
 }
 
-const LED_ORDER = ['pending', 'error', 'waiting', 'thinking', 'running'];
+// Pilule binaire (décision Paul/Etienne, révise « une LED par état ») : au repos
+// la pilule ne dit plus QUEL état, mais « ça bosse » vs « ça attend » — coup
+// d'œil : l'agent taffe ou reste les bras croisés. DROITE = busy, GAUCHE = idle.
+// Tout ce qui n'est pas explicitement busy compte comme idle (un état inconnu
+// ne doit jamais passer pour « au travail »). Le détail par état survit dans le
+// panneau déplié (rows), pas ici.
+const BUSY_STATES = ['running', 'thinking'];
 
 function buildIsland(sessions, config) {
   const order = (config && config.sessionOrder) || [];
   const sorted = sortSessions(sessions || [], order);
   const interactive = sorted.filter((s) => !s.isBackground);
-  const background = sorted.filter((s) => s.isBackground);
+  // Réglage par-personne : masquer les headless dans l'île (ailes + volet).
+  // Défaut on → comportement historique. Off → les headless ne comptent nulle
+  // part (ni ailes ni panneau). Cf. garde bannière côté main.
+  const showHeadless = !config || config.islandShowHeadless !== false;
+  const background = showHeadless ? sorted.filter((s) => s.isBackground) : [];
 
-  // Ailes agrégées par état : une LED par couleur + compte (choix Paul, a
-  // remplacé « une LED par session, cap 4 + +N »). Ordre fixe urgent-d'abord
-  // → les positions ne se mélangent jamais.
-  const wing = (list) => {
-    const counts = new Map();
-    for (const s of list) {
-      const st = s.state.name;
-      counts.set(st, (counts.get(st) || 0) + 1);
-    }
-    const known = LED_ORDER.filter((st) => counts.has(st));
-    const unknown = [...counts.keys()].filter((st) => !LED_ORDER.includes(st));
-    return { leds: [...known, ...unknown].map((st) => ({ state: st, count: counts.get(st) })) };
-  };
+  // Les ailes agrègent SUR L'ENSEMBLE des sessions visibles (interactives +
+  // headless si affichés) : un agent headless qui tourne, ça bosse aussi. Une
+  // seule pastille + compteur par aile ; aile vide (0 session) → repliée.
+  const visible = interactive.concat(background);
+  const busyN = visible.filter((s) => BUSY_STATES.includes(s.state.name)).length;
+  const idleN = visible.length - busyN;
+  const wing = (state, count) => ({ leds: count ? [{ state, count }] : [] });
 
   const row = (s) => ({
     sessionId: s.sessionId,
@@ -90,8 +94,8 @@ function buildIsland(sessions, config) {
   });
 
   return {
-    left: wing(interactive),
-    right: wing(background),
+    left: wing('idle', idleN),  // ça attend (waiting/pending/error/…)
+    right: wing('busy', busyN), // ça bosse (running/thinking)
     rows: interactive.map(row),
     backgroundRows: background.map(row),
   };

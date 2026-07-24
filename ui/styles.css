@@ -255,33 +255,18 @@ body.micro-mode .status-bar {
   font-size: 10px;
 }
 
-body.micro-mode .usage-group {
-  gap: 4px;
+/* Micro : les 3 anneaux DOIVENT tenir sur une seule ligne (fenêtre très
+   basse — un wrap coupe Fable). nowrap + anneaux/texte réduits + reste masqué
+   (pas la place ; le temps reste dans le tooltip et les autres surfaces). */
+body.micro-mode .uring-row {
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow: hidden;
 }
-
-body.micro-mode .usage-bar {
-  width: 38px;
-  height: 5px;
-}
-
-body.micro-mode .usage-label {
-  font-size: 9px;
-}
-
-body.micro-mode .usage-pct {
-  font-size: 10px;
-  min-width: 26px;
-}
-
-body.micro-mode .usage-reset {
-  font-size: 10px;
-  gap: 2px;
-}
-
-body.micro-mode .usage-reset-icon {
-  width: 11px;
-  height: 11px;
-}
+body.micro-mode .uring-item { gap: 4px; }
+body.micro-mode .uring { width: 11px; height: 11px; }
+body.micro-mode .uring-text { font-size: 9px; }
+body.micro-mode .uring-reste { display: none; }
 
 /* ═══ Toolbar ═══ */
 
@@ -759,16 +744,17 @@ body.micro-mode .usage-reset-icon {
 .state-badge.pending { --badge-bg: rgba(245, 158, 11, 0.15); --badge-color: var(--state-pending); }
 .state-badge.error { --badge-bg: rgba(153, 27, 27, 0.15); --badge-color: var(--state-error); }
 
-/* Badges calmes (thinking/running) : inchangés, discrets */
-/* Badges d'action : halo + dot rayonnant */
+/* Badges calmes (thinking/running/waiting) : sobres, discrets. waiting rendu
+   sobre (retour Paul) — le vert « inactif » ne doit pas rayonner, il n'appelle
+   aucune action. */
+/* Badges d'action (pending/error) : halo + dot rayonnant — ils DOIVENT sauter
+   aux yeux (cœur du système de notif). */
 .state-badge.pending,
-.state-badge.waiting,
 .state-badge.error {
   border: 1px solid color-mix(in srgb, var(--badge-color) 40%, transparent);
   box-shadow: 0 0 16px -4px var(--badge-color);
 }
 .state-badge.pending .dot,
-.state-badge.waiting .dot,
 .state-badge.error .dot {
   box-shadow: 0 0 7px 0 currentColor;
 }
@@ -2052,6 +2038,51 @@ body.micro-mode .usage-reset-icon {
 
 .usage-bar-fill.warn { background: var(--state-pending); }
 .usage-bar-fill.danger { background: var(--state-error); }
+
+/* ── Anneau de conso (composant partagé — barre du bas, popover, île) ──
+   Généré par ui/usage-ring.js. Anneau CSS pur : conic-gradient rempli à
+   --uring-pct %, troué par un masque radial. Couleur par seuil (ok/warn/hot),
+   alignée sur le tray. */
+/* nowrap : jamais de wrap vertical (il coupait Fable sous le bord de fenêtre).
+   Quand la fenêtre est étroite (vue liste ~400px), le « reste » s'efface pour
+   que les 3 anneaux tiennent sur une ligne (cf. @media plus bas). */
+.uring-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 14px; overflow: hidden; }
+/* Variante colonne pour les panneaux étroits (popover, île) : un anneau par
+   ligne pleine largeur, reste poussé au bord droit. Une rangée horizontale de
+   3 anneaux + reste ne tient pas dans ~240-320px → wrap désordonné. */
+.uring-col { display: flex; flex-direction: column; gap: 10px; }
+.uring-col .uring-item { width: 100%; }
+.uring-col .uring-reste { margin-left: auto; }
+.uring-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.uring {
+  width: 16px; height: 16px; border-radius: 50%; flex: none;
+  background: conic-gradient(var(--uring-c, var(--state-neutral)) calc(var(--uring-pct, 0) * 1%), var(--uring-track) 0);
+  /* Trait fin (retour Paul) : trou à 70% du rayon → anneau ~2.4px au lieu de ~3.2px. */
+  -webkit-mask: radial-gradient(closest-side, transparent 70%, #000 71%);
+          mask: radial-gradient(closest-side, transparent 70%, #000 71%);
+}
+.uring { --uring-track: color-mix(in srgb, var(--state-neutral) 22%, transparent); }
+.uring[data-lvl="ok"]   { --uring-c: var(--state-waiting); }
+.uring[data-lvl="warn"] { --uring-c: var(--state-pending); }
+.uring[data-lvl="hot"]  { --uring-c: var(--state-error); }
+.uring-text { font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); }
+.uring-reste { font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); }
+/* Fenêtre étroite (vue liste ~400px) : on efface le « reste » pour que les 3
+   anneaux tiennent sur une ligne. En vue large (grid) il reste affiché. */
+@media (max-width: 480px) { .uring-reste { display: none; } }
+
+/* ── Barre de conso (île + popover) ── Barre de progression pleine largeur —
+   Paul préfère la barre à l'anneau dans les panneaux étroits. Empilées en
+   colonne, aérées (gap 12px). Police 11px, uniforme avec les anneaux du
+   dashboard (.uring-text). */
+.ubar-col { display: flex; flex-direction: column; gap: 12px; }
+.ubar-track { height: 4px; border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--state-neutral) 22%, transparent); }
+.ubar-fill { height: 100%; border-radius: 2px; width: calc(var(--ubar-pct, 0) * 1%); transition: width .3s ease; }
+.ubar-fill[data-lvl="ok"]   { background: var(--state-waiting); }
+.ubar-fill[data-lvl="warn"] { background: var(--state-pending); }
+.ubar-fill[data-lvl="hot"]  { background: var(--state-error); }
+.ubar-label { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); }
+.ubar-reste { color: var(--text-muted); }
 
 .usage-pct {
   font-variant-numeric: tabular-nums;

@@ -167,6 +167,24 @@
                 <span class="settings-toggle-knob"></span>
               </button>
             </div>
+            <div class="settings-toggle-row">
+              <div>
+                <div class="settings-label" data-i18n="island_headless_label">Headless sessions in the island</div>
+                <div class="settings-hint" data-i18n="island_headless_hint">Show background (headless) sessions in the island's right wing and panel</div>
+              </div>
+              <button class="settings-toggle" id="islandHeadlessToggle" role="switch" aria-checked="false" data-i18n-title="island_headless_label" title="Headless sessions in the island">
+                <span class="settings-toggle-knob"></span>
+              </button>
+            </div>
+            <div class="settings-toggle-row">
+              <div>
+                <div class="settings-label" data-i18n="tray_popover_label">Tray popover</div>
+                <div class="settings-hint" data-i18n="tray_popover_hint">Click the tray to open the mini panel; off opens the dashboard directly</div>
+              </div>
+              <button class="settings-toggle" id="trayPopoverToggle" role="switch" aria-checked="false" data-i18n-title="tray_popover_label" title="Tray popover">
+                <span class="settings-toggle-knob"></span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -276,23 +294,8 @@
 
   <!-- Status bar -->
   <div class="status-bar" id="statusBar">
-    <div class="usage-group" id="usageGroup" title="">
-      <span class="usage-label">5h</span>
-      <div class="usage-bar"><div class="usage-bar-fill" id="usageBar5h"></div></div>
-      <span class="usage-pct" id="usagePct5h">—</span>
-      <span class="usage-reset" id="usageReset">
-        <svg class="usage-reset-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span class="usage-reset-text"></span>
-      </span>
-      <span class="status-sep">&middot;</span>
-      <span class="usage-label">7D</span>
-      <div class="usage-bar"><div class="usage-bar-fill" id="usageBar7d"></div></div>
-      <span class="usage-pct" id="usagePct7d">—</span>
-      <span class="usage-reset" id="usageReset7d">
-        <svg class="usage-reset-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span class="usage-reset-text"></span>
-      </span>
-    </div>
+    <!-- Anneaux de conso (5H / 7J / scopés Fable) — remplis par renderUsage(). -->
+    <div class="usage-group uring-row" id="usageGroup" title=""></div>
     <span class="status-fallback" id="statusFallback" style="display:none;">
       <span class="status-item" id="statActive"></span>
       <span class="status-sep">&middot;</span>
@@ -328,6 +331,7 @@
   </div>
 
   <script src="../i18n.js"></script>
+  <script src="usage-ring.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

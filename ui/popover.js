@@ -79,13 +79,10 @@ function renderPopover(sessions, config) {
 // Jauges conso — 5H / 7J puis limites scopées (ex. « 7J FABLE »), rendu
 // générique depuis getUsage(). Seuils alignés île/tray : warn ≥50, hot >80.
 function gaugeRow(label, pct, resetsAt) {
-  const cls = pct > 80 ? ' hot' : pct >= 50 ? ' warn' : '';
+  // Barre partagée (usage-ring) — Paul préfère la barre à l'anneau dans le
+  // popover. reste = temps formaté nu (« 3h20 »).
   const rem = resetsAt ? fmtRemaining(resetsAt) : '';
-  const right = rem ? window.i18n.t('island_reste', { t: rem }) : '';
-  return `<div class="pop-gauge">`
-    + `<div class="pop-gauge-track"><div class="pop-gauge-fill${cls}" style="width:${Math.min(100, pct)}%"></div></div>`
-    + `<div class="pop-gauge-label"><span>${esc(label)} · ${pct}%</span><span>${esc(right)}</span></div>`
-    + `</div>`;
+  return window.usageGauge.usageBar(label, pct, rem);
 }
 
 function renderGauges(usage) {

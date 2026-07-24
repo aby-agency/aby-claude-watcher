@@ -1662,8 +1662,15 @@ function formatUsageTooltip(d) {
   };
   fmt('usage_tooltip_5h', d.fiveHour);
   fmt('usage_tooltip_7d', d.sevenDay);
-  fmt('usage_tooltip_7d_sonnet', d.sevenDaySonnet);
-  fmt('usage_tooltip_7d_opus', d.sevenDayOpus);
+  // Limites scopées par modèle (ex. « 7j Fable : 81% ⚠ ») — lues génériquement
+  // depuis limits[] : le libellé suit le display_name renvoyé par l'API.
+  for (const l of d.scopedLimits || []) {
+    const pct = Math.round(l.percent);
+    const time = l.resetsAt ? new Date(l.resetsAt).toLocaleString() : '?';
+    const warn = l.severity === 'critical' ? ' ⛔' : l.severity === 'warning' ? ' ⚠' : '';
+    const win = l.group === 'session' ? t('usage_win_session') : t('usage_win_weekly');
+    lines.push(t('usage_tooltip_model', { win, model: l.model, pct, warn, time }));
+  }
   return lines.join('\n');
 }
 

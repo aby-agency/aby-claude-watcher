@@ -91,11 +91,25 @@ class UsageMonitor extends EventEmitter {
     const pick = (obj) => obj && typeof obj.utilization === 'number'
       ? { utilization: obj.utilization, resetsAt: obj.resets_at || null }
       : null;
+    // Le nouveau schéma expose `limits[]` : une entrée par fenêtre, dont les
+    // limites SCOPÉES par modèle (ex. la limite hebdo Fable) que les ex-clés
+    // seven_day_sonnet/opus (désormais toujours null, constaté 2026-07-24)
+    // n'exposent plus. On lit `scope.model.display_name` GÉNÉRIQUEMENT : le
+    // tooltip suivra automatiquement le modèle sous limite, quel qu'il soit.
+    const scopedLimits = (Array.isArray(d.limits) ? d.limits : [])
+      .filter((l) => l && l.scope && l.scope.model && l.scope.model.display_name
+        && typeof l.percent === 'number')
+      .map((l) => ({
+        model: l.scope.model.display_name,
+        group: l.group || null,
+        percent: l.percent,
+        resetsAt: l.resets_at || null,
+        severity: l.severity || 'normal',
+      }));
     return {
       fiveHour: pick(d.five_hour),
       sevenDay: pick(d.seven_day),
-      sevenDaySonnet: pick(d.seven_day_sonnet),
-      sevenDayOpus: pick(d.seven_day_opus),
+      scopedLimits,
       fetchedAt: Date.now(),
     };
   }

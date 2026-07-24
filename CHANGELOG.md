@@ -4,6 +4,32 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-07-24
+
+### Added
+- **Limites par modèle (dont Fable).** L'API de consommation expose désormais
+  des limites hebdomadaires scopées par modèle. Elles apparaissent dans la
+  dynamic island (jauge dédiée, ex. « 7J FABLE · 82 % », rouge au-delà de 80 %),
+  dans le tooltip de conso de la fenêtre principale et dans le popover. Lecture
+  générique : n'importe quel modèle sous limite s'affiche automatiquement.
+- **Retour du popover du tray.** Un clic sur l'item de la barre de menus rouvre
+  le mini-panneau (liste des sessions, jauges 5H / 7J / Fable, boutons Ouvrir /
+  Quitter), en complément de la dynamic island. Retiré en v2.0.0, remis à la
+  demande. Positionné sous l'item, se ferme au clic ailleurs.
+
+### Fixed
+- **Scrollbar de la liste dans l'île.** Le volet ne montre plus de scrollbar sur
+  la liste des sessions : elle prend sa hauteur naturelle, une ligne par session.
+- **Compat API de conso.** Les clés `seven_day_sonnet` / `seven_day_opus`
+  renvoient désormais `null` côté API ; le code mort correspondant est retiré,
+  la conso par modèle passe par le nouveau schéma `limits`.
+
+### Changed
+- **Electron 41.2 → 41.10.3.** Correctifs de sécurité Chromium de la branche 41.
+  L'installation et le build requièrent désormais Node ≥ 20.19 (le downloader
+  `@electron/get` est passé en ESM) — contrainte documentée via le champ
+  `engines`, un `.nvmrc` (Node 22) et le README interne.
+
 ## [2.1.1] — 2026-07-23
 
 ### Removed

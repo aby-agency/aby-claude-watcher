@@ -11,6 +11,7 @@ const i18n = require('./i18n');
 const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
 const { trayGlance } = require('./tray-glance');
 const island = require('./island');
+const popover = require('./popover');
 const { bannerPayload } = require('./island-model');
 const { gaugeColor, ringBitmap, dotBitmap, trayUsageLabel } = require('./ring-gauge');
 const { isFocusActive } = require('./focus-state');
@@ -397,6 +398,7 @@ function setupUsageMonitor() {
     // stale between session events.
     refreshTrayGlance();
     island.sendUpdate();
+    popover.sendUpdate();
   });
   usageMonitor.on('error', (code) => sendToRenderer('usage-error', code));
   usageMonitor.start();
@@ -497,6 +499,7 @@ function setupIPC() {
 ipcMain.handle('set-session-order', (_, order) => {
     config.setSessionOrder(order);
     island.sendUpdate();
+    popover.sendUpdate();
   });
 
   ipcMain.handle('set-custom-name', (_, sessionId, name) => {
@@ -507,6 +510,7 @@ ipcMain.handle('set-session-order', (_, order) => {
       updateTrayMenu();
       refreshTrayGlance();
       island.sendUpdate();
+      popover.sendUpdate();
     }
   });
 
@@ -559,6 +563,7 @@ ipcMain.handle('set-session-order', (_, order) => {
       mainWindow.webContents.send('language-changed', i18n.getLanguage());
     }
     island.sendUpdate();
+    popover.sendUpdate();
     // Update tray tooltip with new language
     updateTrayMenu();
     refreshTrayGlance();
@@ -613,6 +618,12 @@ ipcMain.handle('set-session-order', (_, order) => {
   });
 
   ipcMain.handle('island-hover', (_, hovering) => island.setHover(!!hovering));
+
+  // Popover du tray — actions app-level (le reste vit dans popover.js).
+  ipcMain.handle('popover-hide', () => popover.hide());
+  ipcMain.handle('popover-open-main', () => showMainWindow());
+  ipcMain.handle('popover-quit', () => app.quit());
+  ipcMain.handle('popover-resize', (_, height) => popover.resize(height));
 }
 
 function serializeSession(session) {
@@ -716,6 +727,7 @@ app.whenReady().then(() => {
   setupTray();
 
   island.refresh(!!config.get().islandEnabled);
+  popover.create(); // fenêtre cachée, montrée au clic tray
   const refreshIsland = () => island.refresh(!!config.get().islandEnabled);
   screen.on('display-added', refreshIsland);
   screen.on('display-removed', refreshIsland);
@@ -774,8 +786,10 @@ function setupTray() {
   tray = new Tray(icon);
   tray.setToolTip('Aby Claude Watcher');
 
-  tray.on('click', showMainWindow);
-  tray.on('right-click', showMainWindow);
+  // Clic (gauche/droit) → popover sous l'item du tray. Le dashboard reste
+  // accessible via le bouton « Ouvrir » du popover et l'icône du Dock.
+  tray.on('click', () => popover.toggle(tray.getBounds()));
+  tray.on('right-click', () => popover.toggle(tray.getBounds()));
 
   updateTrayMenu();
   refreshTrayGlance();
@@ -789,6 +803,7 @@ function setupTray() {
       updateDockBadge();
       refreshTrayGlance();
       island.sendUpdate();
+      popover.sendUpdate();
     }, 300);
   };
   watcher.on('session-added', debouncedUpdate);

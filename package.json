@@ -1,13 +1,16 @@
 {
   "name": "aby-claude-watcher",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Aby Claude Watcher — dashboard desktop pour monitorer en temps réel vos sessions Claude Code",
   "main": "main.js",
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder --mac",
-    "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js && node test/updater.test.js && node test/watcher.test.js && node test/subagents.test.js && node test/workflows.test.js && node test/tray-glance.test.js && node test/focus-state.test.js && node test/ring-gauge.test.js && node test/island-model.test.js"
+    "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js && node test/updater.test.js && node test/watcher.test.js && node test/usage.test.js && node test/subagents.test.js && node test/workflows.test.js && node test/tray-glance.test.js && node test/focus-state.test.js && node test/ring-gauge.test.js && node test/island-model.test.js"
   },
   "build": {
     "appId": "fr.aby-agency.aby-claude-watcher",
@@ -69,6 +72,8 @@
       "island-model.js",
       "island.js",
       "preload-island.js",
+      "popover.js",
+      "preload-popover.js",
       "ui/**/*",
       "bin/**/*",
       "assets/**/*"
@@ -93,7 +98,7 @@
     "url": "https://github.com/aby-agency/aby-claude-watcher.git"
   },
   "devDependencies": {
-    "electron": "^41.2.0",
+    "electron": "^41.10.3",
     "electron-builder": "^26.8.1"
   },
   "dependencies": {

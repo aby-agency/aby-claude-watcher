@@ -238,9 +238,10 @@ body.expanded .panel { max-height: 300px; }
    (overflow-y:auto force overflow-x:auto) → pouce de scrollbar horizontale
    affiché comme une « barre » fantôme sous chaque section. */
 .panel-inner { padding: 6px 6px 12px; }
-.rows { max-height: 190px; overflow-y: auto; }
-.rows::-webkit-scrollbar { width: 4px; }
-.rows::-webkit-scrollbar-thumb { background: #333c50; border-radius: 2px; }
+/* Pas de cap ni de scrollbar sur la liste : elle prend sa hauteur naturelle,
+   une ligne par session — quitte à déborder de la fenêtre si beaucoup de
+   sessions (choix Paul : on accepte que ça sorte plutôt qu'une scrollbar). */
+.rows { }
 .row {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 8px;
@@ -279,7 +280,7 @@ body.expanded .panel { max-height: 300px; }
 .gauge-block { margin: 8px 8px 0; }
 /* Pas de filet entre les deux jauges (retour Paul) — l'air + les labels
    5H/7J suffisent. */
-#gauge7Block { margin-top: 12px; }
+#gauge7Block, .gauge-scoped { margin-top: 12px; }
 .gauge { height: 4px; border-radius: 2px; background: #1d2330; overflow: hidden; }
 .gauge-fill { height: 100%; border-radius: 2px; background: var(--state-waiting); transition: width .3s ease; }
 .gauge-fill.warn { background: var(--state-pending); }

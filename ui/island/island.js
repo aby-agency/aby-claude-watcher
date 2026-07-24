@@ -150,6 +150,23 @@ async function refresh() {
   };
   renderGauge('gaugeBlock', 'gaugeFill', 'gaugeLeft', 'gaugeRight', '5H', usage && usage.fiveHour);
   renderGauge('gauge7Block', 'gauge7Fill', 'gauge7Left', 'gauge7Right', '7J', usage && usage.sevenDay);
+
+  // Limites scopées par modèle (ex. « 7J FABLE ») — une jauge par entrée, même
+  // recette que ci-dessus mais en nombre variable. Lu génériquement depuis
+  // scopedLimits : le libellé suit le display_name renvoyé par l'API.
+  const scoped = (usage && Array.isArray(usage.scopedLimits)) ? usage.scopedLimits : [];
+  document.getElementById('gaugeScoped').innerHTML = scoped.map((l) => {
+    const pct = Math.round(l.percent);
+    const cls = pct > 80 ? ' hot' : pct >= 50 ? ' warn' : '';
+    const win = l.group === 'session' ? '5H' : '7J';
+    const rem = l.resetsAt ? fmtRemaining(l.resetsAt) : '';
+    const right = rem ? window.i18n.t('island_reste', { t: rem }) : '';
+    const label = esc(`${win} ${String(l.model).toUpperCase()}`);
+    return `<div class="gauge-block gauge-scoped">`
+      + `<div class="gauge"><div class="gauge-fill${cls}" style="width:${Math.min(100, pct)}%"></div></div>`
+      + `<div class="gauge-label"><span>${label} · ${pct}%</span><span>${esc(right)}</span></div>`
+      + `</div>`;
+  }).join('');
 }
 
 // ── Hover machinery ──

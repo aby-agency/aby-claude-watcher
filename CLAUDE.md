@@ -8,7 +8,13 @@ Electron desktop app monitoring Claude Code sessions in real-time.
 npm install
 npm start        # production
 npm run dev      # with devtools
+npm run build    # DMG — REQUIERT Node ≥ 20.19 (cf. .nvmrc: 22)
 ```
+
+> **Node ≥ 20.19 obligatoire pour `npm install`/`npm run build`.** Depuis Electron
+> 41.8+, son downloader `@electron/get` est passé en ESM pur : le postinstall
+> `require()` casse (`ERR_REQUIRE_ESM`) sur Node < 20.19. `nvm use` lit le `.nvmrc`
+> (Node 22). Le champ `engines` du package.json documente la contrainte.
 
 ## Architecture
 

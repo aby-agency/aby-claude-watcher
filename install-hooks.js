@@ -1,14 +1,16 @@
 // install-hooks.js
-// Installs the Aby permission-detection hook into a project's
-// `.claude/settings.local.json`. Designed to be safe to call repeatedly.
+// Installs the Aby permission-detection hook into a Claude Code settings file.
+// Used by main.js to install a GLOBAL hook in `~/.claude/settings.json` (the
+// user-level file that actually loads hooks — `~/.claude/settings.local.json`
+// is IGNORED at user scope). Also keeps the per-project helper for the `cc`
+// wrapper path. Safe to call repeatedly.
 //
 // Safety rules:
-// - Refuse to write to `$HOME/.claude/settings.local.json` (that's the user's
-//   global Claude Code config, not a project-local one).
-// - If the existing file exists and is not valid JSON, BAIL without writing —
-//   never clobber a user's settings (Claude Code may accept comments some day).
+// - If the existing file is not valid JSON, BAIL without writing — never
+//   clobber a user's settings.
 // - Recognize our own entries by hook filename so relocating the app heals the
-//   reference instead of adding a duplicate.
+//   reference in place instead of adding a duplicate.
+// - Never touch hooks/keys that aren't ours.
 
 const fs = require('fs');
 const path = require('path');
@@ -30,7 +32,7 @@ function ensureBlock(entries, event, hookPath) {
   for (const block of entries) {
     if (!isOurHook(block)) continue;
     found = true;
-    // Self-heal: if the command path is stale, update it in place
+    // Self-heal: if the command path is stale, update it in place.
     for (const h of block.hooks || []) {
       if (h && h.command !== hookPath) {
         h.command = hookPath;
@@ -49,29 +51,24 @@ function ensureBlock(entries, event, hookPath) {
   return { entries, changed };
 }
 
-function installHooks(cwd, hookPath) {
-  if (!cwd || typeof cwd !== 'string') return { installed: false, reason: 'invalid-cwd' };
-  if (!hookPath || !fs.existsSync(hookPath)) return { installed: false, reason: 'hook-missing' };
-
-  // $HOME/.claude/settings.local.json is the global Claude Code user config.
-  // Installing there is intentional: it covers sessions started outside of a
-  // project directory.  The hook is lightweight (async socket ping, no-op if
-  // the watcher isn't running) so the impact on non-monitored sessions is nil.
-
-  const settingsDir = path.join(cwd, '.claude');
-  const settingsPath = path.join(settingsDir, 'settings.local.json');
-
-  let data = {};
-  if (fs.existsSync(settingsPath)) {
-    try {
-      const raw = fs.readFileSync(settingsPath, 'utf-8');
-      data = JSON.parse(raw);
-      if (!data || typeof data !== 'object' || Array.isArray(data)) data = {};
-    } catch (e) {
-      // Existing file we can't parse — do NOT overwrite user data.
-      return { installed: false, reason: 'parse-failed' };
-    }
+// Reads a settings JSON file (or {} if absent); returns null if it exists but
+// can't be parsed (caller must NOT overwrite in that case).
+function readSettings(settingsPath) {
+  if (!fs.existsSync(settingsPath)) return {};
+  try {
+    const data = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+    return data;
+  } catch (e) {
+    return null; // unparseable — signal bail
   }
+}
+
+// Merge our PreToolUse + Notification hooks into an arbitrary settings file.
+function installHooksIntoFile(settingsPath, hookPath) {
+  if (!settingsPath || typeof settingsPath !== 'string') return { installed: false, reason: 'invalid-path' };
+  const data = readSettings(settingsPath);
+  if (data === null) return { installed: false, reason: 'parse-failed' };
 
   const hooks = (data.hooks && typeof data.hooks === 'object' && !Array.isArray(data.hooks)) ? data.hooks : {};
   let changed = false;
@@ -85,7 +82,8 @@ function installHooks(cwd, hookPath) {
   if (!changed) return { installed: true, reason: 'already-present' };
 
   try {
-    if (!fs.existsSync(settingsDir)) fs.mkdirSync(settingsDir, { recursive: true });
+    const dir = path.dirname(settingsPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     data.hooks = hooks;
     fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + '\n');
     return { installed: true, reason: 'written' };
@@ -94,8 +92,75 @@ function installHooks(cwd, hookPath) {
   }
 }
 
-function getDefaultHookPath() {
-  return path.join(__dirname, 'bin', HOOK_FILENAME);
+// Remove ONLY our hook blocks from a settings file; leave everything else.
+function removeHookFromFile(settingsPath) {
+  if (!settingsPath || typeof settingsPath !== 'string') return { removed: false, reason: 'invalid-path' };
+  if (!fs.existsSync(settingsPath)) return { removed: false, reason: 'absent' };
+  const data = readSettings(settingsPath);
+  if (data === null) return { removed: false, reason: 'parse-failed' };
+  const hooks = (data.hooks && typeof data.hooks === 'object' && !Array.isArray(data.hooks)) ? data.hooks : null;
+  if (!hooks) return { removed: false, reason: 'no-hooks' };
+
+  let changed = false;
+  for (const event of HOOK_EVENTS) {
+    if (!Array.isArray(hooks[event])) continue;
+    const kept = hooks[event].filter(b => !isOurHook(b));
+    if (kept.length !== hooks[event].length) changed = true;
+    if (kept.length) hooks[event] = kept;
+    else delete hooks[event];
+  }
+  if (!changed) return { removed: false, reason: 'not-present' };
+
+  try {
+    data.hooks = hooks;
+    fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + '\n');
+    return { removed: true, reason: 'written' };
+  } catch (e) {
+    return { removed: false, reason: 'write-failed', error: e.message };
+  }
 }
 
-module.exports = { installHooks, getDefaultHookPath };
+// Per-project install into `<cwd>/.claude/settings.local.json` (kept for the
+// `cc` wrapper path; the app itself now prefers the global install below).
+function installHooks(cwd, hookPath) {
+  if (!cwd || typeof cwd !== 'string') return { installed: false, reason: 'invalid-cwd' };
+  if (!hookPath || !fs.existsSync(hookPath)) return { installed: false, reason: 'hook-missing' };
+  return installHooksIntoFile(path.join(cwd, '.claude', 'settings.local.json'), hookPath);
+}
+
+function globalSettingsPath() {
+  // User-level settings.json — the ONLY user-scope file that loads hooks
+  // (settings.local.json is ignored at user scope). Covers ALL sessions,
+  // any project, whether or not the `cc` wrapper is used.
+  return path.join(os.homedir(), '.claude', 'settings.json');
+}
+
+function installGlobalHook(hookPath) {
+  if (!hookPath || !fs.existsSync(hookPath)) return { installed: false, reason: 'hook-missing' };
+  return installHooksIntoFile(globalSettingsPath(), hookPath);
+}
+
+function removeGlobalHook() {
+  return removeHookFromFile(globalSettingsPath());
+}
+
+// Absolute path to the hook script. In a packaged app the script lives in
+// `app.asar.unpacked/bin/` (a REAL file Claude Code's shell can exec) — inside
+// `app.asar` it would not be a real file. Requires `asarUnpack` on bin/ in the
+// build config. In dev, __dirname has no `app.asar` so the replace is a no-op.
+function getDefaultHookPath() {
+  return path.join(__dirname, 'bin', HOOK_FILENAME).replace(
+    `${path.sep}app.asar${path.sep}`,
+    `${path.sep}app.asar.unpacked${path.sep}`
+  );
+}
+
+module.exports = {
+  installHooks,
+  installHooksIntoFile,
+  removeHookFromFile,
+  installGlobalHook,
+  removeGlobalHook,
+  globalSettingsPath,
+  getDefaultHookPath,
+};

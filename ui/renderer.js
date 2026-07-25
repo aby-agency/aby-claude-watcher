@@ -33,6 +33,7 @@ let autoLaunch = false;
 let islandEnabled = true;
 let islandShowHeadless = true;
 let trayPopoverEnabled = true;
+let permissionHookEnabled = true;
 let windowTransparencyEnabled = false;
 let windowOpacity = 0.85;
 let searchQuery = '';
@@ -88,6 +89,7 @@ async function init() {
   islandEnabled = config.islandEnabled !== false;
   islandShowHeadless = config.islandShowHeadless !== false;
   trayPopoverEnabled = config.trayPopoverEnabled !== false;
+  permissionHookEnabled = config.permissionHookEnabled !== false;
   windowTransparencyEnabled = !!config.windowTransparencyEnabled;
   windowOpacity = config.windowOpacity ?? 0.85;
   sessionOrder = config.sessionOrder || [];
@@ -105,6 +107,7 @@ async function init() {
   updateIslandToggle();
   updateIslandHeadlessToggle();
   updateTrayPopoverToggle();
+  updatePermHookToggle();
   $volumeSlider.value = Math.round(volume * 100);
   $volumeValue.textContent = `${Math.round(volume * 100)}%`;
   updateTransparencyControls();
@@ -223,6 +226,9 @@ async function init() {
 
   const trayPopoverBtn = document.getElementById('trayPopoverToggle');
   if (trayPopoverBtn) trayPopoverBtn.addEventListener('click', toggleTrayPopover);
+
+  const permHookBtn = document.getElementById('permHookToggle');
+  if (permHookBtn) permHookBtn.addEventListener('click', togglePermHook);
 
   // Language picker
   document.querySelectorAll('.language-btn').forEach(btn => {
@@ -495,6 +501,20 @@ function toggleTrayPopover() {
   trayPopoverEnabled = !trayPopoverEnabled;
   window.api.setTrayPopoverEnabled(trayPopoverEnabled);
   updateTrayPopoverToggle();
+}
+
+function updatePermHookToggle() {
+  const btn = document.getElementById('permHookToggle');
+  if (btn) {
+    btn.classList.toggle('on', permissionHookEnabled);
+    btn.setAttribute('aria-checked', String(permissionHookEnabled));
+  }
+}
+
+function togglePermHook() {
+  permissionHookEnabled = !permissionHookEnabled;
+  window.api.setPermissionHookEnabled(permissionHookEnabled);
+  updatePermHookToggle();
 }
 
 function updateTransparencyControls() {

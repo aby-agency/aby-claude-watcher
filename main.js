@@ -14,6 +14,7 @@ const island = require('./island');
 const popover = require('./popover');
 const { bannerPayload } = require('./island-model');
 const { gaugeColor, ringBitmap, dotBitmap, trayUsageLabel } = require('./ring-gauge');
+const { installGlobalHook, removeGlobalHook, getDefaultHookPath, globalSettingsPath } = require('./install-hooks');
 const { isFocusActive } = require('./focus-state');
 
 const subagentTracker = new SubagentTracker();
@@ -568,6 +569,11 @@ ipcMain.handle('set-session-order', (_, order) => {
     if (!value) popover.hide(); // coupé pendant qu'il est ouvert → on le referme
   });
 
+  ipcMain.handle('set-permission-hook-enabled', (_, value) => {
+    config.setPermissionHookEnabled(value);
+    applyPermissionHook(); // installe ou retire le hook global immédiatement
+  });
+
   ipcMain.handle('set-language', (_, lang) => {
     config.setLanguage(lang);
     applyLanguage();
@@ -718,6 +724,26 @@ if (!app.requestSingleInstanceLock()) {
   });
 }
 
+// Détection « en attente » (permission prompt) : Claude Code n'écrit le tool_use
+// qu'APRÈS approbation → seul un hook peut signaler l'attente. On installe le hook
+// GLOBALEMENT dans ~/.claude/settings.json (le seul fichier user-scope qui charge
+// les hooks) → marche pour TOUTES les sessions, sans le wrapper `cc`, quel que
+// soit le projet. Idempotent + self-heal du chemin ; merge non destructif.
+function applyPermissionHook() {
+  const enabled = config.get().permissionHookEnabled !== false;
+  try {
+    if (enabled) {
+      const r = installGlobalHook(getDefaultHookPath());
+      log.info(`[hook] global install ${r.installed ? 'ok' : 'FAILED'} (${r.reason}) → ${globalSettingsPath()} : ${getDefaultHookPath()}`);
+    } else {
+      const r = removeGlobalHook();
+      log.info(`[hook] global remove ${r.removed ? 'ok' : 'noop'} (${r.reason}) → ${globalSettingsPath()}`);
+    }
+  } catch (e) {
+    log.warn('[hook] global install/remove threw:', e.message);
+  }
+}
+
 app.whenReady().then(() => {
   // Only grant audio-related permissions (needed for notification sound routing)
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -736,6 +762,7 @@ app.whenReady().then(() => {
   setupIPC();
   setupWatcher();
   setupSocket();
+  applyPermissionHook(); // installe/retire le hook global selon le réglage
   setupUsageMonitor();
   setupTray();
 

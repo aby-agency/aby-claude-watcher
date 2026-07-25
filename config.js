@@ -29,6 +29,7 @@ let config = {
   islandEnabled: true,  // dynamic island sur l'encoche (macOS à encoche uniquement)
   islandShowHeadless: true, // afficher les sessions headless (aile droite + volet) dans l'île
   trayPopoverEnabled: true, // clic tray → popover ; off → clic tray ouvre le dashboard directement
+  permissionHookEnabled: true, // installe le hook global ~/.claude/settings.json (détection « en attente »)
 };
 
 function load() {
@@ -101,6 +102,11 @@ function setIslandShowHeadless(value) {
 
 function setTrayPopoverEnabled(value) {
   config.trayPopoverEnabled = !!value;
+  save();
+}
+
+function setPermissionHookEnabled(value) {
+  config.permissionHookEnabled = !!value;
   save();
 }
 
@@ -234,6 +240,7 @@ module.exports = {
   setIslandEnabled,
   setIslandShowHeadless,
   setTrayPopoverEnabled,
+  setPermissionHookEnabled,
   setAlwaysOnTop,
   setVolume,
   setWindowTransparencyEnabled,

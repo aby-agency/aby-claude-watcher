@@ -72,6 +72,8 @@ settings_title: 'Paramètres',
       island_headless_hint: "Affiche les sessions en arrière-plan (headless) dans l'aile droite et le volet de l'île",
       tray_popover_label: 'Popover du tray',
       tray_popover_hint: 'Clic sur le tray = mini-panneau ; désactivé, le clic ouvre directement le dashboard',
+      perm_hook_label: 'Détecter les demandes de permission',
+      perm_hook_hint: 'Installe un hook dans ~/.claude/settings.json pour que les sessions en attente de ton approbation apparaissent « en attente » (tous projets)',
 
       // Settings — notifications
       volume_label: 'Volume',
@@ -229,6 +231,8 @@ settings_title: 'Settings',
       island_headless_hint: "Show background (headless) sessions in the island's right wing and panel",
       tray_popover_label: 'Tray popover',
       tray_popover_hint: 'Click the tray to open the mini panel; off opens the dashboard directly',
+      perm_hook_label: 'Detect permission prompts',
+      perm_hook_hint: 'Installs a hook in ~/.claude/settings.json so sessions waiting for your approval show as “waiting” (all projects)',
 
       // Settings — notifications
       volume_label: 'Volume',

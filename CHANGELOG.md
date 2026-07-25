@@ -4,6 +4,31 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] — 2026-07-25
+
+### Fixed
+- **Les sessions en attente de ton approbation apparaissent enfin « en attente ».**
+  La détection d'une demande de permission passe par un hook Claude Code ; jusqu'ici
+  ce hook n'était installé que par projet (via le wrapper `cc`) et son script,
+  packé dans l'app, n'était de toute façon pas un fichier exécutable réel — donc
+  pour une app installée, une session bloquée sur une permission restait affichée
+  « en exécution ». Corrigé : le hook est désormais un vrai fichier (`asarUnpack`)
+  et s'installe **globalement** dans `~/.claude/settings.json`, pour toutes les
+  sessions et tous les projets, sans wrapper.
+
+### Added
+- **Réglage « Détecter les demandes de permission »** (défaut activé) — installe
+  ou retire le hook global dans `~/.claude/settings.json` (merge non destructif).
+
+### Changed
+- **Format du temps restant unifié** sur les trois surfaces (dashboard, popover,
+  île) : format compact `4h48` / `45m` / `6j3h` partout (l'île et le popover
+  affichaient un format espacé `2 h 46`).
+
+### Internal
+- Nettoyage du CSS mort des anciennes jauges ; formateurs de temps dupliqués
+  remplacés par `formatRemaining` (testé) ; `install-hooks.js` généralisé et testé.
+
 ## [2.3.1] — 2026-07-25
 
 ### Changed

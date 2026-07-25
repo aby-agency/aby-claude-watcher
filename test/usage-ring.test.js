@@ -1,5 +1,5 @@
 // Tests for ui/usage-ring.js. Run: node test/usage-ring.test.js
-const { usageRing, usageBar, usageLevel } = require('../ui/usage-ring.js');
+const { usageRing, usageBar, usageLevel, formatRemaining } = require('../ui/usage-ring.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -52,6 +52,18 @@ test('no reste span when remaining empty', () => {
 });
 test('escapes the label', () => {
   assert(usageBar('<x>', 10, '').includes('&lt;x&gt;'), 'escaped');
+});
+
+console.log('\nformatRemaining:');
+const M = 60000, H = 60 * M, D = 24 * H;
+test('minutes → "45m"', () => assertEq(formatRemaining(45 * M, 0), '45m'));
+test('heures+minutes → "2h46" (minutes paddées)', () => assertEq(formatRemaining(2 * H + 46 * M, 0), '2h46'));
+test('heure pile → "3h"', () => assertEq(formatRemaining(3 * H, 0), '3h'));
+test('jours+heures → "3j12h"', () => assertEq(formatRemaining(3 * D + 12 * H, 0), '3j12h'));
+test('jours pile → "3j"', () => assertEq(formatRemaining(3 * D, 0), '3j'));
+test('reset passé → ""', () => assertEq(formatRemaining(-1000, 0), ''));
+test('now par défaut = Date.now() (reset lointain → non vide)', () => {
+  assert(formatRemaining(Date.now() + 90 * M).length > 0, 'non vide');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

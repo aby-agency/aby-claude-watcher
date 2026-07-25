@@ -7,23 +7,9 @@ function esc(str) {
   return div.innerHTML;
 }
 
-// « reste X » compact (même style que l'île : « 35 min », « 7 h 33 », « 3 j 12 h »).
-function fmtRemaining(resetsAt) {
-  const ms = new Date(resetsAt).getTime() - Date.now();
-  if (!Number.isFinite(ms) || ms <= 0) return '';
-  const min = Math.round(ms / 60000);
-  if (min >= 1440) {
-    const d = Math.floor(min / 1440);
-    const h = Math.round((min % 1440) / 60);
-    return h ? `${d} j ${h} h` : `${d} j`;
-  }
-  if (min >= 60) {
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    return m ? `${h} h ${m}` : `${h} h`;
-  }
-  return `${min} min`;
-}
+// Temps restant : formateur partagé (window.usageGauge) — format compact
+// unifié avec le dashboard et l'île (« 45m », « 2h46 », « 3j12h »).
+const fmtRemaining = (resetsAt) => window.usageGauge.formatRemaining(resetsAt);
 
 function renderPopover(sessions, config) {
   const $list = document.getElementById('popList');

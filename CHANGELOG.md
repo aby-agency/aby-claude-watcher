@@ -4,6 +4,18 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] — 2026-07-25
+
+### Changed
+- **Format du temps restant unifié** sur les trois surfaces (dashboard, popover,
+  île) : format compact `4h48` / `45m` / `6j3h` partout (l'île et le popover
+  affichaient un format espacé `2 h 46`).
+
+### Internal
+- Nettoyage du CSS mort des anciennes jauges (barres horizontales du dashboard
+  et du popover remplacées par le composant partagé) ; formateurs de temps
+  dupliqués remplacés par `formatRemaining` (testé).
+
 ## [2.3.0] — 2026-07-24
 
 ### Added

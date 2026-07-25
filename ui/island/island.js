@@ -15,23 +15,9 @@ function escAttr(str) {
   return (str || '').replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function fmtMin(minutes) {
-  if (minutes === null || minutes === undefined) return '';
-  if (minutes < 60) return `${minutes} min`;
-  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`;
-}
-
-function fmtRemaining(resetsAt) {
-  const ms = new Date(resetsAt).getTime() - Date.now();
-  if (!Number.isFinite(ms) || ms <= 0) return '';
-  const min = Math.round(ms / 60000);
-  if (min >= 1440) { // fenêtre 7 jours : « 3 j 12 h »
-    const d = Math.floor(min / 1440);
-    const h = Math.round((min % 1440) / 60);
-    return h ? `${d} j ${h} h` : `${d} j`;
-  }
-  return fmtMin(min);
-}
+// Temps restant : formateur partagé (window.usageGauge) — format compact
+// unifié avec le dashboard et le popover.
+const fmtRemaining = (resetsAt) => window.usageGauge.formatRemaining(resetsAt);
 
 function wingHtml(wing) {
   // Pilule binaire : une pastille agrégée par aile — DROITE « busy » (bleu,

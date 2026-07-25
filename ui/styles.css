@@ -2008,37 +2008,6 @@ body.micro-mode .uring-reste { display: none; }
   min-width: 0;
 }
 
-.usage-label,
-.usage-pct,
-.usage-reset {
-  font-size: inherit;
-  color: var(--text-muted);
-}
-
-.usage-label {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.usage-bar {
-  width: 120px;
-  height: 10px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  overflow: hidden;
-}
-
-.usage-bar-fill {
-  height: 100%;
-  width: 0;
-  background: var(--state-running);
-  transition: width 250ms ease, background-color 250ms ease;
-}
-
-.usage-bar-fill.warn { background: var(--state-pending); }
-.usage-bar-fill.danger { background: var(--state-error); }
-
 /* ── Anneau de conso (composant partagé — barre du bas, popover, île) ──
    Généré par ui/usage-ring.js. Anneau CSS pur : conic-gradient rempli à
    --uring-pct %, troué par un masque radial. Couleur par seuil (ok/warn/hot),
@@ -2083,22 +2052,6 @@ body.micro-mode .uring-reste { display: none; }
 .ubar-fill[data-lvl="hot"]  { background: var(--state-error); }
 .ubar-label { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); }
 .ubar-reste { color: var(--text-muted); }
-
-.usage-pct {
-  font-variant-numeric: tabular-nums;
-  min-width: 32px;
-}
-
-.usage-reset {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.usage-reset-icon {
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
 
 .search-input {
   padding: 3px 10px;

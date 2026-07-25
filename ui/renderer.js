@@ -1648,32 +1648,20 @@ function renderUsage(data) {
   const rings = [];
   const add = (label, win) => {
     if (!win || typeof win.utilization !== 'number') return;
-    const rem = win.resetsAt ? formatResetTime(win.resetsAt) : '';
+    const rem = win.resetsAt ? window.usageGauge.formatRemaining(win.resetsAt) : '';
     rings.push(window.usageGauge.usageRing(label, Math.round(win.utilization), rem));
   };
   add('5H', data.fiveHour);
   add('7J', data.sevenDay);
   for (const l of data.scopedLimits || []) {
     const win = l.group === 'session' ? '5H' : '7J';
-    const rem = l.resetsAt ? formatResetTime(l.resetsAt) : '';
+    const rem = l.resetsAt ? window.usageGauge.formatRemaining(l.resetsAt) : '';
     rings.push(window.usageGauge.usageRing(`${win} ${String(l.model).toUpperCase()}`, Math.round(l.percent), rem));
   }
   group.innerHTML = rings.join('');
   group.title = formatUsageTooltip(data);
 }
 
-function formatResetTime(iso) {
-  try {
-    const d = new Date(iso);
-    const diffMs = d.getTime() - Date.now();
-    if (diffMs <= 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const mins = Math.round(diffMs / 60000);
-    if (mins < 60) return `${mins}m`;
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
-  } catch { return ''; }
-}
 
 function formatUsageTooltip(d) {
   const lines = [];

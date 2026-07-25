@@ -45,7 +45,21 @@
       + `</div>`;
   }
 
-  const gauge = { usageRing, usageBar, usageLevel };
+  // Temps restant avant reset, format COMPACT unifié sur les 3 surfaces
+  // (dashboard, popover, île) — remplace les 3 ex-formatters divergents
+  // (« 2h46 » vs « 2 h 46 »). resetsAt = ISO ou epoch ms ; nowMs pour les tests.
+  function formatRemaining(resetsAt, nowMs) {
+    const target = new Date(resetsAt).getTime();
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    const ms = target - now;
+    if (!Number.isFinite(ms) || ms <= 0) return '';
+    const min = Math.round(ms / 60000);
+    if (min >= 1440) { const d = Math.floor(min / 1440); const h = Math.round((min % 1440) / 60); return h ? `${d}j${h}h` : `${d}j`; }
+    if (min >= 60) { const h = Math.floor(min / 60); const m = min % 60; return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`; }
+    return `${min}m`;
+  }
+
+  const gauge = { usageRing, usageBar, usageLevel, formatRemaining };
   if (typeof module !== 'undefined' && module.exports) module.exports = gauge;
   if (typeof window !== 'undefined') window.usageGauge = gauge;
 })();

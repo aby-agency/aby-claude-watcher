@@ -15,11 +15,16 @@
     </div>
     <div class="banner" id="banner"></div>
     <div class="panel" id="panel">
+      <!-- .panel-fold : l'item de grille qui se replie à 0 (voir island.css).
+           Il ne porte AUCUN padding — un padding sur l'item empêche la grille
+           de le ramener à zéro (18px résiduels sous la pilule fermée). -->
+      <div class="panel-fold">
       <div class="panel-inner">
         <div class="rows" id="rows"></div>
         <div class="rows rows-bg" id="rowsBg"></div>
         <!-- Barres de conso (5H / 7J / scopés Fable) — colonne aérée. -->
         <div class="ubar-col" id="gauges"></div>
+      </div>
       </div>
     </div>
   </div>

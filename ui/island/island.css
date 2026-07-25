@@ -7,7 +7,13 @@ body {
   -webkit-user-select: none;
 }
 
-.island { display: flex; flex-direction: column; align-items: center; position: relative; }
+.island {
+  display: flex; flex-direction: column; align-items: center; position: relative;
+  /* Décalage horizontal de la pilule au repos (asymétrie des ailes), partagé
+     par les drops (bannière + panneau) pour qu'ils restent alignés dessous.
+     Défini ICI et pas dans .banner : deux copies de la formule divergeraient. */
+  --off: calc((var(--wing-r, 46px) + var(--pad-r, 14px) - var(--wing-l, 46px) - var(--pad-l, 14px)) / 2);
+}
 
 /* Collapsed pill: fused with the physical notch (same black, bottom radius).
    .notch-gap reserves the zone hidden by the hardware notch — never put
@@ -191,10 +197,9 @@ body.expanded .pill {
   top: var(--pill-h, 34px);
   /* La bannière épouse la pilule AU MOMENT MÊME : même largeur (--pill-w,
      offsetWidth via ResizeObserver) et même décalage horizontal que le
-     translateX de la pilule asymétrique — la pilule ne grossit plus pour la
-     notif. --off change avec les ailes → la transition transform fait glisser
-     la bannière en même temps que la pilule. */
-  --off: calc((var(--wing-r, 46px) + var(--pad-r, 14px) - var(--wing-l, 46px) - var(--pad-l, 14px)) / 2);
+     translateX de la pilule asymétrique (--off, hérité de .island) — la pilule
+     ne grossit plus pour la notif. --off change avec les ailes → la transition
+     transform fait glisser la bannière en même temps que la pilule. */
   transform: translate(calc(-50% + var(--off)), -100%);
   opacity: 0;
   pointer-events: none;
@@ -219,22 +224,75 @@ body.expanded .banner { transform: translate(calc(-50% + var(--off)), -100%); op
 .banner-item:hover { color: #fff; }
 .banner-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Expanded panel below the pill. max-height transition = fold animation. */
+/* Panneau déplié sous la pilule.
+   Le pli s'anime en `grid-template-rows: 0fr → 1fr` (hauteur RÉELLE du
+   contenu), PAS en max-height : avec un max-height plafonné (ex-300px) la
+   course utile s'arrêtait à la hauteur réelle du contenu (~150px) — soit la
+   moitié de la durée passée dans le vide. Résultat : ouverture qui claque en
+   deux fois trop vite, et à la fermeture ~0.11s d'immobilité avant que la
+   moindre chose bouge (le lag mou). En fr, la durée annoncée est la durée
+   vécue, quelle que soit la taille de la liste. Bonus : plus de troncature
+   silencieuse au-delà du cap (au-delà de la fenêtre, c'est elle qui clippe).
+   Ouverture .26s en ease-out franche, fermeture .19s — asymétrie volontaire :
+   ça s'ouvre avec du corps, ça se ferme sans traîner.
+   PIÈGE : inutile de mettre une courbe à dépassement sur le pli — une track
+   `fr` dans un conteneur en hauteur auto est CLAMPÉE à max-content, donc tout
+   ce qui passe au-dessus de 1fr rend la même hauteur (mesuré au CDP : avec
+   cubic-bezier(…1.08…), la hauteur plafonnait à 265px dès 200ms au lieu de
+   rebondir). Pas de rebond sur le panneau non plus : essayé sur le transform
+   de .panel-inner (où il s'interpole vraiment), un easeOutBack sur 6-8px de
+   course rend 0.12px de dépassement — invisible, et le pousser jusqu'au
+   visible ferait gadget. Le rebond reste la signature de la PILULE (largeur),
+   le panneau la suit en ease-out. */
 .panel {
   width: var(--pill-w, 320px); /* = pilule, toujours */
   box-sizing: border-box;
   background: #000;
   border-radius: 0 0 12px 12px;
   overflow: hidden;
-  max-height: 0;
-  transition: max-height .22s ease;
+  display: grid;
+  grid-template-rows: 0fr;
+  /* Suit le décalage de la pilule au repos et se recentre AVEC elle (même
+     courbe/durée que body.expanded .pill) : sans ça, le panneau naissait
+     centré pendant que la pilule glissait encore → ripage latéral au reveal. */
+  transform: translateX(var(--off));
+  transition:
+    grid-template-rows .19s cubic-bezier(.4, 0, .2, 1),
+    transform .3s cubic-bezier(.34, 1.3, .42, 1);
 }
-body.expanded .panel { max-height: 300px; }
-/* 6px + 8px de padding des .row = 14px d'alignement texte. PAS de marges
+body.expanded .panel {
+  grid-template-rows: 1fr;
+  transform: none;
+  transition:
+    grid-template-rows .26s cubic-bezier(.33, 1, .68, 1),
+    transform .3s cubic-bezier(.34, 1.3, .42, 1);
+}
+/* L'item de grille qui se replie : min-height:0 + overflow:hidden sont la
+   condition pour qu'il accepte de tomber à 0 — et il doit rester SANS padding
+   (le padding vit sur .panel-inner à l'intérieur). Un padding porté par l'item
+   lui-même survit au repli : la pilule fermée traînait 18px de noir dessous. */
+.panel-fold { min-height: 0; overflow: hidden; }
+/* Le contenu ne se contente pas d'être dévoilé : il monte de 6px en fondu.
+   Au repli, fondu court et sans délai (le contenu s'efface avant que le pli
+   finisse, on ne voit jamais du texte écrasé).
+   6px + 8px de padding des .row = 14px d'alignement texte. PAS de marges
    négatives sur les .row : elles créaient un débordement horizontal de .rows
    (overflow-y:auto force overflow-x:auto) → pouce de scrollbar horizontale
    affiché comme une « barre » fantôme sous chaque section. */
-.panel-inner { padding: 6px 6px 12px; }
+.panel-inner {
+  padding: 6px 6px 12px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity .12s ease, transform .19s cubic-bezier(.4, 0, .2, 1);
+}
+/* Le contenu se pose une fraction de seconde APRÈS le pli (délais .03/.06) :
+   le noir s'ouvre d'abord, le contenu s'installe dedans — l'inverse donnerait
+   du texte qui court devant son fond. */
+body.expanded .panel-inner {
+  opacity: 1;
+  transform: none;
+  transition: opacity .18s ease .06s, transform .28s cubic-bezier(.33, 1, .68, 1) .03s;
+}
 /* Pas de cap ni de scrollbar sur la liste : elle prend sa hauteur naturelle,
    une ligne par session — quitte à déborder de la fenêtre si beaucoup de
    sessions (choix Paul : on accepte que ça sorte plutôt qu'une scrollbar). */

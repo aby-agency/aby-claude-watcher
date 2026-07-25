@@ -4,6 +4,24 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] — 2026-07-25
+
+### Changed
+- **Le panneau de l'île s'ouvre et se ferme de façon fluide.** Le dépliement
+  s'anime désormais sur la hauteur réelle du contenu : à l'ouverture il ne
+  claque plus, et à la fermeture il part immédiatement au lieu de rester figé
+  un dixième de seconde avant de bouger. Le contenu apparaît en fondu, décalé
+  d'un cheveu sur le pli, et le panneau se recentre en même temps que la pilule
+  au lieu de riper latéralement.
+- **Le panneau ne se referme plus au moindre écart de curseur** : frôler le
+  bord ou traverser le liseré entre la pilule et le panneau laisse 140 ms de
+  battement. Sortir de l'île pour de bon le referme toujours net, et
+  l'ouverture reste instantanée et uniquement au survol.
+
+### Fixed
+- La liste des sessions n'est plus tronquée silencieusement quand elle dépasse
+  300 px (ancien plafond d'animation).
+
 ## [2.4.0] — 2026-07-25
 
 ### Fixed

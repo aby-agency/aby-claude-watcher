@@ -149,10 +149,35 @@ function setMouse(next) {
   hovering = next;
   window.islandApi.setHover(hovering);
 }
-function setExpanded(next) {
-  if (next === document.body.classList.contains('expanded')) return;
-  document.body.classList.toggle('expanded', next);
-  if (next) hideBanner(); // le panneau prend le dessus
+// Fermeture RETARDÉE de 140ms : la souris qui frôle le bord, traverse le
+// liseré entre pilule et panneau ou tremble d'un pixel refermait le panneau
+// instantanément — un clignotement à chaque approche. Le délai laisse le
+// mousemove suivant annuler la fermeture (re-survol = clearTimeout). Ne
+// concerne QUE la fermeture : l'ouverture reste immédiate, et rien d'autre que
+// le survol ne déplie (pas d'auto-expand sur pending/error).
+const COLLAPSE_GRACE_MS = 140;
+let collapseTimer = null;
+function setExpanded(next, immediate = false) {
+  if (next) {
+    clearTimeout(collapseTimer);
+    collapseTimer = null;
+    if (document.body.classList.contains('expanded')) return;
+    document.body.classList.add('expanded');
+    hideBanner(); // le panneau prend le dessus
+    return;
+  }
+  if (!document.body.classList.contains('expanded')) return;
+  if (immediate) {
+    clearTimeout(collapseTimer);
+    collapseTimer = null;
+    document.body.classList.remove('expanded');
+    return;
+  }
+  if (collapseTimer) return;
+  collapseTimer = setTimeout(() => {
+    collapseTimer = null;
+    document.body.classList.remove('expanded');
+  }, COLLAPSE_GRACE_MS);
 }
 const $pill = document.getElementById('pill');
 document.addEventListener('mousemove', (e) => {
@@ -164,8 +189,10 @@ document.addEventListener('mousemove', (e) => {
   setMouse(overPill || overPanel || overBanner);
   setExpanded(overPill || overPanel);
 });
-document.addEventListener('mouseleave', () => { setMouse(false); setExpanded(false); });
-window.addEventListener('blur', () => { setMouse(false); setExpanded(false); });
+// Sortie franche de la fenêtre / perte de focus : repli IMMÉDIAT, pas de
+// grâce — le curseur est parti pour de bon, le doute n'existe plus.
+document.addEventListener('mouseleave', () => { setMouse(false); setExpanded(false, true); });
+window.addEventListener('blur', () => { setMouse(false); setExpanded(false, true); });
 
 // Debounce rapid updates (same pattern as the old popover).
 let refreshPending = null;

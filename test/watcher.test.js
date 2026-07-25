@@ -7,7 +7,7 @@ const os = require('os');
 const { SessionWatcher, STATES } = require('../watcher');
 
 function makeMockConfig() {
-  const data = { sessions: {}, notifications: {}, customNames: {}, sessionOrder: [] };
+  const data = { sessions: {}, notifications: {}, customNames: {}, sessionOrder: [], pendingMarks: {} };
   return {
     _data: data,
     getSavedSessions: () => data.sessions,
@@ -16,7 +16,11 @@ function makeMockConfig() {
       delete data.sessions[id];
       delete data.notifications[id];
       delete data.customNames[id];
+      delete data.pendingMarks[id];
     },
+    setPendingMark: (id, mark) => { data.pendingMarks[id] = mark; },
+    clearPendingMark: (id) => { delete data.pendingMarks[id]; },
+    getPendingMark: (id) => data.pendingMarks[id] || null,
     getNotificationPrefs: (id) => data.notifications[id] || { modal: false, sound: false },
     setNotificationPrefs: (id, prefs) => { data.notifications[id] = prefs; },
     getCustomName: (id) => data.customNames[id] || null,
@@ -148,6 +152,128 @@ test('persists determined state to config', () => {
   const persisted = config.getSavedSessions()['C'];
   if (!persisted) throw new Error('session not persisted');
   if (persisted.stateName !== 'waiting') throw new Error(`expected stateName=waiting, got ${persisted.stateName}`);
+});
+
+// ─── pending persistant (survit au redémarrage) ──────────────────
+// Le pending n'existe QUE en RAM (aucune trace JSONL tant que l'utilisateur
+// n'a pas répondu) → sans ancrage disque, un redémarrage le reconstruisait en
+// `running` depuis le dernier `stop_reason: tool_use`, définitivement (le hook
+// PreToolUse ne re-fire jamais). Vu en live sur TrainBox le 2026-07-25.
+section('pending persistant:');
+
+function jsonlPending(name) {
+  // Dernier event = tool_use non résolu → état déduit du JSONL = running
+  const tmp = tmpJsonl(name);
+  fs.writeFileSync(tmp, JSON.stringify({
+    type: 'assistant',
+    timestamp: '2026-07-25T16:45:36.000Z',
+    message: { role: 'assistant',
+      content: [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: {} }],
+      stop_reason: 'tool_use' },
+  }) + '\n');
+  return tmp;
+}
+
+test('entrer en pending écrit une trace portant le mtime du JSONL', () => {
+  const tmp = jsonlPending('mark');
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('P1', makeSession('P1', { state: STATES.RUNNING, jsonlPath: tmp, lastTool: 'Bash' }));
+
+  w.setState('P1', STATES.PENDING, false, 'hook:PreToolUse');
+
+  const mark = config.getPendingMark('P1');
+  if (!mark) throw new Error('trace pending non écrite');
+  if (mark.mtimeMs !== fs.statSync(tmp).mtimeMs) throw new Error('mtime de la trace ≠ mtime du JSONL');
+  if (mark.tool !== 'Bash') throw new Error(`outil attendu Bash, obtenu ${mark.tool}`);
+});
+
+test('sortir de pending purge la trace', () => {
+  const tmp = jsonlPending('unmark');
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('P2', makeSession('P2', { state: STATES.RUNNING, jsonlPath: tmp }));
+
+  w.setState('P2', STATES.PENDING, false, 'hook:PreToolUse');
+  w.setState('P2', STATES.RUNNING, false, 'tool_use:Read');
+
+  if (config.getPendingMark('P2')) throw new Error('trace non purgée après sortie du pending');
+});
+
+test('restaure pending au démarrage quand le JSONL n\'a pas bougé', () => {
+  const tmp = jsonlPending('restore');
+  const config = makeMockConfig();
+  config.setPendingMark('P3', { mtimeMs: fs.statSync(tmp).mtimeMs, tool: 'Bash', at: Date.now() });
+
+  const w = new SessionWatcher(config);
+  w.sessions.set('P3', makeSession('P3', { state: STATES.RUNNING, jsonlPath: tmp }));
+  w.fastInitialLoad('P3', tmp);
+
+  const got = w.sessions.get('P3').state.name;
+  if (got !== 'pending') throw new Error(`pending attendu (le JSONL dirait running), obtenu ${got}`);
+  if (config.getSavedSessions()['P3'].stateName !== 'pending') throw new Error('état pending non persisté');
+});
+
+test('ignore et purge la trace quand le JSONL a bougé depuis (question déjà traitée)', () => {
+  const tmp = jsonlPending('stale');
+  const config = makeMockConfig();
+  // La trace date d'AVANT la dernière écriture → l'utilisateur a répondu
+  // pendant que l'app était éteinte.
+  config.setPendingMark('P4', { mtimeMs: fs.statSync(tmp).mtimeMs - 5000, tool: 'Bash', at: Date.now() });
+
+  const w = new SessionWatcher(config);
+  w.sessions.set('P4', makeSession('P4', { state: STATES.WAITING, jsonlPath: tmp }));
+  w.fastInitialLoad('P4', tmp);
+
+  const got = w.sessions.get('P4').state.name;
+  if (got !== 'running') throw new Error(`running attendu (état déduit du JSONL), obtenu ${got}`);
+  if (config.getPendingMark('P4')) throw new Error('trace périmée non purgée');
+});
+
+test('restauration idempotente : session déjà pending → tokens quand même émis', () => {
+  const tmp = tmpJsonl('idem');
+  fs.writeFileSync(tmp, JSON.stringify({
+    type: 'assistant',
+    timestamp: '2026-07-25T16:45:36.000Z',
+    message: { role: 'assistant',
+      content: [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: {} }],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 42, output_tokens: 7 } },
+  }) + '\n');
+  const config = makeMockConfig();
+  config.setPendingMark('P5', { mtimeMs: fs.statSync(tmp).mtimeMs, tool: 'Bash', at: Date.now() });
+
+  const w = new SessionWatcher(config);
+  w.sessions.set('P5', makeSession('P5', { state: STATES.PENDING, jsonlPath: tmp }));
+  let emitted = 0;
+  w.on('session-updated', () => emitted++);
+  w.fastInitialLoad('P5', tmp);
+
+  if (w.sessions.get('P5').state.name !== 'pending') throw new Error('pending perdu');
+  if (emitted === 0) throw new Error('aucun session-updated émis — tokens/model ne remonteraient pas');
+  if (w.sessions.get('P5').tokens.input !== 42) throw new Error('tokens non relus');
+});
+
+test('supprimer une session purge sa trace pending', () => {
+  const tmp = jsonlPending('remove');
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('P6', makeSession('P6', { state: STATES.RUNNING, jsonlPath: tmp }));
+  w.setState('P6', STATES.PENDING, false, 'hook:PreToolUse');
+
+  w.removeSession('P6');
+
+  if (config.getPendingMark('P6')) throw new Error('trace orpheline laissée après removeSession');
+});
+
+test('start() purge les traces orphelines (sessions disparues)', () => {
+  const config = makeMockConfig();
+  config.setPendingMark('fantome', { mtimeMs: 1, tool: null, at: Date.now() });
+  const w = new SessionWatcher(config);
+  w.start();
+  w.stop();
+
+  if (config.getPendingMark('fantome')) throw new Error('trace orpheline non purgée au démarrage');
 });
 
 // ─── /clear detection: helper unit tests ─────────────────────────

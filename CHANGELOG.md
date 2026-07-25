@@ -4,6 +4,20 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2] — 2026-07-25
+
+### Fixed
+- **Une session qui attend une réponse reste en « en attente » après un
+  redémarrage de l'app.** Jusqu'ici, relancer l'app pendant qu'une session
+  posait une question la faisait repasser en « en exécution » (bleu) — et elle
+  y restait jusqu'à ce que vous répondiez de vous-même, sans aucun signal.
+  Cause : la question n'existe nulle part dans les fichiers de session (Claude
+  Code n'y écrit rien avant votre réponse), donc l'app n'avait plus aucun moyen
+  de savoir qu'elle était toujours là. L'attente est désormais mémorisée sur
+  disque et rétablie au démarrage, tant que la session n'a effectivement pas
+  bougé entre-temps ; si vous avez répondu pendant que l'app était fermée, la
+  session reprend son état normal.
+
 ## [2.4.1] — 2026-07-25
 
 ### Changed

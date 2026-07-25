@@ -30,6 +30,7 @@ let config = {
   islandShowHeadless: true, // afficher les sessions headless (aile droite + volet) dans l'île
   trayPopoverEnabled: true, // clic tray → popover ; off → clic tray ouvre le dashboard directement
   permissionHookEnabled: true, // installe le hook global ~/.claude/settings.json (détection « en attente »)
+  pendingMarks: {},     // { [sessionId]: { mtimeMs, tool, at } } — pending survit au redémarrage
 };
 
 function load() {
@@ -211,6 +212,34 @@ function getMicroWindowBounds() {
   return config.microWindowBounds;
 }
 
+// --- Pending marks ---------------------------------------------------------
+// Le `pending` (question / prompt de permission) n'existe QUE dans la RAM du
+// watcher : il naît d'un ping de hook et le JSONL n'en garde aucune trace (rien
+// n'y est écrit tant que l'utilisateur n'a pas répondu). Sans persistance, tout
+// redémarrage de l'app reconstruisait l'état depuis le JSONL — dernier
+// `assistant` en `stop_reason: tool_use` → **running** — et comme `PreToolUse`
+// ne re-fire jamais, la session restait bleue jusqu'à ce que l'utilisateur
+// réponde (constaté en live sur TrainBox, 2026-07-25).
+// On mémorise donc le mtime du JSONL au moment du pending : au démarrage, mtime
+// inchangé = toujours bloqué (on restaure), mtime plus récent = la question a
+// été traitée pendant que l'app était éteinte (on purge). Le mtime est le seul
+// signal fiable ici — pas d'heuristique de délai.
+function setPendingMark(sessionId, mark) {
+  if (!config.pendingMarks) config.pendingMarks = {};
+  config.pendingMarks[sessionId] = mark;
+  save();
+}
+
+function clearPendingMark(sessionId) {
+  if (!config.pendingMarks || !(sessionId in config.pendingMarks)) return;
+  delete config.pendingMarks[sessionId];
+  save();
+}
+
+function getPendingMark(sessionId) {
+  return (config.pendingMarks && config.pendingMarks[sessionId]) || null;
+}
+
 function saveSession(sessionId, data) {
   config.sessions[sessionId] = data;
   save();
@@ -224,6 +253,7 @@ function deleteSession(sessionId) {
   delete config.sessions[sessionId];
   delete config.notifications[sessionId];
   if (config.customNames) delete config.customNames[sessionId];
+  if (config.pendingMarks) delete config.pendingMarks[sessionId];
   if (Array.isArray(config.sessionOrder)) {
     config.sessionOrder = config.sessionOrder.filter(id => id !== sessionId);
   }
@@ -259,6 +289,9 @@ module.exports = {
   getWindowBounds,
   setMicroWindowBounds,
   getMicroWindowBounds,
+  setPendingMark,
+  clearPendingMark,
+  getPendingMark,
   saveSync,
   saveSession,
   getSavedSessions,

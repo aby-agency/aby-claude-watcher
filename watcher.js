@@ -86,6 +86,11 @@ class SessionWatcher extends EventEmitter {
           if (!knownIds.has(id)) { delete cfg.customNames[id]; dirty = true; }
         }
       }
+      if (cfg.pendingMarks) {
+        for (const id of Object.keys(cfg.pendingMarks)) {
+          if (!knownIds.has(id)) { delete cfg.pendingMarks[id]; dirty = true; }
+        }
+      }
       if (Array.isArray(cfg.sessionOrder)) {
         const before = cfg.sessionOrder.length;
         cfg.sessionOrder = cfg.sessionOrder.filter(id => knownIds.has(id));
@@ -565,6 +570,23 @@ class SessionWatcher extends EventEmitter {
       session.tokens.input = Math.max(session.tokens.input, prevTokens.input || 0);
       session.tokens.output = Math.max(session.tokens.output, prevTokens.output || 0);
 
+      // Un pending ancré sur disque et toujours valide (JSONL inchangé depuis)
+      // PRIME sur l'état déduit du JSONL : la question est encore à l'écran, et
+      // le hook ne re-fire jamais pour nous le redire. isInitial=true → badge
+      // ambre restauré, pas de notif rétroactive (règle établie au démarrage).
+      if (this.restorePending(sessionId, stat)) {
+        if (session.state.name === 'pending') {
+          // Déjà pending (restauré depuis config.sessions) → setState serait un
+          // no-op et n'émettrait rien : on émet nous-mêmes pour que les tokens /
+          // model / slug fraîchement relus remontent quand même.
+          this.emit('session-updated', session);
+          this.persistSession(session);
+        } else {
+          this.setState(sessionId, STATES.PENDING, true, 'pending-restored');
+        }
+        return;
+      }
+
       // Apply state via setState so the determination is persisted to config
       // (otherwise the stale restored state survives across restarts and the
       // session looks "stuck running"). isInitial=true skips the notification.
@@ -824,6 +846,11 @@ class SessionWatcher extends EventEmitter {
       session.state = newState;
       this.emit('session-updated', session);
       this.persistSession(session);
+      // Le pending est le SEUL état invisible dans le JSONL (rien n'y est écrit
+      // tant que l'utilisateur n'a pas répondu) → on l'ancre sur disque, sinon
+      // un redémarrage le perd définitivement (cf. config.setPendingMark).
+      if (newState.name === 'pending') this.markPendingPersisted(sessionId, session);
+      else if (oldState.name === 'pending') this.clearPendingPersisted(sessionId);
     }
 
     // Trigger notification on waiting/pending — with 30s cooldown to avoid spam
@@ -1006,6 +1033,42 @@ class SessionWatcher extends EventEmitter {
       this.setState(sessionId, target, false, trigger);
     }, 1000);
     this.pendingTimers.set(sessionId, timer);
+  }
+
+  // Ancre le pending sur disque avec le mtime courant du JSONL. Au prochain
+  // démarrage, mtime inchangé = la question est toujours là (cf. restorePending).
+  markPendingPersisted(sessionId, session) {
+    if (!this.config || !this.config.setPendingMark) return;
+    const jsonlPath = (session && session.jsonlPath) || this.findJsonlPath(sessionId);
+    if (!jsonlPath) return;
+    try {
+      const st = fs.statSync(jsonlPath);
+      this.config.setPendingMark(sessionId, {
+        mtimeMs: st.mtimeMs,
+        tool: (session && session.lastTool) || null,
+        at: Date.now(),
+      });
+    } catch (e) {
+      // JSONL disparu — rien à ancrer
+    }
+  }
+
+  clearPendingPersisted(sessionId) {
+    if (this.config && this.config.clearPendingMark) this.config.clearPendingMark(sessionId);
+  }
+
+  // Appelé par fastInitialLoad : le pending persisté prime sur l'état déduit du
+  // JSONL tant que le fichier n'a pas bougé depuis. S'il a bougé, la question a
+  // été traitée pendant que l'app était éteinte → on purge la trace.
+  restorePending(sessionId, stat) {
+    if (!this.config || !this.config.getPendingMark) return false;
+    const mark = this.config.getPendingMark(sessionId);
+    if (!mark) return false;
+    if (!stat || typeof mark.mtimeMs !== 'number' || stat.mtimeMs > mark.mtimeMs) {
+      this.clearPendingPersisted(sessionId);
+      return false;
+    }
+    return true;
   }
 
   clearPendingTimer(sessionId) {

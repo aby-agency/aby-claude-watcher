@@ -20,6 +20,9 @@ function tmpFile() {
   return p;
 }
 const HOOK = '/opt/app/bin/aby-permission-hook.sh';
+// La commande écrite dans settings.json est QUOTÉE (sh -c découperait un chemin
+// à espaces — cf. /Applications/Aby Claude Watcher.app).
+const Q = (p) => `'${p}'`;
 function read(p) { return JSON.parse(fs.readFileSync(p, 'utf-8')); }
 
 console.log('\ninstallHooksIntoFile:');
@@ -30,8 +33,8 @@ test('fichier neuf → PreToolUse(*) + Notification("") pointant sur le hook', (
   const d = read(p);
   assertEq(d.hooks.PreToolUse[0].matcher, '*');
   assertEq(d.hooks.Notification[0].matcher, '');
-  assertEq(d.hooks.PreToolUse[0].hooks[0].command, HOOK);
-  assertEq(d.hooks.Notification[0].hooks[0].command, HOOK);
+  assertEq(d.hooks.PreToolUse[0].hooks[0].command, Q(HOOK));
+  assertEq(d.hooks.Notification[0].hooks[0].command, Q(HOOK));
 });
 test('idempotent : 2e appel → already-present, aucun doublon', () => {
   const p = tmpFile();
@@ -46,7 +49,7 @@ test('self-heal : chemin périmé mis à jour en place', () => {
   installHooksIntoFile(p, HOOK);
   const d = read(p);
   assertEq(d.hooks.PreToolUse.length, 1);
-  assertEq(d.hooks.PreToolUse[0].hooks[0].command, HOOK);
+  assertEq(d.hooks.PreToolUse[0].hooks[0].command, Q(HOOK));
 });
 test('non destructif : préserve les autres hooks et les autres clés', () => {
   const p = tmpFile();
@@ -89,6 +92,51 @@ test('fichier absent → no-op', () => {
   const p = tmpFile();
   const r = removeHookFromFile(p);
   assertEq(r.removed, false);
+});
+
+console.log('\nquoting du chemin (sh -c):');
+const SPACED = '/Applications/Aby Claude Watcher.app/Contents/Resources/app.asar.unpacked/bin/aby-permission-hook.sh';
+
+test('chemin à espaces → commande quotée (sinon sh coupe à « /Applications/Aby »)', () => {
+  const p = tmpFile();
+  installHooksIntoFile(p, SPACED);
+  const cmd = read(p).hooks.PreToolUse[0].hooks[0].command;
+  assertEq(cmd, `'${SPACED}'`);
+  // La commande DOIT désigner le script en entier, pas son premier mot.
+  assertEq(cmd.split(' ')[0] === "'/Applications/Aby", true);
+  assertEq(cmd.endsWith(`aby-permission-hook.sh'`), true);
+});
+
+test('migration : une commande nue écrite par une version ≤2.4.x est re-quotée', () => {
+  const p = tmpFile();
+  fs.writeFileSync(p, JSON.stringify({
+    hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: SPACED }] }] },
+  }, null, 2));
+  const r = installHooksIntoFile(p, SPACED);
+  assertEq(r.reason, 'written');
+  const d = read(p);
+  assertEq(d.hooks.PreToolUse.length, 1); // reconnu comme le nôtre → pas de doublon
+  assertEq(d.hooks.PreToolUse[0].hooks[0].command, `'${SPACED}'`);
+});
+
+test('idempotent sur la forme quotée (pas de réécriture à chaque démarrage)', () => {
+  const p = tmpFile();
+  installHooksIntoFile(p, SPACED);
+  assertEq(installHooksIntoFile(p, SPACED).reason, 'already-present');
+});
+
+test('removeHookFromFile reconnaît la forme quotée', () => {
+  const p = tmpFile();
+  installHooksIntoFile(p, SPACED);
+  assertEq(removeHookFromFile(p).removed, true);
+  assertEq(read(p).hooks.PreToolUse, undefined);
+});
+
+test('apostrophe dans le chemin → échappement shell correct', () => {
+  const p = tmpFile();
+  const weird = "/Users/paul/Claude's apps/bin/aby-permission-hook.sh";
+  installHooksIntoFile(p, weird);
+  assertEq(read(p).hooks.PreToolUse[0].hooks[0].command, `'/Users/paul/Claude'\\''s apps/bin/aby-permission-hook.sh'`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -19,23 +19,53 @@ const os = require('os');
 const HOOK_FILENAME = 'aby-permission-hook.sh';
 const HOOK_EVENTS = ['PreToolUse', 'Notification'];
 
+// Claude Code exécute la commande d'un hook via `/bin/sh -c` : un chemin NON
+// QUOTÉ est découpé au premier espace. Le bundle installé vit sous
+// `/Applications/Aby Claude Watcher.app/…` → sh cherchait `/Applications/Aby`,
+// le hook ne partait JAMAIS et le pending n'était jamais détecté sur l'app
+// installée (`PreToolUse:Bash hook error … /Applications/Aby: No such file`).
+// Invisible en dev, où le checkout n'a pas d'espace dans son chemin — c'est la
+// seconde moitié du bug historique d'Etienne, la première étant asarUnpack.
+// Quotes SIMPLES : rien n'y est interprété par le shell (un `$` ou une backquote
+// dans un nom de dossier resterait littéral) ; une quote simple interne se ferme
+// et se ré-échappe façon `'\''`.
+function shellQuote(p) {
+  return `'${String(p).replace(/'/g, `'\\''`)}'`;
+}
+
+// Inverse de shellQuote, tolérant : accepte le nu (entrées écrites par les
+// versions ≤ 2.4.x), le simple-quoté et le double-quoté.
+function shellUnquote(cmd) {
+  const s = String(cmd).trim();
+  if (s.length >= 2 && s[0] === `'` && s[s.length - 1] === `'`) {
+    return s.slice(1, -1).replace(/'\\''/g, `'`);
+  }
+  if (s.length >= 2 && s[0] === '"' && s[s.length - 1] === '"') {
+    return s.slice(1, -1).replace(/\\"/g, '"');
+  }
+  return s;
+}
+
 function isOurHook(entry) {
   if (!entry || typeof entry !== 'object') return false;
   const hooks = Array.isArray(entry.hooks) ? entry.hooks : [];
-  return hooks.some(h => typeof h === 'object' && h && typeof h.command === 'string' && h.command.endsWith('/' + HOOK_FILENAME));
+  return hooks.some(h => typeof h === 'object' && h && typeof h.command === 'string'
+    && shellUnquote(h.command).endsWith('/' + HOOK_FILENAME));
 }
 
 function ensureBlock(entries, event, hookPath) {
   if (!Array.isArray(entries)) return { entries: [], changed: true };
+  const command = shellQuote(hookPath);
   let changed = false;
   let found = false;
   for (const block of entries) {
     if (!isOurHook(block)) continue;
     found = true;
-    // Self-heal: if the command path is stale, update it in place.
+    // Self-heal: chemin périmé OU commande non quotée écrite par une version
+    // antérieure — les deux se réparent en réécrivant la forme quotée.
     for (const h of block.hooks || []) {
-      if (h && h.command !== hookPath) {
-        h.command = hookPath;
+      if (h && h.command !== command) {
+        h.command = command;
         changed = true;
       }
     }
@@ -44,7 +74,7 @@ function ensureBlock(entries, event, hookPath) {
   if (!found) {
     entries.push({
       matcher: event === 'PreToolUse' ? '*' : '',
-      hooks: [{ type: 'command', command: hookPath }],
+      hooks: [{ type: 'command', command }],
     });
     changed = true;
   }

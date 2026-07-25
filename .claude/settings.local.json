@@ -4,5 +4,6 @@
       "Bash(pkill -f \"electron\")",
       "Bash(npx electron:*)"
     ]
-  }
+  },
+  "hooks": {}
 }

@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { SessionWatcher, STATES } = require('../watcher');
+const { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed } = require('../watcher');
 
 function makeMockConfig() {
   const data = { sessions: {}, notifications: {}, customNames: {}, sessionOrder: [], pendingMarks: {} };
@@ -859,6 +859,178 @@ test('no-op sans crash pour session inconnue ou sans jsonlPath', () => {
   w.refreshSession('inconnu');
   w.sessions.set('NOP', makeSession('NOP'));
   w.refreshSession('NOP');
+});
+
+// ─── État job (tâche de fond) ────────────────────────────────────
+section('job — end_turn sur une tâche de fond ouverte:');
+
+const bgOpenEv = (id, ts) => ({
+  type: 'user',
+  message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_bg', content: `Command running in background with ID: ${id}.` }] },
+  toolUseResult: { stdout: '', stderr: '', backgroundTaskId: id },
+  timestamp: ts || '2026-07-25T17:34:28.683Z',
+});
+const bgDoneEv = (id, ts, status = 'completed') => ({
+  type: 'user',
+  message: { role: 'user', content: `<task-notification> <task-id>${id}</task-id> <tool-use-id>toolu_bg</tool-use-id> <status>${status}</status> <summary>done</summary> </task-notification>` },
+  timestamp: ts || '2026-07-25T17:38:45.423Z',
+});
+const endTurnEv = (ts) => ({
+  type: 'assistant',
+  message: { role: 'assistant', content: [{ type: 'text', text: 'Je te reviens dès que j\'ai les mesures.' }], stop_reason: 'end_turn' },
+  timestamp: ts || '2026-07-25T17:34:43.099Z',
+});
+
+test('bgTaskOpened lit backgroundTaskId, ignore le reste', () => {
+  if (bgTaskOpened(bgOpenEv('b82erfk9x')) !== 'b82erfk9x') throw new Error('ouverture non détectée');
+  if (bgTaskOpened({ type: 'user', message: { content: 'hi' } }) !== null) throw new Error('faux positif sur prompt');
+  if (bgTaskOpened({ type: 'assistant', toolUseResult: { backgroundTaskId: 'x' } }) !== null) throw new Error('assistant ne doit pas ouvrir');
+  if (bgTaskOpened(null) !== null) throw new Error('null doit être toléré');
+});
+
+test('bgTaskClosed lit la task-notification (user ET queue-operation, tout statut)', () => {
+  if (bgTaskClosed(bgDoneEv('b82erfk9x')) !== 'b82erfk9x') throw new Error('fermeture user non détectée');
+  if (bgTaskClosed(bgDoneEv('b1', null, 'failed')) !== 'b1') throw new Error('un échec ferme aussi le job');
+  const qEv = { type: 'queue-operation', operation: 'enqueue', content: '<task-notification> <task-id>qid</task-id> <status>completed</status> </task-notification>' };
+  if (bgTaskClosed(qEv) !== 'qid') throw new Error('fermeture queue-operation non détectée');
+  if (bgTaskClosed({ type: 'user', message: { content: 'parle-moi de <task-notification>' } }) !== null) throw new Error('sans <status> ne ferme pas');
+  if (bgTaskClosed(bgOpenEv('z')) !== null) throw new Error('une ouverture ne ferme pas');
+});
+
+test('end_turn avec job ouvert → job (pas waiting), et zéro notification', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J1', makeSession('J1', { state: STATES.RUNNING }));
+  let notified = 0;
+  w.on('session-waiting', () => { notified++; });
+
+  w.processEvent('J1', bgOpenEv('bgA'), false);
+  w.processEvent('J1', endTurnEv(), false);
+  await sleep(2200); // WAITING_DELAY
+  const got = w.sessions.get('J1').state.name;
+  if (got !== 'job') throw new Error(`attendu job, obtenu ${got}`);
+  if (notified !== 0) throw new Error(`aucune notif attendue sur job, ${notified} émise(s)`);
+});
+
+test('end_turn sans job ouvert → waiting (aucune régression)', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J2', makeSession('J2', { state: STATES.RUNNING }));
+  w.processEvent('J2', endTurnEv(), false);
+  await sleep(2200);
+  const got = w.sessions.get('J2').state.name;
+  if (got !== 'waiting') throw new Error(`attendu waiting, obtenu ${got}`);
+});
+
+test('job terminé avant le end_turn → waiting normal', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J3', makeSession('J3', { state: STATES.RUNNING }));
+  w.processEvent('J3', bgOpenEv('bgB'), false);
+  w.processEvent('J3', bgDoneEv('bgB'), false);
+  w.processEvent('J3', endTurnEv(), false);
+  await sleep(2200);
+  const got = w.sessions.get('J3').state.name;
+  if (got !== 'waiting') throw new Error(`attendu waiting, obtenu ${got}`);
+});
+
+test('la task-notification sort du job en running, sans reset du cooldown notif', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J4', makeSession('J4', { state: STATES.JOB }));
+  w.lastNotifTime.set('J4', 12345);
+  w.processEvent('J4', bgOpenEv('bgC'), false);
+  w.processEvent('J4', bgDoneEv('bgC'), false);
+  const s = w.sessions.get('J4');
+  if (s.state.name !== 'running') throw new Error(`attendu running, obtenu ${s.state.name}`);
+  if (w.lastNotifTime.get('J4') !== 12345) throw new Error('le cooldown ne doit pas être remis à zéro par une reprise auto');
+  if (s.bgTasks.size !== 0) throw new Error('le job doit être refermé');
+});
+
+test('plusieurs jobs : la session ne quitte job qu\'au dernier', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J5', makeSession('J5', { state: STATES.RUNNING }));
+  w.processEvent('J5', bgOpenEv('b1'), false);
+  w.processEvent('J5', bgOpenEv('b2'), false);
+  w.processEvent('J5', bgDoneEv('b1'), false);
+  w.processEvent('J5', endTurnEv(), false);
+  await sleep(2200);
+  if (w.sessions.get('J5').state.name !== 'job') throw new Error('un job restant ouvert → job');
+  w.processEvent('J5', bgDoneEv('b2'), false);
+  w.processEvent('J5', endTurnEv(), false);
+  await sleep(2200);
+  const got = w.sessions.get('J5').state.name;
+  if (got !== 'waiting') throw new Error(`dernier job fermé → waiting, obtenu ${got}`);
+});
+
+test('fastInitialLoad reconstruit le job depuis le tail', () => {
+  const tmp = tmpJsonl('bg-restore');
+  fs.writeFileSync(tmp, [
+    JSON.stringify({ type: 'user', message: { role: 'user', content: 'go' }, timestamp: '2026-07-25T17:30:00.000Z' }),
+    JSON.stringify(bgOpenEv('bgR', '2026-07-25T17:34:28.683Z')),
+    JSON.stringify(endTurnEv('2026-07-25T17:34:43.099Z')),
+    '',
+  ].join('\n'));
+
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J6', makeSession('J6', { state: STATES.RUNNING, startedAt: new Date(Date.now() - 60000).toISOString() }));
+  w.fastInitialLoad('J6', tmp);
+  const got = w.sessions.get('J6').state.name;
+  if (got !== 'job') throw new Error(`attendu job après restauration, obtenu ${got}`);
+});
+
+test('fastInitialLoad : job fermé dans le tail → waiting', () => {
+  const tmp = tmpJsonl('bg-restore-done');
+  fs.writeFileSync(tmp, [
+    JSON.stringify(bgOpenEv('bgS', '2026-07-25T17:34:28.683Z')),
+    JSON.stringify(bgDoneEv('bgS', '2026-07-25T17:38:45.423Z')),
+    JSON.stringify(endTurnEv('2026-07-25T17:39:00.000Z')),
+    '',
+  ].join('\n'));
+
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J7', makeSession('J7', { state: STATES.RUNNING, startedAt: new Date(Date.now() - 60000).toISOString() }));
+  w.fastInitialLoad('J7', tmp);
+  const got = w.sessions.get('J7').state.name;
+  if (got !== 'waiting') throw new Error(`attendu waiting, obtenu ${got}`);
+});
+
+test('le rappel idle 60s ne casse pas un job (sinon la bannière parasite revient)', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J8', makeSession('J8', { state: STATES.JOB, lastEventTime: Date.now() - 10000 }));
+  w.markPending('J8', 'Notification', null, true);
+  await sleep(1200);
+  const got = w.sessions.get('J8').state.name;
+  if (got !== 'job') throw new Error(`le job doit survivre au rappel idle, obtenu ${got}`);
+});
+
+test('une vraie demande de permission pendant un job passe quand même pending', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J9', makeSession('J9', { state: STATES.JOB, lastEventTime: Date.now() - 10000 }));
+  w.markPending('J9', 'PreToolUse', 'Bash', false);
+  await sleep(1200);
+  const got = w.sessions.get('J9').state.name;
+  if (got !== 'pending') throw new Error(`attendu pending, obtenu ${got}`);
+});
+
+test('garde-fou : job muet depuis > 45 min → waiting (job-stale)', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J10', makeSession('J10', {
+    state: STATES.JOB,
+    lastEventTime: Date.now() - 46 * 60 * 1000,
+    bgTasks: new Set(['zombie']),
+  }));
+  w.scan();
+  const s = w.sessions.get('J10');
+  if (s.state.name !== 'waiting') throw new Error(`attendu waiting, obtenu ${s.state.name}`);
+  if (s.bgTasks.size !== 0) throw new Error('le job zombie doit être lâché');
+});
+
+test('garde-fou : un job récent n\'est pas lâché', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('J11', makeSession('J11', {
+    state: STATES.JOB,
+    lastEventTime: Date.now() - 20 * 60 * 1000,
+    bgTasks: new Set(['vivant']),
+  }));
+  w.scan();
+  if (w.sessions.get('J11').state.name !== 'job') throw new Error('un import de 20 min reste un job');
 });
 
 runAll().then(() => {

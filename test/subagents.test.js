@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readMeta, readLastEvent, deriveState, scanSession, SubagentTracker, hasBlockingForegroundAgent } = require('../subagents');
+const { readMeta, readLastEvent, deriveState, scanSession, SubagentTracker, hasBlockingForegroundAgent, hasLiveDelegation } = require('../subagents');
 
 let passed = 0, failed = 0;
 const queue = [];
@@ -310,6 +310,29 @@ test('false on empty snapshot', () => {
 test('false when runInBackground is undefined (unknown dispatch — conservative)', () => {
   const snap = [{ agentId: 'a', state: 'running', runInBackground: undefined }];
   if (hasBlockingForegroundAgent(snap) !== false) throw new Error('expected false');
+});
+
+section('hasLiveDelegation:');
+
+test('true dès qu\'un agent vit — background compris (il réveillera le parent)', () => {
+  const snap = [{ agentId: 'a', state: 'running', runInBackground: true }];
+  if (hasLiveDelegation(snap, []) !== true) throw new Error('expected true');
+});
+
+test('true sur un agent stale (silence long ≠ mort — pas de clignotement du libellé)', () => {
+  const snap = [{ agentId: 'a', state: 'stale', runInBackground: false }];
+  if (hasLiveDelegation(snap, []) !== true) throw new Error('expected true');
+});
+
+test('true sur un run de workflow actif, sans aucun agent', () => {
+  if (hasLiveDelegation([], [{ runId: 'wf_1', name: 'audit' }]) !== true) throw new Error('expected true');
+  if (hasLiveDelegation([], [{ runId: 'wf_1', status: 'running' }]) !== true) throw new Error('expected true');
+});
+
+test('false quand plus rien ne tourne (là, la session attend vraiment l\'utilisateur)', () => {
+  if (hasLiveDelegation([], []) !== false) throw new Error('expected false');
+  if (hasLiveDelegation(null, null) !== false) throw new Error('expected false');
+  if (hasLiveDelegation([], [{ runId: 'wf_1', status: 'completed' }]) !== false) throw new Error('expected false');
 });
 
 runAll().then(() => {

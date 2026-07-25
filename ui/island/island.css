@@ -113,6 +113,8 @@ body.expanded .pill {
 .led[data-state="thinking"] { --led: var(--state-thinking); }
 .led[data-state="running"]  { --led: var(--state-running); }
 .led[data-state="waiting"]  { --led: var(--state-waiting); }
+.led[data-state="job"],
+.led[data-state="delegating"] { --led: var(--state-job); }
 .led[data-state="pending"]  { --led: var(--state-pending); }
 .led[data-state="error"]    { --led: var(--state-error); }
 /* Headless: smaller, dimmer, no glow. */
@@ -125,9 +127,12 @@ body.expanded .pill {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.4); opacity: .7; }
 }
-/* États actifs (thinking/running) : anneau qui tourne, comme l'ex-popover —
-   le mouvement dit « ça travaille », le point plein dit « stable ». */
-.led[data-state="thinking"], .led[data-state="running"] {
+/* États actifs (thinking/running/job/delegating) : anneau qui tourne, comme
+   l'ex-popover — le mouvement dit « ça travaille », le point plein dit
+   « stable ». job/delegating en font partie : un process ou un agent tourne,
+   la session reprendra seule. */
+.led[data-state="thinking"], .led[data-state="running"],
+.led[data-state="job"], .led[data-state="delegating"] {
   background: transparent;
   border: 1.5px solid var(--led);
   border-top-color: transparent;

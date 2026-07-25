@@ -43,6 +43,17 @@ test('empty group → empty wing (all working → left empty)', () => {
   assertEq(m.right.leds, [{ state: 'busy', count: 9 }]);
   assertEq(m.left.leds, []);
 });
+// `job` = tour suspendu à une tâche de fond : ça tourne et ça reprendra seul,
+// donc aile busy — le compter idle rappellerait l'utilisateur pour rien.
+test('job counts as busy, not idle', () => {
+  const m = buildIsland([sess('job'), sess('waiting')], {});
+  assertEq(m.right.leds, [{ state: 'busy', count: 1 }]);
+  assertEq(m.left.leds, [{ state: 'idle', count: 1 }]);
+});
+test('job survit dans les rows du panneau (détail par état)', () => {
+  const m = buildIsland([sess('job')], {});
+  assertEq(m.rows.map(r => r.state), ['job']);
+});
 test('unknown state counts as idle (attend), never busy', () => {
   const m = buildIsland([sess('weird')], {});
   assertEq(m.right.leds, []);

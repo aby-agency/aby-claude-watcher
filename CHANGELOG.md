@@ -4,6 +4,36 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] — 2026-07-25
+
+### Fixed
+- **Les demandes de permission n'étaient jamais détectées dans l'application
+  installée.** Le hook que l'app installe pour repérer ces demandes pointait
+  vers un chemin contenant des espaces (« Aby Claude Watcher.app »), et ce
+  chemin n'était pas protégé : le shell s'arrêtait au premier espace et le hook
+  ne s'exécutait jamais. Résultat, l'état « action requise » (ambre) ne
+  s'allumait pas, et le terminal affichait des erreurs `hook error … No such
+  file or directory` à chaque appel d'outil. Le problème ne se voyait qu'avec
+  l'application installée, jamais en développement. Les installations
+  existantes sont réparées automatiquement au démarrage, sans doublon.
+
+### Added
+- **Nouvel état « Background » (cyan).** Une session qui termine son tour en
+  laissant tourner une commande de fond (un import, un build, un script long)
+  n'attend pas *vous* : elle attend son processus, et Claude Code la relancera
+  tout seul quand il aura fini. Elle s'affichait en vert « inactif » et
+  déclenchait une notification à chaque fois. Elle apparaît désormais en cyan,
+  du côté « ça travaille » de la dynamic island, et ne vous sollicite plus.
+- **Nouvel état « Délégation » (cyan).** Même principe pour une session qui a
+  confié le travail à des sous-agents ou à un workflow : tant qu'ils tournent,
+  elle affiche « Délégation » au lieu de « Inactif » — et reste silencieuse,
+  puisque ce sont eux qui la réveilleront.
+
+### Changed
+- La section des sessions sans terminal (lancées par script, cron, Telegram…)
+  s'appelle désormais **« Headless »** au lieu de « Background », pour ne pas
+  la confondre avec le nouvel état du même nom.
+
 ## [2.4.2] — 2026-07-25
 
 ### Fixed

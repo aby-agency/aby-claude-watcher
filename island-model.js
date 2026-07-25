@@ -58,7 +58,10 @@ function sortSessions(sessions, sessionOrder) {
 // Tout ce qui n'est pas explicitement busy compte comme idle (un état inconnu
 // ne doit jamais passer pour « au travail »). Le détail par état survit dans le
 // panneau déplié (rows), pas ici.
-const BUSY_STATES = ['running', 'thinking'];
+// `job` (tâche de fond) et `delegating` (sous-agents/workflow au travail) : ça
+// tourne et ça reprendra seul → aile busy. Les compter côté idle appellerait une
+// action inutile, alors que personne n'attend l'utilisateur.
+const BUSY_STATES = ['running', 'thinking', 'job', 'delegating'];
 
 function buildIsland(sessions, config) {
   const order = (config && config.sessionOrder) || [];

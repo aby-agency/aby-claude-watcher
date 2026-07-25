@@ -17,9 +17,58 @@ const STATES = {
   THINKING: { name: 'thinking', color: '#a78bfa' },
   RUNNING: { name: 'running', color: '#3b82f6' },
   WAITING: { name: 'waiting', color: '#22c55e' },
+  // Tour fini SUR un job de fond encore ouvert (Bash backgroundé) : la session
+  // n'attend pas l'utilisateur, elle attend son process — Claude Code la
+  // réveillera seul via <task-notification>. Distinct de `isBackground`, qui
+  // qualifie une SESSION headless ; ici c'est une session interactive normale
+  // dont le tour est suspendu à une tâche. Compté « busy », jamais notifié.
+  JOB: { name: 'job', color: '#06b6d4' },
+  // État de PRÉSENTATION — jamais produit par cette state machine. Le watcher ne
+  // voit pas les sous-agents (ils vivent dans <session>/subagents/, lus par
+  // main.js) ; c'est main.js qui substitue DELEGATING à un waiting dont les
+  // délégués travaillent encore. Même cyan que JOB : même famille « ça tourne
+  // sans toi » (décision Paul), seul le libellé distingue.
+  DELEGATING: { name: 'delegating', color: '#06b6d4' },
   PENDING: { name: 'pending', color: '#f59e0b' },
   ERROR: { name: 'error', color: '#ef4444' },
 };
+
+// Un job de fond meurt sans notification si le process est tué à la main (ou si
+// la CLI est interrompue au mauvais moment) — sans garde-fou la session resterait
+// cyan à vie et ne notifierait plus jamais. Seuil volontairement large : un
+// réimport Godot / build DMG de 20-30 min est légitime et n'écrit RIEN dans le
+// JSONL pendant tout ce temps. Au-delà, on retombe sur waiting (donc notif).
+const JOB_STALE_MS = 45 * 60 * 1000;
+
+// ─── Jobs de fond (Bash `run_in_background`) ───
+// Ouverture ET fermeture sont lisibles dans le JSONL, aucun besoin de scruter le
+// filesystem (le fichier tasks/<id>.output SURVIT à la fin du job — il ne dit
+// rien de son vivant). Purs → testables.
+//   ouverture : event `user` (le tool_result du Bash) avec toolUseResult.backgroundTaskId
+//   fermeture : <task-notification>…<task-id>ID</task-id>…<status>…</status>
+//               injectée deux fois — en `queue-operation` (event.content) puis en
+//               `user` (event.message.content, string). On accepte les deux.
+function bgTaskOpened(event) {
+  if (!event || event.type !== 'user') return null;
+  const id = event.toolUseResult && event.toolUseResult.backgroundTaskId;
+  return typeof id === 'string' && id ? id : null;
+}
+
+function bgTaskClosed(event) {
+  if (!event) return null;
+  let text = null;
+  if (event.type === 'queue-operation' && typeof event.content === 'string') {
+    text = event.content;
+  } else if (event.type === 'user' && event.message && typeof event.message.content === 'string') {
+    text = event.message.content;
+  }
+  if (!text || !text.includes('<task-notification>')) return null;
+  // N'importe quel statut ferme le job (completed, failed, killed…) : ce qui
+  // compte est que la session ne l'attend plus.
+  if (!/<status>[^<]*<\/status>/.test(text)) return null;
+  const m = text.match(/<task-id>([^<]+)<\/task-id>/);
+  return m ? m[1].trim() : null;
+}
 
 class SessionWatcher extends EventEmitter {
   constructor(configModule) {
@@ -258,6 +307,19 @@ class SessionWatcher extends EventEmitter {
         }
       }
 
+      // Filet des jobs de fond : un process tué à la main n'émet jamais sa
+      // <task-notification>, la session resterait cyan et muette pour toujours.
+      // Passé JOB_STALE_MS sans le moindre event, on lâche le job et on retombe
+      // en waiting — qui notifie (mieux vaut une bannière tardive que rien).
+      for (const [id, session] of this.sessions) {
+        if (session.state.name !== 'job') continue;
+        const last = session.lastEventTime || 0;
+        if (last && Date.now() - last > JOB_STALE_MS) {
+          if (session.bgTasks) session.bgTasks.clear();
+          this.setState(id, STATES.WAITING, false, 'job-stale');
+        }
+      }
+
       // Sessions not in active files: check PID with a grace window
       // (session file can briefly disappear during atomic rewrites)
       for (const [id, session] of this.sessions) {
@@ -480,6 +542,14 @@ class SessionWatcher extends EventEmitter {
       let readStart = 0;
       let scanned = false;
 
+      // Jobs de fond reconstruits DEPUIS LE TAIL SEUL, sans persistance : la
+      // fenêtre est un suffixe du fichier, donc si l'ouverture y est, sa
+      // fermeture éventuelle y est aussi (elle est écrite après) — un job
+      // « ouvert » reconstruit ici ne peut pas être un fantôme. Ouverture hors
+      // fenêtre = job oublié → la session retombe en waiting : dégradation
+      // gracieuse (comportement d'avant l'état job), jamais de blocage cyan.
+      let openJobs = new Set();
+
       let tailSize = MIN_TAIL;
       while (!scanned) {
         readStart = Math.max(0, stat.size - tailSize);
@@ -488,6 +558,7 @@ class SessionWatcher extends EventEmitter {
         lastAssistant = null;
         lastUser = null;
         hasLastPrompt = false;
+        openJobs = new Set();
 
         const fd = fs.openSync(jsonlPath, 'r');
         const buffer = Buffer.alloc(stat.size - readStart);
@@ -503,6 +574,11 @@ class SessionWatcher extends EventEmitter {
             const event = JSON.parse(lines[i]);
             if (event.slug) session.slug = event.slug;
             if (event.gitBranch) session.gitBranch = event.gitBranch;
+
+            const jobOpened = bgTaskOpened(event);
+            if (jobOpened) openJobs.add(jobOpened);
+            const jobClosed = bgTaskClosed(event);
+            if (jobClosed) openJobs.delete(jobClosed);
 
             if (event.type === 'assistant') {
               lastAssistant = event;
@@ -533,6 +609,8 @@ class SessionWatcher extends EventEmitter {
         }
       }
 
+      session.bgTasks = openJobs;
+
       // Determine state from last events
       // Key insight: the LAST event type tells us the current state
       let computedState = null;
@@ -556,7 +634,7 @@ class SessionWatcher extends EventEmitter {
         } else if (msg.stop_reason === 'tool_use') {
           computedState = STATES.RUNNING;
         } else if (msg.stop_reason === 'end_turn') {
-          computedState = STATES.WAITING;
+          computedState = openJobs.size > 0 ? STATES.JOB : STATES.WAITING;
         }
       }
 
@@ -693,6 +771,8 @@ class SessionWatcher extends EventEmitter {
       session.gitBranch = event.gitBranch;
     }
 
+    this.trackBgTask(session, event);
+
     switch (event.type) {
       case 'permission-mode':
         if (event.permissionMode) session.permissionMode = event.permissionMode;
@@ -708,6 +788,11 @@ class SessionWatcher extends EventEmitter {
         const isToolResult = Array.isArray(content) && content.some(c => c.type === 'tool_result');
         if (isToolResult) {
           this.setState(sessionId, STATES.RUNNING, isInitial, 'tool_result');
+        } else if (bgTaskClosed(event)) {
+          // Reprise déclenchée par la fin d'un job, PAS par une frappe : router
+          // en RUNNING plutôt qu'en THINKING/'user-prompt', sinon setState
+          // remettrait le cooldown de notif à zéro sur un faux prompt utilisateur.
+          this.setState(sessionId, STATES.RUNNING, isInitial, 'task-notification');
         } else {
           this.setState(sessionId, STATES.THINKING, isInitial, 'user-prompt');
         }
@@ -808,18 +893,45 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
+  // Jobs de fond ouverts d'une session (Set, créé à la demande — les sessions
+  // restaurées depuis config n'en ont pas).
+  bgTasksOf(session) {
+    if (!session.bgTasks) session.bgTasks = new Set();
+    return session.bgTasks;
+  }
+
+  hasOpenBgTask(sessionId) {
+    const session = this.sessions.get(sessionId);
+    return !!(session && session.bgTasks && session.bgTasks.size > 0);
+  }
+
+  trackBgTask(session, event) {
+    const opened = bgTaskOpened(event);
+    if (opened) this.bgTasksOf(session).add(opened);
+    const closed = bgTaskClosed(event);
+    if (closed) this.bgTasksOf(session).delete(closed);
+  }
+
+  // end_turn avec un job encore ouvert = tour suspendu à un process, pas à
+  // l'utilisateur (« je te reviens dès que j'ai les mesures »). JOB au lieu de
+  // WAITING : compté busy, et setState ne notifie que waiting/pending → silence.
+  endTurnTarget(sessionId) {
+    return this.hasOpenBgTask(sessionId) ? STATES.JOB : STATES.WAITING;
+  }
+
   startWaitingTimer(sessionId, isInitial) {
     this.clearWaitingTimer(sessionId);
     if (isInitial) {
       // For initial load, check if enough time has passed
       const session = this.sessions.get(sessionId);
       if (session && Date.now() - new Date(session.startedAt).getTime() > WAITING_DELAY) {
-        this.setState(sessionId, STATES.WAITING, isInitial, 'end_turn-initial');
+        this.setState(sessionId, this.endTurnTarget(sessionId), isInitial, 'end_turn-initial');
       }
       return;
     }
     const timer = setTimeout(() => {
-      this.setState(sessionId, STATES.WAITING, false, 'end_turn-idle');
+      const target = this.endTurnTarget(sessionId);
+      this.setState(sessionId, target, false, target === STATES.JOB ? 'end_turn-bg-task' : 'end_turn-idle');
     }, WAITING_DELAY);
     this.waitingTimers.set(sessionId, timer);
   }
@@ -1003,7 +1115,11 @@ class SessionWatcher extends EventEmitter {
     // permission prompt. An already-waiting session was notified at end_turn —
     // re-ringing it (and flipping it amber) is spam. If end_turn was missed
     // (state still looks busy), use the reminder as a WAITING correction.
-    if (idle && session.state.name === 'waiting') return;
+    // `job` est ignoré ici pour la même raison, en plus fort : le rappel idle
+    // est structurellement vrai pendant TOUT le job (l'utilisateur ne tape rien,
+    // c'est normal, ça travaille) — le laisser corriger en waiting rebranche
+    // exactement la bannière parasite que l'état job supprime.
+    if (idle && (session.state.name === 'waiting' || session.state.name === 'job')) return;
 
     // bypassPermissions skips most hooks (Claude auto-approves and proceeds)
     // — EXCEPT for hooks that signal a genuine user-blocking interaction:
@@ -1099,4 +1215,4 @@ getSessions() {
   }
 }
 
-module.exports = { SessionWatcher, STATES };
+module.exports = { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed };

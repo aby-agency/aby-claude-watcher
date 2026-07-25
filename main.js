@@ -8,7 +8,7 @@ const { focusTerminal } = require('./focus');
 const { checkForUpdates, downloadAndInstall, abortActiveDownload, GITHUB_OWNER, GITHUB_REPO, WEBSITE_URL } = require('./updater');
 const config = require('./config');
 const i18n = require('./i18n');
-const { SubagentTracker, hasBlockingForegroundAgent } = require('./subagents');
+const { SubagentTracker, hasBlockingForegroundAgent, hasLiveDelegation } = require('./subagents');
 const { trayGlance } = require('./tray-glance');
 const island = require('./island');
 const popover = require('./popover');
@@ -39,11 +39,26 @@ function blockingForegroundAgent(session) {
   );
 }
 
-// Effective display state. Only scans subagents when the raw state is pending
-// (the only state the override can change), keeping the badge/tray cheap.
+// Un tour fini pendant que des sous-agents (ou un workflow) travaillent encore
+// n'est pas de l'inactivité : la session délègue, et ses délégués la
+// réveilleront — même raisonnement que l'état `job` pour les tâches de fond.
+// Sans ça, la carte affichait « Inactif » en vert sous les lignes des agents
+// encore en cours, et la bannière needs-you partait pour rien.
+function delegatingNow(session) {
+  const dir = sessionDirFor(session);
+  if (!dir) return false;
+  return hasLiveDelegation(
+    subagentTracker.snapshotForSession(dir, session.agentDispatches || new Map()),
+    subagentTracker.workflowsForSession(dir)
+  );
+}
+
+// Effective display state. Only scans subagents when the raw state is pending or
+// waiting (the only states an override can change), keeping the badge/tray cheap.
 function effectiveStateName(session) {
   const name = session && session.state ? session.state.name : 'waiting';
   if (name === 'pending' && blockingForegroundAgent(session)) return 'running';
+  if (name === 'waiting' && delegatingNow(session)) return 'delegating';
   return name;
 }
 
@@ -313,6 +328,12 @@ function setupWatcher() {
     // Busy on a foreground subagent → no bell, no sound (it's not waiting on you).
     if (blockingForegroundAgent(session)) {
       log.info(`[notif] suppressed for ${session.sessionId.slice(0, 8)} — blocked on foreground agent`);
+      return;
+    }
+    // Tour fini mais délégués au travail : ils réveilleront la session, elle
+    // n'attend rien de l'utilisateur — même silence que l'état `job`.
+    if (session.state && session.state.name === 'waiting' && delegatingNow(session)) {
+      log.info(`[notif] suppressed for ${session.sessionId.slice(0, 8)} — delegating (subagents/workflow actifs)`);
       return;
     }
     const prefs = config.getNotificationPrefs(session.sessionId);
@@ -660,10 +681,15 @@ function serializeSession(session) {
   if (workflows.length) {
     workflowActive.set(session.sessionId, new Set(workflows.map(w => w.runId)));
   }
-  // Blocked on a foreground subagent → show running, not pending/orange.
-  const state = (session.state.name === 'pending' && hasBlockingForegroundAgent(subagents))
-    ? STATES.RUNNING
-    : session.state;
+  // Overrides de présentation (réutilisent les scans déjà faits ci-dessus) :
+  //  - bloquée sur un agent foreground → running, pas pending/orange ;
+  //  - tour fini mais délégués au travail → delegating, pas waiting/« Inactif ».
+  let state = session.state;
+  if (state.name === 'pending' && hasBlockingForegroundAgent(subagents)) {
+    state = STATES.RUNNING;
+  } else if (state.name === 'waiting' && hasLiveDelegation(subagents, workflows)) {
+    state = STATES.DELEGATING;
+  }
 
   return {
     sessionId: session.sessionId,

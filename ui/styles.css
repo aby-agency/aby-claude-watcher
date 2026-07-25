@@ -16,6 +16,10 @@
   --state-thinking: #a78bfa;
   --state-running: #3b82f6;
   --state-waiting: #22c55e;
+  /* job = tour suspendu à une tâche de fond. Cyan : lu comme « ça tourne »
+     (famille froide, côté running) sans se confondre avec le bleu du running
+     ni réclamer l'attention comme le vert/ambre. */
+  --state-job: #06b6d4;
   --state-pending: #f59e0b;
   --state-pending-contrast: #ffffff;
   --state-neutral: #94a3b8;
@@ -25,6 +29,7 @@
   --glow-thinking: rgba(167, 139, 250, 0.15);
   --glow-running: rgba(59, 130, 246, 0.15);
   --glow-waiting: rgba(34, 197, 94, 0.15);
+  --glow-job: rgba(6, 182, 212, 0.15);
 
   --radius: 8px;
   /* Soft Glass — matière opaque à reflets (aucun backdrop-filter) */
@@ -174,6 +179,12 @@ body {
 .micro-item[data-state="running"] { color: var(--state-running); }
 .micro-item[data-state="running"] .micro-item-dot { background: var(--state-running); }
 .micro-item[data-state="waiting"] .micro-item-dot { background: var(--state-waiting); box-shadow: 0 0 7px 0 var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
+/* job/delegating : pas de halo ni de respiration — ça travaille tout seul,
+   ça n'appelle pas. */
+.micro-item[data-state="job"],
+.micro-item[data-state="delegating"] { color: var(--state-job); }
+.micro-item[data-state="job"] .micro-item-dot,
+.micro-item[data-state="delegating"] .micro-item-dot { background: var(--state-job); }
 .micro-item[data-state="pending"] { color: var(--state-pending); }
 .micro-item[data-state="pending"] .micro-item-dot { background: var(--state-pending); box-shadow: 0 0 7px 0 var(--state-pending); }
 .micro-item[data-state="error"] .micro-item-dot { background: var(--state-error); box-shadow: 0 0 7px 0 var(--state-error); animation: breathe 3s ease-in-out infinite; }
@@ -741,6 +752,8 @@ body.micro-mode .uring-reste { display: none; }
 .state-badge.thinking { --badge-bg: var(--glow-thinking); --badge-color: var(--state-thinking); }
 .state-badge.running { --badge-bg: var(--glow-running); --badge-color: var(--state-running); }
 .state-badge.waiting { --badge-bg: var(--glow-waiting); --badge-color: var(--state-waiting); }
+.state-badge.job,
+.state-badge.delegating { --badge-bg: var(--glow-job); --badge-color: var(--state-job); }
 .state-badge.pending { --badge-bg: rgba(245, 158, 11, 0.15); --badge-color: var(--state-pending); }
 .state-badge.error { --badge-bg: rgba(153, 27, 27, 0.15); --badge-color: var(--state-error); }
 
@@ -1105,6 +1118,12 @@ body.micro-mode .uring-reste { display: none; }
 .compact-card[data-state="waiting"] { --card-accent: var(--state-waiting); }
 .compact-card[data-state="waiting"] .compact-card-state { color: var(--state-waiting); }
 .compact-card[data-state="waiting"] .compact-dot { background: var(--state-waiting); box-shadow: 0 0 7px 0 var(--state-waiting); animation: breathe 3s ease-in-out infinite; }
+.compact-card[data-state="job"],
+.compact-card[data-state="delegating"] { --card-accent: var(--state-job); }
+.compact-card[data-state="job"] .compact-card-state,
+.compact-card[data-state="delegating"] .compact-card-state { color: var(--state-job); }
+.compact-card[data-state="job"] .compact-dot,
+.compact-card[data-state="delegating"] .compact-dot { background: var(--state-job); }
 .compact-card[data-state="pending"] { --card-accent: var(--state-pending); }
 .compact-card[data-state="pending"] .compact-card-state { color: var(--state-pending); }
 .compact-card[data-state="pending"] .compact-dot { background: var(--state-pending); box-shadow: 0 0 7px 0 var(--state-pending); }
@@ -1651,6 +1670,8 @@ body.micro-mode .uring-reste { display: none; }
 .card[data-state="thinking"] { --card-accent: var(--state-thinking); }
 .card[data-state="running"] { --card-accent: var(--state-running); }
 .card[data-state="waiting"] { --card-accent: var(--state-waiting); }
+.card[data-state="job"],
+.card[data-state="delegating"] { --card-accent: var(--state-job); }
 .card[data-state="pending"] { --card-accent: var(--state-pending); }
 .card[data-state="error"] { --card-accent: var(--state-error); }
 

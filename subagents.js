@@ -231,6 +231,21 @@ function hasBlockingForegroundAgent(snapshot) {
     && snapshot.some(sa => sa.state === 'running' && sa.runInBackground === false);
 }
 
+// True quand le tour est fini mais que du monde travaille encore POUR la session
+// (sous-agents vivants ou runs de workflow) : elle n'est pas « inactive », elle
+// délègue — et ses délégués la réveilleront. Volontairement plus large que
+// hasBlockingForegroundAgent : ici on ne cherche pas ce qui BLOQUE, on cherche ce
+// qui TRAVAILLE, donc les agents détachés et les workflows comptent aussi.
+// `snapshot` est la liste running+stale de snapshotForSession — on garde le
+// 'stale' (un agent qui lit un gros diff n'écrit rien pendant des minutes, cf.
+// ERROR_TIMEOUT_MS) : l'exclure ferait clignoter le libellé entre « délégation »
+// et « inactif » alors que les lignes d'agents restent affichées sur la carte.
+function hasLiveDelegation(snapshot, workflows) {
+  const agents = Array.isArray(snapshot) && snapshot.length > 0;
+  const runs = Array.isArray(workflows) && workflows.some(wf => !wf.status || wf.status === 'running');
+  return agents || runs;
+}
+
 module.exports = {
   readMeta,
   readLastEvent,
@@ -242,6 +257,7 @@ module.exports = {
   readWorkflowState,
   SubagentTracker,
   hasBlockingForegroundAgent,
+  hasLiveDelegation,
   ERROR_TIMEOUT_MS,
   TAIL_BYTES,
   WORKFLOW_STALE_MS,

@@ -23,6 +23,12 @@ const ICONS = {
   wrench: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
 };
 
+// États « ça travaille » : spinner au lieu du point, pilule d'outil affichée,
+// cloche obsolète. `job` (tour suspendu à une tâche de fond) en fait partie —
+// la session reprendra seule, elle n'attend personne.
+const ACTIVE_STATES = ['running', 'thinking', 'job', 'delegating'];
+const isActiveState = (name) => ACTIVE_STATES.includes(name);
+
 const sessions = new Map();
 let viewMode = 'grid'; // 'grid' | 'compact' | 'micro'
 let previousViewMode = 'grid'; // remembered when entering micro so Back can restore
@@ -780,7 +786,7 @@ function toggleBackgroundSection() {
 function updateSession(s) {
   const stateName = s.state.name;
   const bell = activeBells.get(s.sessionId);
-  const isActiveAgain = stateName === 'running' || stateName === 'thinking';
+  const isActiveAgain = isActiveState(stateName);
   const isInactive = stateName === 'error';
 
   // Bell + toast handoff : une cloche devenue obsolète (session repartie
@@ -963,7 +969,7 @@ onclick="handleCardClick(event, '${sid}')">
         </div>
       </div>
       <div class="state-badge ${stateName}">
-        ${(stateName === 'running' || stateName === 'thinking') ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
+        ${isActiveState(stateName) ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
         ${stateLabel}
       </div>
       <div class="card-details">
@@ -989,7 +995,7 @@ onclick="handleCardClick(event, '${sid}')">
         </div>
         <div class="detail">
           <span class="detail-label">${t('tool')}</span>
-          <span class="detail-value">${(stateName === 'running' || stateName === 'thinking') ? toolPill(s.lastTool) : toolPill(null)}</span>
+          <span class="detail-value">${isActiveState(stateName) ? toolPill(s.lastTool) : toolPill(null)}</span>
         </div>
       </div>
       ${subagentsBlockHTML(s)}
@@ -1001,7 +1007,7 @@ function microItemHTML(s) {
   const stateName = s.state.name;
   const sid = escAttr(s.sessionId);
   const name = s.customName || s.projectName;
-  const isActive = stateName === 'running' || stateName === 'thinking';
+  const isActive = isActiveState(stateName);
   const isPending = stateName === 'pending';
   const indicator = isActive
     ? '<span class="micro-item-spinner"></span>'
@@ -1034,7 +1040,7 @@ function microItemHTML(s) {
 function compactItemHTML(s) {
   const stateName = s.state.name;
   const sid = escAttr(s.sessionId);
-  const isActive = stateName === 'running' || stateName === 'thinking';
+  const isActive = isActiveState(stateName);
   const stateLabel = getStateLabel(s);
 
   // Always wrap in a fixed-size slot so bell-flash (12×12) doesn't push the

@@ -132,6 +132,28 @@ test('removeHookFromFile reconnaît la forme quotée', () => {
   assertEq(read(p).hooks.PreToolUse, undefined);
 });
 
+test('doublon des nôtres → réduit à une seule entrée, les hooks tiers préservés', () => {
+  const p = tmpFile();
+  // Reproduit le cas réel : une 2.4.x relancée après une 2.5.x ne reconnaît pas
+  // la commande quotée et ajoute la sienne à côté.
+  fs.writeFileSync(p, JSON.stringify({
+    hooks: {
+      PreToolUse: [
+        { matcher: '*', hooks: [{ type: 'command', command: `'${SPACED}'` }] },
+        { matcher: 'Bash', hooks: [{ type: 'command', command: '/user/own.sh' }] },
+        { matcher: '*', hooks: [{ type: 'command', command: SPACED }] },
+      ],
+    },
+  }, null, 2));
+  const r = installHooksIntoFile(p, SPACED);
+  assertEq(r.reason, 'written');
+  const arr = read(p).hooks.PreToolUse;
+  assertEq(arr.length, 2); // le nôtre (dédoublonné) + celui de l'utilisateur
+  assertEq(arr.filter(b => b.hooks[0].command.includes('aby-permission-hook')).length, 1);
+  assertEq(arr.some(b => b.hooks[0].command === '/user/own.sh'), true);
+  assertEq(installHooksIntoFile(p, SPACED).reason, 'already-present'); // stable
+});
+
 test('apostrophe dans le chemin → échappement shell correct', () => {
   const p = tmpFile();
   const weird = "/Users/paul/Claude's apps/bin/aby-permission-hook.sh";

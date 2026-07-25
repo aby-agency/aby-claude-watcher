@@ -58,8 +58,19 @@ function ensureBlock(entries, event, hookPath) {
   const command = shellQuote(hookPath);
   let changed = false;
   let found = false;
+  const kept = [];
   for (const block of entries) {
-    if (!isOurHook(block)) continue;
+    if (!isOurHook(block)) { kept.push(block); continue; }
+    if (found) {
+      // Doublon des nôtres → on le laisse tomber. Cas réel : une version ≤2.4.x
+      // relancée APRÈS une 2.5.x ne reconnaît pas la commande quotée (son
+      // isOurHook teste `endsWith('/…hook.sh')`, or la nôtre finit par `.sh'`)
+      // et ajoute sa propre entrée. Sans ce ménage, le hook pingerait deux fois
+      // le socket à chaque outil (bénin mais sale) et le doublon survivrait à
+      // toutes les migrations suivantes.
+      changed = true;
+      continue;
+    }
     found = true;
     // Self-heal: chemin périmé OU commande non quotée écrite par une version
     // antérieure — les deux se réparent en réécrivant la forme quotée.
@@ -69,16 +80,16 @@ function ensureBlock(entries, event, hookPath) {
         changed = true;
       }
     }
-    break;
+    kept.push(block);
   }
   if (!found) {
-    entries.push({
+    kept.push({
       matcher: event === 'PreToolUse' ? '*' : '',
       hooks: [{ type: 'command', command }],
     });
     changed = true;
   }
-  return { entries, changed };
+  return { entries: kept, changed };
 }
 
 // Reads a settings JSON file (or {} if absent); returns null if it exists but

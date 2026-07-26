@@ -4,6 +4,25 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] — 2026-07-26
+
+### Added
+- **Les cartes affichent enfin le nom de la session.** Quand une session est
+  lancée avec un nom (`claude -n "🦉 Athéna"`, ou `/name` en cours de route),
+  c'est ce nom qui s'affiche, à la place du dossier de travail. Le cas qui
+  posait problème : plusieurs sessions partageant le même dossier — des
+  bureaux d'une même instance, par exemple — apparaissaient toutes sous le
+  même libellé, impossibles à distinguer, alors que Claude Code, lui, les
+  nommait correctement partout ailleurs. Le nom suit sur toutes les surfaces :
+  cartes, vue compacte, dynamic island, notifications et recherche.
+- Un renommage fait depuis l'application reste prioritaire sur tout le reste,
+  et vider le champ revient désormais au nom de la session s'il y en a un,
+  plutôt qu'au nom du dossier.
+
+### Fixed
+- La recherche ignorait les noms donnés depuis l'application : chercher une
+  session par le nom qu'on lui avait soi-même attribué ne renvoyait rien.
+
 ## [2.6.0] — 2026-07-26
 
 ### Added

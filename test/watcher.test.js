@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed } = require('../watcher');
+const { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName } = require('../watcher');
 
 function makeMockConfig() {
   const data = { sessions: {}, notifications: {}, customNames: {}, sessionOrder: [], pendingMarks: {} };
@@ -1031,6 +1031,47 @@ test('garde-fou : un job récent n\'est pas lâché', () => {
   }));
   w.scan();
   if (w.sessions.get('J11').state.name !== 'job') throw new Error('un import de 20 min reste un job');
+});
+
+section('Nom de session explicite (claude -n / /name)');
+
+test('nameSource "user" → le nom est retenu', () => {
+  const got = explicitSessionName({ name: '🦉 Athéna · perso', nameSource: 'user' });
+  if (got !== '🦉 Athéna · perso') throw new Error(`got ${JSON.stringify(got)}`);
+});
+
+// Le cas réel de `claude -n "…" -p …` sur 2.1.220 : name écrit, nameSource OMIS.
+// Filtrer sur nameSource === 'user' ratait précisément les bureaux headless.
+test('nameSource ABSENT (claude -n en print/SDK) → le nom est retenu', () => {
+  const got = explicitSessionName({ name: '🦉 Athéna · test', entrypoint: 'sdk-cli' });
+  if (got !== '🦉 Athéna · test') throw new Error(`got ${JSON.stringify(got)}`);
+});
+
+test('nameSource "derived" → ignoré (doublon du dossier)', () => {
+  if (explicitSessionName({ name: 'perso-agents-23', nameSource: 'derived' }) !== null) {
+    throw new Error('un nom dérivé du dossier ne doit pas primer sur le basename');
+  }
+});
+
+test('nameSource "auto" → ignoré (nom mouvant)', () => {
+  if (explicitSessionName({ name: 'fixing the island', nameSource: 'auto' }) !== null) {
+    throw new Error('un nom auto-généré peut changer en cours de session');
+  }
+});
+
+test('nom vide / absent / non-string → null', () => {
+  if (explicitSessionName({ name: '   ' }) !== null) throw new Error('espaces seules');
+  if (explicitSessionName({ nameSource: 'user' }) !== null) throw new Error('nom absent');
+  if (explicitSessionName({}) !== null) throw new Error('ni nom ni source');
+  if (explicitSessionName({ name: 42, nameSource: 'user' }) !== null) throw new Error('nom non-string');
+  if (explicitSessionName(null) !== null) throw new Error('data absent');
+});
+
+test('caractères de contrôle strippés, longueur capée à 60', () => {
+  const got = explicitSessionName({ name: 'Athéna\n', nameSource: 'user' });
+  if (got !== 'Athéna') throw new Error(`got ${JSON.stringify(got)}`);
+  const long = explicitSessionName({ name: 'x'.repeat(200), nameSource: 'user' });
+  if (long.length !== 60) throw new Error(`got ${long.length}`);
 });
 
 runAll().then(() => {

@@ -45,7 +45,7 @@ function renderPopover(sessions, config) {
     const indicator = isActive
       ? `<span class="pop-spinner"></span>`
       : `<span class="pop-dot"></span>`;
-    const displayName = customNames[s.sessionId] || s.projectName;
+    const displayName = customNames[s.sessionId] || s.sessionName || s.projectName;
     return `
       <div class="pop-item" data-session="${esc(s.sessionId)}" data-state="${esc(stateName)}">
         ${indicator}

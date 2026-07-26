@@ -13,6 +13,30 @@ const POLL_INTERVAL = 250;
 const WAITING_DELAY = 2000;
 const PENDING_DELAY = 1000; // defer interactive-tool PENDING so a same-batch tool_result can cancel it
 
+// Nom de session EXPLICITE (claude -n "…" ou /name) tel que Claude Code l'écrit
+// dans ~/.claude/sessions/<pid>.json. On EXCLUT, on ne sélectionne pas :
+//   - "derived" → nom fabriqué depuis le dossier (« aby-claude-watcher-9a ») =
+//                 doublon bruité du basename qu'on affiche déjà, hash en plus
+//   - "auto"    → nom inventé par Claude Code ; il PEUT changer en cours de route,
+//                 or une carte de supervision doit garder une identité stable
+//   - tout le reste (dont `nameSource` ABSENT) → nom voulu par l'utilisateur
+//
+// PIÈGE : `nameSource` n'est PAS toujours écrit. Mesuré sur 2.1.220 — un
+// `claude -n "🦉 Athéna · perso" -p …` pose `name` et OMET `nameSource`
+// (le code CLI l'affecte à `void 0` quand aucune source n'est qualifiée), alors
+// qu'un `claude -p` nu écrit bien `nameSource: "derived"`. Filtrer sur
+// `nameSource === 'user'` ratait donc exactement le cas visé : les bureaux
+// headless lancés avec -n. D'où la logique en liste d'exclusion.
+// Contrôles/longueur alignés sur config.setCustomName (mêmes garanties d'affichage).
+const AUTO_NAME_SOURCES = ['derived', 'auto'];
+
+function explicitSessionName(data) {
+  if (!data || typeof data.name !== 'string') return null;
+  if (AUTO_NAME_SOURCES.includes(data.nameSource)) return null;
+  const clean = data.name.trim().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 60);
+  return clean || null;
+}
+
 const STATES = {
   THINKING: { name: 'thinking', color: '#a78bfa' },
   RUNNING: { name: 'running', color: '#3b82f6' },
@@ -101,6 +125,7 @@ class SessionWatcher extends EventEmitter {
           pid: data.pid || null,
           cwd: data.cwd || null,
           projectName: data.projectName || 'Unknown',
+          sessionName: data.sessionName || null,
           slug: data.slug || '',
           state: savedState,
           lastTool: data.lastTool || null,
@@ -259,6 +284,7 @@ class SessionWatcher extends EventEmitter {
               pid,
               cwd,
               projectName,
+              sessionName: explicitSessionName(data),
               slug: '',
               state: STATES.WAITING,
               lastTool: null,
@@ -286,6 +312,15 @@ class SessionWatcher extends EventEmitter {
             session.pid = pid;
             session.cwd = cwd;
             session.isBackground = isBackground;
+            // Le nom peut apparaître/changer en cours de session (`/name`) sans
+            // qu'aucun event ne soit écrit dans le JSONL → on émet nous-mêmes,
+            // sinon la carte garderait l'ancien libellé jusqu'au prochain tour.
+            const liveName = explicitSessionName(data);
+            if (liveName !== (session.sessionName || null)) {
+              session.sessionName = liveName;
+              this.persistSession(session);
+              this.emit('session-updated', session);
+            }
             if (startedAt) {
               const startedAtISO = typeof startedAt === 'number'
                 ? new Date(startedAt).toISOString() : startedAt;
@@ -1000,6 +1035,7 @@ class SessionWatcher extends EventEmitter {
       pid: session.pid,
       cwd: session.cwd,
       projectName: session.projectName,
+      sessionName: session.sessionName || null,
       slug: session.slug,
       stateName: session.state.name,
       lastTool: session.lastTool,
@@ -1215,4 +1251,4 @@ getSessions() {
   }
 }
 
-module.exports = { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed };
+module.exports = { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName };

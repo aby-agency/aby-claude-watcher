@@ -34,7 +34,7 @@ function islandLayout(display, notch, winW) {
 function bannerPayload(session, customName) {
   return {
     sessionId: session.sessionId,
-    name: customName || session.projectName || 'Claude Code',
+    name: customName || session.sessionName || session.projectName || 'Claude Code',
     state: (session.state && session.state.name) || null,
   };
 }
@@ -120,7 +120,7 @@ function buildIsland(sessions, config) {
 
   const row = (s) => ({
     sessionId: s.sessionId,
-    name: s.customName || s.projectName,
+    name: s.customName || s.sessionName || s.projectName,
     state: s.state.name,
     isBackground: !!s.isBackground,
     // Sous-lignes : subagents actifs + runs de workflow (déjà filtrés

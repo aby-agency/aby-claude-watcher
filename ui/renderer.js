@@ -863,12 +863,24 @@ function removeSessionFromDOM(sessionId) {
   render();
 }
 
+// Libellé de carte, par ordre de priorité décroissante :
+//   1. customName  — renommage local dans le watcher, l'utilisateur a tranché ici
+//   2. sessionName — nom explicite côté Claude Code (`claude -n "…"`, `/name`)
+//   3. projectName — basename du cwd, le fallback historique
+// Le 2 existe parce que plusieurs sessions peuvent partager un cwd (bureaux d'un
+// même dossier d'instance) : elles s'affichaient toutes sous le même nom de
+// dossier alors que Claude Code sait très bien les distinguer.
+function sessionLabel(s) {
+  return (s && (s.customName || s.sessionName || s.projectName)) || '';
+}
+
 function getSortedSessions() {
   let arr = Array.from(sessions.values());
 
   // Filter by search query
   if (searchQuery) {
     arr = arr.filter(s =>
+      sessionLabel(s).toLowerCase().includes(searchQuery) ||
       s.projectName.toLowerCase().includes(searchQuery) ||
       (s.slug || '').toLowerCase().includes(searchQuery) ||
       (s.gitBranch || '').toLowerCase().includes(searchQuery)
@@ -957,7 +969,7 @@ onclick="handleCardClick(event, '${sid}')">
       <div class="card-header">
         <div class="card-title">
           <div class="project-name editable-name" onclick="event.stopPropagation(); startInlineRename(event, '${sid}')" title="${t('action_rename_hint')}">
-            <span class="project-name-text">${esc(s.customName || s.projectName)}</span>
+            <span class="project-name-text">${esc(sessionLabel(s))}</span>
             <span class="edit-hint">${ICONS.edit}</span>
           </div>
         </div>
@@ -1006,7 +1018,7 @@ onclick="handleCardClick(event, '${sid}')">
 function microItemHTML(s) {
   const stateName = s.state.name;
   const sid = escAttr(s.sessionId);
-  const name = s.customName || s.projectName;
+  const name = sessionLabel(s);
   const isActive = isActiveState(stateName);
   const isPending = stateName === 'pending';
   const indicator = isActive
@@ -1063,7 +1075,7 @@ function compactItemHTML(s) {
 onclick="handleCardClick(event, '${sid}')">
       <div class="compact-card-header">
         <div class="compact-card-name editable-name" onclick="event.stopPropagation(); startInlineRename(event, '${sid}')" title="${t('action_rename_hint')}">
-          <span class="project-name-text">${esc(s.customName || s.projectName)}</span>
+          <span class="project-name-text">${esc(sessionLabel(s))}</span>
           <span class="edit-hint">${ICONS.edit}</span>
         </div>
         <div class="compact-card-actions">
@@ -1203,11 +1215,13 @@ function startInlineRename(event, sessionId) {
   const card = document.querySelector(`[data-session="${sessionId}"] .editable-name`);
   if (!card || card.classList.contains('renaming')) return;
 
-  const currentName = s.customName || s.projectName;
-  const placeholder = s.projectName;
+  const currentName = sessionLabel(s);
+  // Ce qui s'affichera si l'utilisateur vide le champ — pas forcément le dossier
+  // depuis que le nom Claude Code (`-n`) s'intercale avant lui.
+  const fallbackName = s.sessionName || s.projectName;
 
   card.classList.add('renaming');
-  card.innerHTML = `<input class="inline-rename-input" type="text" value="${escAttr(currentName)}" placeholder="${escAttr(placeholder)}" />`;
+  card.innerHTML = `<input class="inline-rename-input" type="text" value="${escAttr(currentName)}" placeholder="${escAttr(fallbackName)}" />`;
   const input = card.querySelector('.inline-rename-input');
   input.focus();
   input.select();
@@ -1218,7 +1232,7 @@ function startInlineRename(event, sessionId) {
     finished = true;
     if (commit) {
       const value = input.value.trim();
-      const nameToSet = (!value || value === s.projectName) ? '' : value;
+      const nameToSet = (!value || value === fallbackName) ? '' : value;
       const current = s.customName || '';
       if (nameToSet !== current) {
         window.api.setCustomName(sessionId, nameToSet);
@@ -1230,7 +1244,7 @@ function startInlineRename(event, sessionId) {
       const stillThere = document.querySelector(`[data-session="${sessionId}"] .editable-name.renaming`);
       if (stillThere) {
         const updated = sessions.get(sessionId);
-        const display = updated ? (updated.customName || updated.projectName) : currentName;
+        const display = updated ? sessionLabel(updated) : currentName;
         stillThere.classList.remove('renaming');
         stillThere.innerHTML = `<span class="project-name-text">${esc(display)}</span><span class="edit-hint">${ICONS.edit}</span>`;
       }
@@ -1328,7 +1342,7 @@ function showToast(data) {
   const bell = ICONS.bellRing.replace('width="14"', 'width="13"').replace('height="14"', 'height="13"');
   toast.innerHTML = `
     <span class="toast-bell">${bell}</span>
-    <span class="toast-name">${esc(data.customName || data.projectName)}</span>
+    <span class="toast-name">${esc(sessionLabel(data))}</span>
     <span class="toast-arrow">→</span>
     <span class="toast-state">${stateLabel}</span>
     <button class="toast-close" title="${t('close')}" aria-label="${t('close')}">${ICONS.x}</button>

@@ -189,6 +189,78 @@ let currentViewMode = 'grid';
 let lastUsage = null;
 const MICRO_DEFAULT_BOUNDS = { width: 260, height: 200 };
 
+// ─── Mise à jour : état partagé avec l'île ────────────────────────────────
+// Le check périodique ne poussait sa trouvaille QUE vers le dashboard : app en
+// tray, fenêtre fermée, l'utilisateur ne voyait jamais qu'une release existait
+// (Etienne, resté sur une version périmée). L'île expose maintenant la même
+// info en permanence — d'où cet état retenu ici plutôt qu'envoyé et oublié.
+let latestUpdate = null;        // dernier résultat 'update-available'
+let updateInstall = null;       // { phase: 'downloading'|'installing'|'error', percent }
+let dismissedUpdate = null;     // version écartée depuis l'île (RAM : revient au prochain lancement)
+let updateAborted = false;      // abort volontaire → le rejet qui suit n'est pas un « échec »
+
+function islandUpdatePayload() {
+  return {
+    current: app.getVersion(),
+    latest: latestUpdate ? latestUpdate.latest : null,
+    canInstall: !!(latestUpdate && latestUpdate.dmgUrl),
+    url: latestUpdate ? latestUpdate.url : null,
+    dismissed: !!(latestUpdate && dismissedUpdate === latestUpdate.latest),
+    install: updateInstall,
+  };
+}
+
+// Poussé en direct (pas via sendUpdate/refresh complet) : la progression tombe
+// à ~10 fps, un refresh de l'île re-interrogerait sessions + config + usage à
+// chaque pourcent.
+function pushIslandUpdate() {
+  island.sendUpdateState(islandUpdatePayload());
+}
+
+// Download + install, appelé par le dashboard ET par la bannière de l'île —
+// une seule implémentation, sinon deux téléchargements concurrents auraient
+// pu partir sur le même DMG.
+async function runUpdateInstall(release) {
+  if (!release || !release.dmgUrl) return { ok: false, error: 'no-asset' };
+  if (updateInstall && updateInstall.phase !== 'error') return { ok: false, error: 'busy' };
+
+  updateAborted = false;
+  updateInstall = { phase: 'downloading', percent: 0 };
+  pushIslandUpdate();
+  sendToRenderer('update-progress', { received: 0, total: release.dmgSize || 0, percent: 0 });
+
+  let lastSent = 0;
+  const onProgress = (p) => {
+    // Throttle to ~10 fps to avoid IPC flooding
+    const now = Date.now();
+    if (now - lastSent < 100 && p.percent < 100) return;
+    lastSent = now;
+    updateInstall = { phase: 'downloading', percent: p.percent };
+    sendToRenderer('update-progress', p);
+    pushIslandUpdate();
+  };
+
+  try {
+    await downloadAndInstall(release, onProgress);
+    updateInstall = { phase: 'installing', percent: 100 };
+    pushIslandUpdate();
+    sendToRenderer('update-installing', { version: release.latest });
+    return { ok: true };
+  } catch (e) {
+    if (updateAborted) {
+      updateAborted = false;
+      updateInstall = null;
+      pushIslandUpdate();
+      return { ok: false, error: 'aborted' };
+    }
+    log.error(`[update] install ${release.latest || '?'} failed: ${e.message}`);
+    updateInstall = { phase: 'error', percent: 0, message: e.message };
+    pushIslandUpdate();
+    sendToRenderer('update-error', { message: e.message });
+    return { ok: false, error: e.message };
+  }
+}
+
 // Window transparency state. The window is fully opaque while focused or
 // hovered, and drops to config.windowOpacity when idle — but only when the
 // feature is enabled. See applyWindowOpacity().
@@ -612,34 +684,26 @@ ipcMain.handle('set-session-order', (_, order) => {
   ipcMain.handle('get-language', () => i18n.getLanguage());
 
   ipcMain.handle('check-updates', async (_, force) => {
-    return checkForUpdates(!!force);
+    const result = await checkForUpdates(!!force);
+    // Un check manuel depuis le dashboard alimente l'île comme le check
+    // périodique : une seule source de vérité pour les deux surfaces.
+    if (result.status === 'update-available') {
+      latestUpdate = result;
+      pushIslandUpdate();
+    }
+    return result;
   });
 
-  ipcMain.handle('download-update', async (_, release) => {
-    if (!release || !release.dmgUrl) {
-      return { ok: false, error: 'no-asset' };
-    }
-    try {
-      let lastSent = 0;
-      const onProgress = (p) => {
-        // Throttle to ~10 fps to avoid IPC flooding
-        const now = Date.now();
-        if (now - lastSent < 100 && p.percent < 100) return;
-        lastSent = now;
-        sendToRenderer('update-progress', p);
-      };
-      sendToRenderer('update-progress', { received: 0, total: release.dmgSize || 0, percent: 0 });
-      await downloadAndInstall(release, onProgress);
-      sendToRenderer('update-installing', { version: release.latest });
-      return { ok: true };
-    } catch (e) {
-      sendToRenderer('update-error', { message: e.message });
-      return { ok: false, error: e.message };
-    }
-  });
+  ipcMain.handle('download-update', async (_, release) => runUpdateInstall(release));
 
   ipcMain.handle('abort-update', () => {
-    return { aborted: abortActiveDownload() };
+    // Abort volontaire : on repart d'un état neutre. Le drapeau est lu par le
+    // catch de runUpdateInstall, qui sinon afficherait « Échec » sur l'île pour
+    // une annulation demandée par l'utilisateur.
+    updateAborted = true;
+    const aborted = abortActiveDownload();
+    if (!aborted) updateAborted = false;
+    return { aborted };
   });
 
   ipcMain.handle('get-app-info', () => {
@@ -658,6 +722,34 @@ ipcMain.handle('set-session-order', (_, order) => {
   });
 
   ipcMain.handle('island-hover', (_, hovering) => island.setHover(!!hovering));
+
+  // Île : version courante (ligne du panneau) + maj éventuelle (bannière).
+  ipcMain.handle('island-get-update', () => islandUpdatePayload());
+
+  // Clic sur la bannière = installation DIRECTE (décision Paul) : pas de
+  // détour par le dashboard. Sans DMG pour cette archi, on ouvre la release.
+  ipcMain.handle('island-install-update', async () => {
+    if (!latestUpdate) return { ok: false, error: 'no-update' };
+    if (!latestUpdate.dmgUrl) {
+      if (latestUpdate.url) shell.openExternal(latestUpdate.url);
+      return { ok: false, error: 'no-asset' };
+    }
+    log.info(`[update] install ${latestUpdate.latest} requested from island`);
+    return runUpdateInstall(latestUpdate);
+  });
+
+  // « Plus tard » : garde-fou au caractère collant de la bannière — sans lui,
+  // la seule sortie serait d'installer. Volontairement NON persisté : la
+  // prochaine ouverture de l'app la remet, un rappel doux plutôt qu'un oubli
+  // définitif.
+  ipcMain.handle('island-dismiss-update', () => {
+    if (latestUpdate) {
+      dismissedUpdate = latestUpdate.latest;
+      log.info(`[update] ${dismissedUpdate} dismissed from island (until next launch)`);
+      pushIslandUpdate();
+    }
+    return true;
+  });
 
   // Popover du tray — actions app-level (le reste vit dans popover.js).
   ipcMain.handle('popover-hide', () => popover.hide());
@@ -805,7 +897,13 @@ app.whenReady().then(() => {
   const checkAndNotify = async () => {
     const result = await checkForUpdates(false);
     if (result.status === 'update-available') {
+      // Nouvelle version depuis le dernier check → l'écart précédemment
+      // « plus tard » ne vaut plus, la bannière ressort.
+      if (latestUpdate && latestUpdate.latest !== result.latest) dismissedUpdate = null;
+      latestUpdate = result;
+      log.info(`[update] ${result.current} → ${result.latest} available (dmg=${!!result.dmgUrl})`);
       sendToRenderer('update-available', result);
+      pushIslandUpdate();
     }
   };
   setTimeout(checkAndNotify, 10_000);

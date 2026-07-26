@@ -87,6 +87,9 @@ function fitPill() {
 }
 
 let refreshSeq = 0;
+// Dernier état de mise à jour connu (main = source de vérité) : relu au
+// refresh, poussé pendant un téléchargement. Voir renderUpdate() plus bas.
+let updateState = null;
 async function refresh() {
   const myId = ++refreshSeq;
   const sessions = await window.islandApi.getSessions();
@@ -133,6 +136,13 @@ async function refresh() {
     bars.push(window.usageGauge.usageBar(`${win} ${String(l.model).toUpperCase()}`, Math.round(l.percent), rem));
   }
   document.getElementById('gauges').innerHTML = bars.join('');
+
+  // Version + mise à jour : relus à chaque refresh (le main est la source de
+  // vérité) — la bannière collante se reconstruit donc toute seule après un
+  // repli de panneau, un reload du renderer ou un rallumage de l'île.
+  updateState = await window.islandApi.getUpdate();
+  if (myId !== refreshSeq) return;
+  renderUpdate();
 }
 
 // ── Hover machinery ──
@@ -220,8 +230,12 @@ function removeBanner(sessionId) {
     if (!document.body.classList.contains('expanded')) setMouse(false);
   }
 }
-function hideBanner() { // vidage complet (appelé à l'ouverture du panneau)
-  [...banners.keys()].forEach(removeBanner);
+// Vidage à l'ouverture du panneau — SAUF la ligne de mise à jour : elle est
+// collante par définition, la vider ici reviendrait à l'effacer au premier
+// survol de la pilule (le CSS l'escamote déjà pendant que le panneau est
+// ouvert, elle réapparaît au repli).
+function hideBanner() {
+  [...banners.keys()].filter((k) => k !== UPDATE_KEY).forEach(removeBanner);
 }
 window.islandApi.onBanner((b) => {
   if (!b.state) return; // payload sans état — rien à afficher
@@ -248,6 +262,84 @@ window.islandApi.onBanner((b) => {
   entry.timer = setTimeout(() => removeBanner(b.sessionId), BANNER_MS);
   document.getElementById('banner').classList.add('visible');
 });
+
+// ── Mise à jour : bannière collante + pied de panneau ──
+// Deux surfaces, un seul modèle pur (islandModel.updateNotice) : le pied du
+// panneau (version courante, toujours affichée) et une bannière SANS timer.
+// Pourquoi collante alors que les bannières de session vivent 10 s : une
+// session ratée revient d'elle-même (elle repassera waiting), une release
+// ratée non — et le dashboard, seule surface qui la signalait, reste fermé
+// des jours chez un utilisateur qui vit dans le tray.
+// Clic = installation DIRECTE (décision Paul) ; « Plus tard » est la seule
+// sortie sans installer (garde-fou au caractère collant), valable jusqu'au
+// prochain lancement de l'app.
+const UPDATE_KEY = '__update';
+
+function updateText(n) {
+  const t = window.i18n.t;
+  if (n.phase === 'downloading') return t('update_downloading', { percent: n.percent });
+  if (n.phase === 'installing') return t('update_installing');
+  if (n.phase === 'error') return t('update_install_failed');
+  return t('island_update', { version: n.latest });
+}
+
+function renderUpdate() {
+  if (!updateState) return;
+  const n = window.islandModel.updateNotice(updateState);
+  const t = window.i18n.t;
+
+  // Pied du panneau : « v2.5.0 » seul, ou « v2.5.0 → 2.6.0 » + action.
+  const foot = document.getElementById('foot');
+  const label = n.phase ? updateText(n) : t('island_update_install');
+  const html = `<span class="foot-ver">v${esc(n.current || '?')}${
+    n.latest ? ` <span class="foot-next">→ ${esc(n.latest)}</span>` : ''}</span>${
+    n.showBanner ? `<span class="foot-action"${n.clickable ? ' data-act="install"' : ''}>${esc(label)}</span>` : ''}`;
+  // Même précaution que setWing : renderUpdate() est rappelé ~10 fois par
+  // seconde pendant un téléchargement, inutile de reconstruire un pied
+  // identique (et de ré-attacher son listener) à chaque push.
+  if (foot._html !== html) {
+    foot._html = html;
+    foot.innerHTML = html;
+    const act = foot.querySelector('.foot-action[data-act="install"]');
+    if (act) act.addEventListener('click', () => window.islandApi.installUpdate());
+  }
+
+  if (!n.showBanner) { removeBanner(UPDATE_KEY); return; }
+
+  let entry = banners.get(UPDATE_KEY);
+  if (!entry) {
+    const el = document.createElement('div');
+    el.className = 'banner-item update';
+    el.innerHTML = '<span class="up-arrow">↑</span><span class="banner-text"></span>'
+      + '<span class="banner-later"></span><span class="banner-prog"></span>';
+    el.addEventListener('click', () => {
+      // Relu au clic, pas capturé à la création : la ligne vit longtemps, son
+      // état a pu changer (téléchargement déjà lancé depuis le dashboard).
+      if (window.islandModel.updateNotice(updateState).clickable) window.islandApi.installUpdate();
+    });
+    el.querySelector('.banner-later').addEventListener('click', (e) => {
+      e.stopPropagation(); // sans ça, « Plus tard » déclencherait l'installation
+      window.islandApi.dismissUpdate();
+      // Retrait optimiste : le main confirmera par son push, mais un clic dont
+      // l'effet attend un aller-retour IPC se lit comme un clic raté.
+      removeBanner(UPDATE_KEY);
+    });
+    document.getElementById('banner').appendChild(el);
+    entry = { el, timer: null }; // timer null = collante, par construction
+    banners.set(UPDATE_KEY, entry);
+    requestAnimationFrame(() => el.classList.add('in'));
+  }
+  entry.el.querySelector('.banner-text').textContent = updateText(n);
+  entry.el.querySelector('.banner-later').textContent = n.phase ? '' : t('island_update_later');
+  entry.el.querySelector('.banner-prog').style.width = n.phase === 'downloading' ? `${n.percent}%` : '0%';
+  entry.el.dataset.phase = n.phase || '';
+  document.getElementById('banner').classList.add('visible');
+}
+
+// Push direct du main pendant le téléchargement (~10 fps) : on ne repasse pas
+// par refresh(), qui re-interrogerait sessions + config + usage à chaque pourcent.
+window.islandApi.onUpdateState((u) => { updateState = u; renderUpdate(); });
+
 window.islandApi.onUpdate(scheduleRefresh);
 // Largeur réelle de l'encoche mesurée par le main (fallback CSS : 180px).
 window.islandApi.onGeometry((g) => {

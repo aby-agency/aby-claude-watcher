@@ -340,3 +340,41 @@ body.expanded .panel-inner {
 /* Barres de conso (5H/7J/Fable) — séparées des lignes de session par un filet
    + de l'air ; l'espacement inter-barres vient de .ubar-col (styles.css). */
 #gauges { margin: 12px 8px 0; padding-top: 12px; border-top: 1px solid #1d2330; }
+
+/* Pied du panneau : version courante en tout petit — l'info qu'on cherche
+   quand on se demande « je tourne sur quoi ? ». Pas de filet séparateur : un
+   deuxième trait sous celui des jauges alourdirait un panneau déjà dense, la
+   taille et la couleur suffisent à le mettre au second plan. */
+.island-foot {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 8px 0;
+  font-size: 9px; font-family: var(--font-mono); color: #4d5566;
+}
+.foot-next { color: var(--state-thinking); }
+.foot-action {
+  margin-left: auto;
+  color: var(--state-thinking);
+  cursor: pointer;
+}
+.foot-action:not([data-act]) { color: #6b7385; cursor: default; } /* phase en cours : simple libellé */
+.foot-action[data-act]:hover { text-decoration: underline; }
+
+/* Ligne de mise à jour dans la bannière — collante (aucun timer côté JS).
+   Elle se distingue des lignes de session par la flèche violette au lieu de
+   la LED d'état, et porte sa propre jauge de téléchargement. */
+.banner-item.update { position: relative; }
+.banner-item.update .up-arrow { flex: none; color: var(--state-thinking); font-size: 12px; line-height: 1; }
+.banner-later {
+  margin-left: auto; flex: none;
+  font-size: 10px; color: #6b7385;
+}
+.banner-later:hover { color: #e8eaf0; }
+.banner-later:empty { display: none; } /* pendant download/install : pas d'échappatoire à afficher */
+/* Jauge de téléchargement : filet en bas de la ligne, largeur = pourcentage.
+   Pas de transition sur la largeur — la progression arrive déjà lissée à
+   ~10 fps depuis le main, une transition par-dessus la ferait traîner. */
+.banner-prog {
+  position: absolute; left: 0; bottom: 0; height: 2px; width: 0;
+  background: var(--state-thinking);
+  border-radius: 0 1px 1px 0;
+}

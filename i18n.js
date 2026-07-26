@@ -130,6 +130,9 @@ settings_title: 'Paramètres',
       // Island
       island_empty: 'aucune session',
       island_reste: 'reste {t}',
+      island_update: 'Mise à jour {version}',
+      island_update_install: 'Installer',
+      island_update_later: 'Plus tard',
 
       // Status bar
       status_active: '{n} active{s}',
@@ -291,6 +294,9 @@ settings_title: 'Settings',
       // Island
       island_empty: 'no sessions',
       island_reste: '{t} left',
+      island_update: 'Update {version}',
+      island_update_install: 'Install',
+      island_update_later: 'Later',
 
       // Status bar
       status_active: '{n} active',

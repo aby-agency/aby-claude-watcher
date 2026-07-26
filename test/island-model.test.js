@@ -1,5 +1,5 @@
 // Tests for island-model.js. Run: node test/island-model.test.js
-const { buildIsland, islandLayout, bannerPayload } = require('../island-model.js');
+const { buildIsland, islandLayout, bannerPayload, updateNotice } = require('../island-model.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -144,6 +144,39 @@ test('customName prioritaire, puis projectName, puis fallback', () => {
 test('state extrait du nom d\'état ; null si absent', () => {
   assertEq(bannerPayload({ sessionId: 'z', projectName: 'p', state: { name: 'pending' } }, null).state, 'pending');
   assertEq(bannerPayload({ sessionId: 'z', projectName: 'p' }, null).state, null);
+});
+
+console.log('\nupdateNotice:');
+test('sans info : version courante seule, pas de bannière', () => {
+  const n = updateNotice({ current: '2.5.0' });
+  assertEq([n.current, n.latest, n.showBanner, n.phase], ['2.5.0', null, false, null]);
+});
+test('maj dispo → bannière + clic actif', () => {
+  const n = updateNotice({ current: '2.5.0', latest: '2.6.0', canInstall: true });
+  assertEq([n.showBanner, n.canInstall, n.clickable], [true, true, true]);
+});
+test('écartée → plus de bannière, mais la version courante reste', () => {
+  const n = updateNotice({ current: '2.5.0', latest: '2.6.0', canInstall: true, dismissed: true });
+  assertEq([n.showBanner, n.latest], [false, '2.6.0']);
+});
+test('installation en cours : prime sur dismissed, clic neutralisé', () => {
+  const n = updateNotice({
+    current: '2.5.0', latest: '2.6.0', canInstall: true, dismissed: true,
+    install: { phase: 'downloading', percent: 41.7 },
+  });
+  assertEq([n.showBanner, n.phase, n.percent, n.clickable], [true, 'downloading', 42, false]);
+});
+test('échec : la ligne redevient cliquable (réessayer)', () => {
+  const n = updateNotice({ current: '2.5.0', latest: '2.6.0', canInstall: true, install: { phase: 'error' } });
+  assertEq([n.showBanner, n.clickable], [true, true]);
+});
+test('pourcentage borné 0-100', () => {
+  assertEq(updateNotice({ install: { phase: 'downloading', percent: -5 } }).percent, 0);
+  assertEq(updateNotice({ install: { phase: 'downloading', percent: 180 } }).percent, 100);
+});
+test('sans DMG pour cette architecture : bannière informative, canInstall false', () => {
+  const n = updateNotice({ current: '2.5.0', latest: '2.6.0', canInstall: false, url: 'https://x' });
+  assertEq([n.showBanner, n.canInstall, n.url], [true, false, 'https://x']);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

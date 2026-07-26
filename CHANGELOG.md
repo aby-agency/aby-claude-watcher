@@ -4,6 +4,21 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] — 2026-07-26
+
+### Added
+- **La dynamic island annonce les mises à jour.** Jusqu'ici, une nouvelle
+  version n'était signalée que dans la fenêtre principale : en gardant
+  l'application dans la barre de menus, fenêtre fermée, on pouvait rester des
+  semaines sur une version périmée sans jamais le savoir. Une bande apparaît
+  désormais sous l'encoche dès qu'une version est disponible. Contrairement
+  aux notifications de session, elle **ne disparaît pas toute seule** : un
+  message manqué revient (la session repassera en attente), pas une nouvelle
+  version. Un clic dessus lance l'installation, « Plus tard » l'écarte
+  jusqu'au prochain démarrage de l'application.
+- **Numéro de version au bas du volet déplié** de la dynamic island, en tout
+  petit — et « v2.5.0 → 2.6.0 · Installer » quand une mise à jour attend.
+
 ## [2.5.0] — 2026-07-25
 
 ### Fixed

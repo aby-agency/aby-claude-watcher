@@ -176,10 +176,18 @@ function sendBanner(payload) {
   }
 }
 
+// État de mise à jour (version courante, release dispo, progression) — poussé
+// en direct pour ne pas déclencher un refresh complet de l'île à chaque
+// pourcent de téléchargement. Pas de garde isVisible() ici, contrairement à
+// sendBanner : c'est une mise à jour d'état, le renderer décide de l'afficher.
+function sendUpdateState(payload) {
+  if (win && !win.isDestroyed() && win._loaded) win.webContents.send('island-update-state', payload);
+}
+
 function setHover(hovering) {
   if (!win || win.isDestroyed()) return;
   if (hovering) win.setIgnoreMouseEvents(false);
   else win.setIgnoreMouseEvents(true, { forward: true });
 }
 
-module.exports = { refresh, destroy, sendUpdate, sendBanner, setHover, window: () => win };
+module.exports = { refresh, destroy, sendUpdate, sendBanner, sendUpdateState, setHover, window: () => win };

@@ -39,6 +39,43 @@ function bannerPayload(session, customName) {
   };
 }
 
+// Notice de mise à jour — modèle unique pour les DEUX surfaces de l'île : la
+// ligne de version du panneau déplié (toujours là, ne serait-ce que pour dire
+// « v2.5.0 ») et la bannière collante sous l'encoche (seulement quand une
+// version plus récente existe). Pur → testé sans Electron ni DOM.
+//
+// Pourquoi une bannière SANS timer alors que les bannières de session vivent
+// 10 s : une session ratée revient (elle repassera waiting), une release non
+// vue ne revient jamais — le dashboard, seule surface qui la signalait
+// jusqu'ici, reste fermé des jours chez un utilisateur en tray (constaté chez
+// Etienne, resté sur une version périmée sans le savoir).
+//
+// `install.phase` (downloading | installing | error) prime sur `dismissed` :
+// une fois le téléchargement lancé on ne masque plus la ligne, elle sert de
+// jauge puis annonce le redémarrage.
+function updateNotice(info) {
+  const u = info || {};
+  const phase = (u.install && u.install.phase) || null;
+  const pct = u.install && typeof u.install.percent === 'number' ? u.install.percent : 0;
+  const available = !!u.latest && !u.dismissed;
+  return {
+    current: u.current || null,
+    latest: u.latest || null,
+    phase,
+    percent: Math.max(0, Math.min(100, Math.round(pct))),
+    // Bannière : dispo non écartée, ou installation déjà en route.
+    showBanner: available || !!phase,
+    // Action possible : DMG publié pour cette architecture. Sinon la ligne
+    // reste informative et renvoie vers la release GitHub.
+    canInstall: !!u.canInstall,
+    url: u.url || null,
+    // Pendant download/install, plus rien n'est cliquable (le clic relancerait
+    // un second téléchargement par-dessus le premier) — mais après un échec si :
+    // la ligne devient un bouton « réessayer ».
+    clickable: phase !== 'downloading' && phase !== 'installing',
+  };
+}
+
 // Same ordering as the main window / popover: user-defined sessionOrder
 // first, then newest first. Stable → LEDs never jump on state changes.
 function sortSessions(sessions, sessionOrder) {
@@ -104,6 +141,6 @@ function buildIsland(sessions, config) {
   };
 }
 
-const api = { buildIsland, islandLayout, bannerPayload };
+const api = { buildIsland, islandLayout, bannerPayload, updateNotice };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.islandModel = api;

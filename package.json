@@ -10,7 +10,7 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder --mac",
-    "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js && node test/updater.test.js && node test/watcher.test.js && node test/usage.test.js && node test/subagents.test.js && node test/workflows.test.js && node test/tray-glance.test.js && node test/focus-state.test.js && node test/ring-gauge.test.js && node test/island-model.test.js && node test/usage-ring.test.js && node test/install-hooks.test.js"
+    "test": "node test/url.test.js && node test/focus.test.js && node test/config.test.js && node test/updater.test.js && node test/watcher.test.js && node test/usage.test.js && node test/subagents.test.js && node test/workflows.test.js && node test/tray-glance.test.js && node test/focus-state.test.js && node test/ring-gauge.test.js && node test/island-model.test.js && node test/usage-ring.test.js && node test/install-hooks.test.js && node test/state-duration.test.js"
   },
   "build": {
     "appId": "fr.aby-agency.aby-claude-watcher",

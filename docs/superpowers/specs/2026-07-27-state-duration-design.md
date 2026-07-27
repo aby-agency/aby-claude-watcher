@@ -43,7 +43,7 @@
 
 - `row()` retrouve son champ `minutes` (retiré lors du compactage v2.x) : calculé depuis `s.stateSince`, arrondi à la minute, `null` sous 60 s. `buildIsland` gagne un paramètre `now` (défaut `Date.now()`) pour rester pur et testable.
 - Rendu : « · 12 min » à droite du libellé dans `.r-state`, même taille 10px — on ré-introduit l'info sans regonfler ce qui avait été compacté.
-- Granularité minute, rafraîchie par le cycle de refresh existant de l'île — **pas de ticker seconde** côté île. Le renderer ne réassigne pas le HTML si la valeur affichée n'a pas changé (même précaution que `setWing` : ne pas rejouer les anims).
+- Granularité minute, rafraîchie par le cycle de refresh existant de l'île — **pas de ticker seconde** côté île. Les rangées sont réassignées en bloc à chaque refresh, comme le reste du panneau (comportement pré-existant, sans anim à préserver — pas la même précaution que `setWing`).
 
 ### Tests
 

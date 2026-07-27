@@ -570,6 +570,46 @@ test('scan: brand-new Claude (no tracked entry, fresh jsonl) → added directly,
   if (added.length !== 1) throw new Error(`expected one added('fresh-id'), got ${JSON.stringify(events)}`);
 });
 
+test('scan: nouvelle session découverte + initial-scan no-op → stateSince amorcé au mtime JSONL, pas Date.now() (finding I1)', () => {
+  // Régression ciblée : la branche de découverte de scan() posait autrefois
+  // stateSince: Date.now() sur le pré-seed. Ici l'état déduit du JSONL (end_turn
+  // → WAITING) est identique à l'état par défaut d'une session neuve (WAITING)
+  // → setState('initial-scan') est un no-op, exactement le chemin qui masquait
+  // le bug : l'amorce mtime ne se déclenche que si stateSince est encore null.
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/proj-i1';
+  const now = Date.now();
+  const twoHoursAgo = now - 2 * 3600 * 1000;
+  writeSessionJson(tree.sessions, 6001, 'i1-id', cwd);
+
+  const slug = cwd.replace(/\//g, '-');
+  const projDir = path.join(tree.projects, slug);
+  fs.mkdirSync(projDir, { recursive: true });
+  const jsonlPath = path.join(projDir, 'i1-id.jsonl');
+  fs.writeFileSync(jsonlPath, JSON.stringify({
+    type: 'assistant',
+    message: { role: 'assistant', content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn' },
+  }) + '\n');
+  fs.utimesSync(jsonlPath, twoHoursAgo / 1000, twoHoursAgo / 1000);
+  const realMtimeMs = fs.statSync(jsonlPath).mtimeMs;
+
+  const w = freshScanWatcher(tree.root);
+  w.scan(); // branche découverte : this.sessions.set(..., stateSince: null)
+  if (!w.sessions.has('i1-id')) throw new Error('i1-id must be tracked after scan');
+
+  // watchJsonl est stubbé no-op par freshScanWatcher (pas de vrai poller en
+  // test) — on rejoue l'appel réel que ferait startFileWatch, même jsonlPath.
+  const resolved = w.findJsonlPath('i1-id');
+  if (resolved !== jsonlPath) throw new Error(`findJsonlPath mismatch: ${resolved}`);
+  w.fastInitialLoad('i1-id', resolved);
+
+  const session = w.sessions.get('i1-id');
+  if (session.state.name !== 'waiting') throw new Error('expected computed state waiting, got ' + session.state.name);
+  if (session.stateSince !== realMtimeMs) {
+    throw new Error(`stateSince doit être amorcé au mtime du JSONL (${realMtimeMs}), got ${session.stateSince}`);
+  }
+});
+
 test('scan: migration preserves sessionOrder slot, custom name, notification prefs', () => {
   const tree = makeFakeClaudeTree();
   const cwd = '/tmp/proj-e';

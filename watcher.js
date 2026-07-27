@@ -294,7 +294,16 @@ class SessionWatcher extends EventEmitter {
               lastEventTime: Date.now(),
               hasActivity: false,
               agentDispatches: new Map(),
-              stateSince: Date.now(),
+              // Pas Date.now() ici : ce pré-seed annulait l'amorce mtime de
+              // fastInitialLoad pour toute session jamais persistée — l'état
+              // déduit du JSONL égale souvent l'état initial (WAITING) → no-op,
+              // et comme stateSince n'était plus null l'amorce ne se déclenchait
+              // pas, affichant « Inactif · 1 min » pour une session en réalité
+              // inactive depuis des heures (installation neuve). null → soit une
+              // vraie transition la pose (Date.now()), soit fastInitialLoad
+              // l'amorce au mtime du JSONL ; indéterminable → rien d'affiché,
+              // dégradation honnête.
+              stateSince: null,
             });
             this.watchJsonl(effectiveId);
             // Persist immediately so a fresh session that hasn't yet transitioned

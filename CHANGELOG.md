@@ -4,6 +4,34 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] — 2026-07-27
+
+### Changed
+- **L'état « Background » devient un chip « N bg process ».** Un tour terminé
+  avec une tâche de fond encore ouverte affichait la session « Background » en
+  cyan — faux dès que le process était un serveur laissé tourner exprès (une
+  app en dev, un watch) : la conversation attendait bel et bien l'utilisateur,
+  mais la carte prétendait le contraire. Les deux informations sont désormais
+  séparées : le badge d'état redit la vérité (« Inactif », vert, compté côté
+  repos dans la dynamic island) et les tâches de fond s'affichent dans un chip
+  cyan dédié, mis à jour en direct à l'ouverture comme à la fermeture. Les
+  notifications restent silencieuses tant qu'une tâche de fond est ouverte —
+  les fins de tour d'un long build ne sonnent pas pour rien — et une demande
+  de permission notifie toujours.
+- **Le temps restant remplace « 5H » dans le tray et les jauges.** Le titre de
+  la barre de menu affiche désormais « 1h13 · 72% » : quand ça reset, pas la
+  taille de la fenêtre. Même logique dans les anneaux de l'application — le
+  temps restant, qui disparaissait dans les fenêtres étroites, est maintenant
+  le label lui-même (la limite Fable garde son nom). Le détail complet reste
+  dans les infobulles.
+
+### Fixed
+- **Le bas du panneau de l'île n'est plus rogné.** Dès cinq sessions environ,
+  les jauges de consommation et le pied de version disparaissaient sous le
+  bord de la fenêtre (hauteur fixe de 340 points, alors que la liste prend sa
+  hauteur naturelle, sans scrollbar). La fenêtre fait désormais 800 points,
+  clampés à l'écran — invisible et sans coût, la fenêtre étant transparente.
+
 ## [2.7.0] — 2026-07-26
 
 ### Added

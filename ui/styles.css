@@ -746,6 +746,9 @@ body.micro-mode .uring-text { font-size: 9px; }
   to { transform: rotate(360deg); }
 }
 
+/* Durée d'état dans le badge — discrète, l'état reste l'info principale */
+.state-duration { opacity: .7; }
+
 .state-badge.thinking { --badge-bg: var(--glow-thinking); --badge-color: var(--state-thinking); }
 .state-badge.running { --badge-bg: var(--glow-running); --badge-color: var(--state-running); }
 .state-badge.waiting { --badge-bg: var(--glow-waiting); --badge-color: var(--state-waiting); }

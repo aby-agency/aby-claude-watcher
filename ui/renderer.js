@@ -909,6 +909,28 @@ function getStateLabel(s) {
   return t('state_' + s.state.name);
 }
 
+// Durée d'état dans le badge (« Inactif · 12 min ») : le span est toujours
+// présent, le ticker 1 s (updateDurations) le remplit en place — pas de
+// re-render de carte. Vide sous 60 s (jamais de « 0 min »).
+function stateDurationHTML(s) {
+  const txt = typeof s.stateSince === 'number'
+    ? window.stateDuration.formatStateDuration(s.stateSince) : null;
+  return `<span class="state-duration" data-since="${s.stateSince ?? ''}">${txt ? ' · ' + txt : ''}</span>`;
+}
+
+// Tooltip : horodatage absolu du passage dans l'état (« depuis 14:32 »,
+// date incluse au-delà de 24 h). Un timestamp absolu ne périme pas — posé
+// au render, pas de ticker.
+function stateSinceTitle(s) {
+  if (typeof s.stateSince !== 'number') return '';
+  const d = new Date(s.stateSince);
+  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const abs = (Date.now() - s.stateSince > 86_400_000)
+    ? `${d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' })} ${time}`
+    : time;
+  return ` title="${escAttr(t('state_since_abs', { t: abs }))}"`;
+}
+
 // Chip « N bg process » : des tâches Bash `run_in_background` sont encore
 // ouvertes. Orthogonal à l'état — la conversation est dispo (waiting), seul le
 // process tourne encore ; les notifs sont mutées côté watcher tant qu'il vit.
@@ -989,9 +1011,9 @@ onclick="handleCardClick(event, '${sid}')">
           </button>
         </div>
       </div>
-      <div class="state-badge ${stateName}">
+      <div class="state-badge ${stateName}"${stateSinceTitle(s)}>
         ${isActiveState(stateName) ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
-        ${stateLabel}
+        ${stateLabel}${stateDurationHTML(s)}
       </div>${bgChip}
       <div class="card-details">
         <div class="detail">
@@ -1095,8 +1117,8 @@ onclick="handleCardClick(event, '${sid}')">
         </div>
       </div>
       <div class="compact-card-row">
-        <span class="compact-card-state">
-          ${stateIndicator}<span class="compact-card-state-label">${stateLabel}</span>
+        <span class="compact-card-state"${stateSinceTitle(s)}>
+          ${stateIndicator}<span class="compact-card-state-label">${stateLabel}</span>${stateDurationHTML(s)}
         </span>
         <span class="compact-meta-sep">·</span>
         <span class="compact-card-tool">${toolDisplay}</span>
@@ -1121,6 +1143,15 @@ function updateDurations() {
   document.querySelectorAll('.duration-value').forEach(el => {
     const started = el.dataset.started;
     if (started) el.textContent = formatDuration(started);
+  });
+  // Durée d'état des badges — écrit seulement si la valeur change (pas de
+  // churn DOM à chaque tick).
+  document.querySelectorAll('.state-duration[data-since]').forEach(el => {
+    const since = Number(el.dataset.since);
+    if (!since) return;
+    const txt = window.stateDuration.formatStateDuration(since);
+    const next = txt ? ' · ' + txt : '';
+    if (el.textContent !== next) el.textContent = next;
   });
 }
 

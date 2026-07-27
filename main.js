@@ -799,6 +799,10 @@ function serializeSession(session) {
     gitBranch: session.gitBranch || null,
     startedAt: session.startedAt,
     lastEventTime: session.lastEventTime ?? null,
+    // Durée d'état : timestamp de l'état MACHINE, volontairement non retouché
+    // par les overrides de présentation ci-dessus (delegating/running) — le
+    // libellé peut basculer sans que le compteur reparte à zéro.
+    stateSince: session.stateSince ?? null,
     tokens: session.tokens,
     cwd: session.cwd,
     isBackground: !!session.isBackground,

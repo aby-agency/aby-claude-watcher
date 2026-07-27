@@ -4,6 +4,21 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] — 2026-07-27
+
+### Added
+- **Chaque session affiche depuis quand elle est dans son état.** Le badge des
+  cartes devient « Inactif · 12 min », « En exécution · 2 min » — sur toutes
+  les vues (grille et compacte), mis à jour à la seconde, et sur les rangées
+  du panneau de la dynamic island (« · 12 min », à la minute). Le survol du
+  badge donne l'heure exacte du passage dans l'état (« depuis 14:32 », date
+  incluse au-delà de 24 h). La durée survit au redémarrage de l'application :
+  une session inactive depuis deux heures affiche deux heures, pas le temps
+  écoulé depuis la relance — y compris au tout premier lancement, où l'heure
+  du dernier événement du journal fait foi. Rien ne s'affiche sous la minute,
+  et un libellé qui bascule (« Inactif » ↔ « Délégation ») ne remet pas le
+  compteur à zéro.
+
 ## [2.8.0] — 2026-07-27
 
 ### Changed

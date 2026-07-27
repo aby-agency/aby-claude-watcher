@@ -10,14 +10,23 @@
 // mesurée + marge de sécurité. Sans mesure : centré display, gap 180.
 const NOTCH_GAP_FALLBACK = 180;
 const NOTCH_GAP_MARGIN = 24;
+// Hauteur de fenêtre : le panneau n'a ni cap ni scrollbar (la liste prend sa
+// hauteur naturelle) — l'ex-340 rognait jauges et footer dès ~5 sessions, le
+// bas du drop disparaissait sous le bord de la fenêtre. 800 absorbe une
+// flotte réaliste (≈ 15 sessions avec sous-lignes) ; la fenêtre étant
+// transparente et click-through, le surplus est invisible et sans coût.
+// Clampée au display (petit écran externe).
+const WIN_H_MAX = 800;
 
 function islandLayout(display, notch, winW) {
+  const h = Math.min(WIN_H_MAX, display.bounds.height);
   const valid = notch && notch.width > 0 && notch.left >= 0;
   if (valid) {
     const notchCenter = display.bounds.x + notch.left + notch.width / 2;
     return {
       x: Math.round(notchCenter - winW / 2),
       gapPx: Math.round(notch.width + NOTCH_GAP_MARGIN),
+      h,
     };
   }
   return {
@@ -26,6 +35,7 @@ function islandLayout(display, notch, winW) {
     // display sans encoche (docké) → FAUSSE encoche aux dimensions de la
     // vraie (pilule compacte essayée puis écartée : « tout petit » sur 34").
     gapPx: NOTCH_GAP_FALLBACK,
+    h,
   };
 }
 

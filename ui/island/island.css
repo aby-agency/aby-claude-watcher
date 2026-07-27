@@ -300,7 +300,10 @@ body.expanded .panel-inner {
 }
 /* Pas de cap ni de scrollbar sur la liste : elle prend sa hauteur naturelle,
    une ligne par session — quitte à déborder de la fenêtre si beaucoup de
-   sessions (choix Paul : on accepte que ça sorte plutôt qu'une scrollbar). */
+   sessions (choix Paul : on accepte que ça sorte plutôt qu'une scrollbar).
+   La fenêtre fait 800pt (island-model WIN_H_MAX — l'ex-340 rognait jauges et
+   footer dès ~5 sessions) : le débordement ne redevient possible qu'au-delà
+   d'une quinzaine de sessions. */
 .rows { }
 .row {
   display: flex; align-items: center; gap: 8px;

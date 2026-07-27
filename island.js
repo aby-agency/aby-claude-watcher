@@ -2,7 +2,8 @@
 // Dynamic island window anchored to the MacBook notch. Fixed-size transparent
 // always-on-top window, click-through by default; the renderer drives hover
 // via the 'island-hover' IPC (never resize on hover — transparent-window
-// resizes flicker).
+// resizes flicker; the height only changes with the display geometry,
+// computed by islandLayout).
 
 const { BrowserWindow, screen } = require('electron');
 const { execFile } = require('child_process');
@@ -11,7 +12,6 @@ const { log } = require('./logger');
 const { islandLayout } = require('./island-model');
 
 const WIN_W = 460;
-const WIN_H = 340;
 
 let win = null;
 let lastLayout = null; // { x, gapPx } — dernier layout calculé (mesure ou fallback)
@@ -66,13 +66,14 @@ function measureNotch(display) {
 }
 
 function applyBounds(display) {
-  win.setBounds({ x: lastLayout.x, y: display.bounds.y, width: WIN_W, height: WIN_H });
+  win.setBounds({ x: lastLayout.x, y: display.bounds.y, width: WIN_W, height: lastLayout.h });
 }
 
 function create(display) {
   win = new BrowserWindow({
     width: WIN_W,
-    height: WIN_H,
+    height: lastLayout.h, // toujours défini : create() n'est appelé qu'après islandLayout
+
     show: false,
     frame: false,
     transparent: true,

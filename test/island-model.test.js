@@ -115,24 +115,28 @@ test('centers window on the MEASURED notch, gap = notch + margin', () => {
   const d = { bounds: { x: 0, y: 0, width: 1728, height: 1117 } };
   const l = islandLayout(d, { left: 771, width: 185 }, 460);
   // centre encoche = 771 + 92.5 = 863.5 → x = 863.5 - 230 arrondi
-  assertEq(l, { x: 634, gapPx: 209 });
+  assertEq(l, { x: 634, gapPx: 209, h: 800 });
 });
 test('secondary display coords: bounds.x is added', () => {
   const d = { bounds: { x: 2000, y: 0, width: 1728, height: 1117 } };
-  assertEq(islandLayout(d, { left: 771, width: 185 }, 460), { x: 2634, gapPx: 209 });
+  assertEq(islandLayout(d, { left: 771, width: 185 }, 460), { x: 2634, gapPx: 209, h: 800 });
 });
 test('no measurement → window centered on display, default gap 180', () => {
   const d = { internal: true, bounds: { x: 0, y: 0, width: 1728, height: 1117 }, workArea: { x: 0, y: 34, width: 1728, height: 1083 } };
-  assertEq(islandLayout(d, null, 460), { x: 634, gapPx: 180 });
+  assertEq(islandLayout(d, null, 460), { x: 634, gapPx: 180, h: 800 });
 });
 test('invalid measurement (width <= 0, negative left) → fallback', () => {
   const d = { internal: true, bounds: { x: 0, y: 0, width: 1728, height: 1117 }, workArea: { x: 0, y: 34, width: 1728, height: 1083 } };
-  assertEq(islandLayout(d, { left: 771, width: 0 }, 460), { x: 634, gapPx: 180 });
-  assertEq(islandLayout(d, { left: -5, width: 185 }, 460), { x: 634, gapPx: 180 });
+  assertEq(islandLayout(d, { left: 771, width: 0 }, 460), { x: 634, gapPx: 180, h: 800 });
+  assertEq(islandLayout(d, { left: -5, width: 185 }, 460), { x: 634, gapPx: 180, h: 800 });
 });
 test('display sans encoche (docké) → centré, fausse encoche 180', () => {
   const d = { internal: false, bounds: { x: 0, y: 0, width: 3440, height: 1440 }, workArea: { x: 0, y: 31, width: 3440, height: 1409 } };
-  assertEq(islandLayout(d, null, 460), { x: 1490, gapPx: 180 });
+  assertEq(islandLayout(d, null, 460), { x: 1490, gapPx: 180, h: 800 });
+});
+test('hauteur clampée à l\'écran quand le display fait moins de 800pt', () => {
+  const d = { bounds: { x: 0, y: 0, width: 1280, height: 720 } };
+  assertEq(islandLayout(d, null, 460).h, 720);
 });
 console.log('\nbannerPayload:');
 test('customName prioritaire, puis projectName, puis fallback', () => {

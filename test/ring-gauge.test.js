@@ -65,16 +65,26 @@ test('coin transparent', () => assertEq(px(dotBitmap(RED, SIZE), 0, 0, SIZE).a, 
 test('color null → centre transparent', () => assertEq(px(dotBitmap(null, SIZE), 8, 8, SIZE).a, 0));
 
 console.log('\ntrayUsageLabel:');
-// Décision Paul : le titre du tray ne montre plus que le %, sans le temps
-// restant, avec un point séparateur entre « 5H » et le pourcentage.
-test('5h présent → "5H · 27%"', () => {
-  assertEq(trayUsageLabel({ fiveHour: { utilization: 27, resetsAt: SEC + 2100 } }, NOW), '5H · 27%');
+// Décision Paul 2026-07-27 (révise le « 5H · % » de v2.3.0) : le préfixe est le
+// TEMPS RESTANT avant reset — l'info utile, la taille de fenêtre ne l'est pas.
+// Fallback « 5H » seulement quand resetsAt manque.
+test('5h présent → "35m · 27%" (2100 s restantes)', () => {
+  assertEq(trayUsageLabel({ fiveHour: { utilization: 27, resetsAt: SEC + 2100 } }, NOW), '35m · 27%');
+});
+test('format heures → "2h30 · 27%"', () => {
+  assertEq(trayUsageLabel({ fiveHour: { utilization: 27, resetsAt: SEC + 9000 } }, NOW), '2h30 · 27%');
 });
 test('arrondi de utilization', () => {
-  assertEq(trayUsageLabel({ fiveHour: { utilization: 26.6, resetsAt: SEC + 2100 } }, NOW), '5H · 27%');
+  assertEq(trayUsageLabel({ fiveHour: { utilization: 26.6, resetsAt: SEC + 2100 } }, NOW), '35m · 27%');
 });
 test('clamp à 100', () => {
-  assertEq(trayUsageLabel({ fiveHour: { utilization: 130, resetsAt: SEC + 2100 } }, NOW), '5H · 100%');
+  assertEq(trayUsageLabel({ fiveHour: { utilization: 130, resetsAt: SEC + 2100 } }, NOW), '35m · 100%');
+});
+test('resetsAt absent → fallback "5H · 27%"', () => {
+  assertEq(trayUsageLabel({ fiveHour: { utilization: 27 } }, NOW), '5H · 27%');
+});
+test('reset passé (API pas encore rafraîchie) → "reset · 27%"', () => {
+  assertEq(trayUsageLabel({ fiveHour: { utilization: 27, resetsAt: SEC - 100 } }, NOW), 'reset · 27%');
 });
 test('pas de fiveHour → null', () => assertEq(trayUsageLabel({}, NOW), null));
 test('usage null → null', () => assertEq(trayUsageLabel(null, NOW), null));

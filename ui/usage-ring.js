@@ -20,16 +20,16 @@
     ));
   }
 
-  // label = « 5H » / « 7J » / « 7J FABLE » ; pct = entier (déjà arrondi par
-  // l'appelant) ; remaining = temps déjà formaté (« 3h20 ») ou '' si pas de reset.
+  // label = temps restant (« 3h20 », « FABLE 4j3h »), fallback fenêtre (« 5H »)
+  // sans resetsAt ; pct = entier (déjà arrondi par l'appelant). L'ex-champ
+  // « reste » séparé a fusionné DANS le label (demande Paul 2026-07-27) : il
+  // était masqué en vue étroite (@media 480px) et l'info était perdue.
   // L'arc est borné à [0,100] ; le texte garde le pct réel (peut dépasser 100).
-  function usageRing(label, pct, remaining) {
+  function usageRing(label, pct) {
     const arc = Math.max(0, Math.min(100, pct));
-    const reste = remaining ? `<span class="uring-reste">${escHtml(remaining)}</span>` : '';
     return `<div class="uring-item">`
       + `<span class="uring" data-lvl="${usageLevel(pct)}" style="--uring-pct:${arc}"></span>`
       + `<span class="uring-text">${escHtml(label)} · ${pct}%</span>`
-      + reste
       + `</div>`;
   }
 

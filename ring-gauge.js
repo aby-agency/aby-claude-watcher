@@ -114,10 +114,12 @@ function trayUsageLabel(usage, nowMs) {
   const fh = usage && usage.fiveHour;
   if (!fh || typeof fh.utilization !== 'number' || !Number.isFinite(fh.utilization)) return null;
   const pct = Math.round(Math.max(0, Math.min(100, fh.utilization)));
-  // Titre du tray : seulement le % (décision Paul) — le temps restant reste
-  // dispo dans la jauge du panneau déplié de l'île. Point séparateur entre
-  // « 5H » et le pourcentage.
-  return `5H · ${pct}%`;
+  // Titre du tray : temps restant avant reset + % (demande Paul 2026-07-27,
+  // révise le « 5H · % » de v2.3.0 — l'info utile est QUAND ça reset, pas la
+  // taille de la fenêtre). « reset » si l'échéance est passée mais que l'API
+  // n'a pas encore rafraîchi ; fallback « 5H » seulement sans resetsAt.
+  const prefix = fh.resetsAt != null ? formatCountdown(fh.resetsAt, nowMs) : '5H';
+  return `${prefix} · ${pct}%`;
 }
 
 module.exports = { gaugeColor, formatCountdown, ringBitmap, dotBitmap, trayUsageLabel };

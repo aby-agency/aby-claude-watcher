@@ -15,23 +15,22 @@ test('50..80 → warn', () => { assertEq(usageLevel(50), 'warn'); assertEq(usage
 test('> 80 → hot', () => { assertEq(usageLevel(81), 'hot'); assertEq(usageLevel(100), 'hot'); });
 
 console.log('\nusageRing:');
-test('embeds level, arc, label · pct and reste', () => {
-  const h = usageRing('5H', 8, '3h20');
+// v2.8.0 : le label EST le temps restant (« 3h20 · 8% ») — le champ « reste »
+// séparé a disparu avec son media query 480px qui le masquait en vue étroite.
+test('embeds level, arc and label · pct', () => {
+  const h = usageRing('3h20', 8);
   assert(h.includes('data-lvl="ok"'), 'level');
   assert(h.includes('--uring-pct:8'), 'arc');
-  assert(h.includes('5H · 8%'), 'label·pct');
-  assert(h.includes('class="uring-reste">3h20'), 'reste');
+  assert(h.includes('3h20 · 8%'), 'label·pct');
+  assert(!h.includes('uring-reste'), 'plus de champ reste séparé');
 });
 test('clamps the arc to 100 but keeps the real pct in text', () => {
-  const h = usageRing('7J', 130, '');
+  const h = usageRing('7J', 130);
   assert(h.includes('--uring-pct:100'), 'arc clamped');
   assert(h.includes('7J · 130%'), 'real pct shown');
 });
-test('no reste span when remaining empty', () => {
-  assert(!usageRing('7J', 76, '').includes('uring-reste'), 'no reste');
-});
 test('escapes the label', () => {
-  assert(usageRing('<x>', 10, '').includes('&lt;x&gt;'), 'escaped');
+  assert(usageRing('<x>', 10).includes('&lt;x&gt;'), 'escaped');
 });
 
 console.log('\nusageBar:');

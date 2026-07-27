@@ -275,7 +275,6 @@ body.micro-mode .uring-row {
 body.micro-mode .uring-item { gap: 4px; }
 body.micro-mode .uring { width: 11px; height: 11px; }
 body.micro-mode .uring-text { font-size: 9px; }
-body.micro-mode .uring-reste { display: none; }
 
 /* ═══ Toolbar ═══ */
 
@@ -2055,7 +2054,6 @@ body.micro-mode .uring-reste { display: none; }
    3 anneaux + reste ne tient pas dans ~240-320px → wrap désordonné. */
 .uring-col { display: flex; flex-direction: column; gap: 10px; }
 .uring-col .uring-item { width: 100%; }
-.uring-col .uring-reste { margin-left: auto; }
 .uring-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .uring {
   width: 16px; height: 16px; border-radius: 50%; flex: none;
@@ -2069,10 +2067,8 @@ body.micro-mode .uring-reste { display: none; }
 .uring[data-lvl="warn"] { --uring-c: var(--state-pending); }
 .uring[data-lvl="hot"]  { --uring-c: var(--state-error); }
 .uring-text { font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); }
-.uring-reste { font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); }
-/* Fenêtre étroite (vue liste ~400px) : on efface le « reste » pour que les 3
-   anneaux tiennent sur une ligne. En vue large (grid) il reste affiché. */
-@media (max-width: 480px) { .uring-reste { display: none; } }
+/* L'ex-champ « reste » séparé (.uring-reste) et son @media 480px qui le
+   masquait en vue étroite ont disparu : le temps restant EST le label. */
 
 /* ── Barre de conso (île + popover) ── Barre de progression pleine largeur —
    Paul préfère la barre à l'anneau dans les panneaux étroits. Empilées en

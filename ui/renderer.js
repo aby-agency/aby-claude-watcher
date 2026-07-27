@@ -1693,20 +1693,25 @@ function renderUsage(data) {
   group.style.display = '';
   if (fallback) fallback.style.display = 'none';
 
-  // Anneaux : 5H, 7J, puis chaque limite scopée (ex. « 7J FABLE ») — même
-  // recette que le popover et l'île, via le composant partagé usage-ring.
+  // Anneaux : 5H, 7J, puis chaque limite scopée (ex. Fable). Le label est le
+  // TEMPS RESTANT avant reset (« 2h23 · 66% ») — demande Paul 2026-07-27 : le
+  // nom de fenêtre statique n'apporte rien, et le champ « reste » séparé était
+  // masqué en vue étroite (@media 480px), l'info était perdue. Fallback nom de
+  // fenêtre sans resetsAt ; les scopées gardent leur modèle (« FABLE 4j3h »),
+  // sinon indistinguables du 7J global. Les tooltips gardent le détail complet.
   const rings = [];
   const add = (label, win) => {
     if (!win || typeof win.utilization !== 'number') return;
     const rem = win.resetsAt ? window.usageGauge.formatRemaining(win.resetsAt) : '';
-    rings.push(window.usageGauge.usageRing(label, Math.round(win.utilization), rem));
+    rings.push(window.usageGauge.usageRing(rem || label, Math.round(win.utilization)));
   };
   add('5H', data.fiveHour);
   add('7J', data.sevenDay);
   for (const l of data.scopedLimits || []) {
     const win = l.group === 'session' ? '5H' : '7J';
+    const model = String(l.model).toUpperCase();
     const rem = l.resetsAt ? window.usageGauge.formatRemaining(l.resetsAt) : '';
-    rings.push(window.usageGauge.usageRing(`${win} ${String(l.model).toUpperCase()}`, Math.round(l.percent), rem));
+    rings.push(window.usageGauge.usageRing(rem ? `${model} ${rem}` : `${win} ${model}`, Math.round(l.percent)));
   }
   group.innerHTML = rings.join('');
   group.title = formatUsageTooltip(data);

@@ -39,7 +39,7 @@ function renderPopover(sessions, config) {
     const stateName = s.state.name;
     // job/delegating = tour suspendu à une tâche de fond ou à des sous-agents
     // → spinner, comme running/thinking.
-    const isActive = ['running', 'thinking', 'job', 'delegating'].includes(stateName);
+    const isActive = ['running', 'thinking', 'delegating'].includes(stateName);
     // Color comes from CSS via [data-state] (same convention as .micro-item),
     // not from an inline style — keeps state colors single-sourced in styles.css.
     const indicator = isActive

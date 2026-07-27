@@ -41,27 +41,21 @@ const STATES = {
   THINKING: { name: 'thinking', color: '#a78bfa' },
   RUNNING: { name: 'running', color: '#3b82f6' },
   WAITING: { name: 'waiting', color: '#22c55e' },
-  // Tour fini SUR un job de fond encore ouvert (Bash backgroundé) : la session
-  // n'attend pas l'utilisateur, elle attend son process — Claude Code la
-  // réveillera seul via <task-notification>. Distinct de `isBackground`, qui
-  // qualifie une SESSION headless ; ici c'est une session interactive normale
-  // dont le tour est suspendu à une tâche. Compté « busy », jamais notifié.
-  JOB: { name: 'job', color: '#06b6d4' },
   // État de PRÉSENTATION — jamais produit par cette state machine. Le watcher ne
   // voit pas les sous-agents (ils vivent dans <session>/subagents/, lus par
   // main.js) ; c'est main.js qui substitue DELEGATING à un waiting dont les
-  // délégués travaillent encore. Même cyan que JOB : même famille « ça tourne
-  // sans toi » (décision Paul), seul le libellé distingue.
+  // délégués travaillent encore. Cyan « ça tourne sans toi » (décision Paul).
   DELEGATING: { name: 'delegating', color: '#06b6d4' },
   PENDING: { name: 'pending', color: '#f59e0b' },
   ERROR: { name: 'error', color: '#ef4444' },
 };
 
-// Un job de fond meurt sans notification si le process est tué à la main (ou si
-// la CLI est interrompue au mauvais moment) — sans garde-fou la session resterait
-// cyan à vie et ne notifierait plus jamais. Seuil volontairement large : un
+// Une tâche de fond meurt sans notification si le process est tué à la main (ou
+// si la CLI est interrompue au mauvais moment) — sans garde-fou le chip « bg
+// process » resterait affiché à vie et la session ne notifierait plus jamais
+// (le mute waiting-avec-bg est éternel). Seuil volontairement large : un
 // réimport Godot / build DMG de 20-30 min est légitime et n'écrit RIEN dans le
-// JSONL pendant tout ce temps. Au-delà, on retombe sur waiting (donc notif).
+// JSONL pendant tout ce temps. Au-delà, on lâche les tâches et on notifie.
 const JOB_STALE_MS = 45 * 60 * 1000;
 
 // ─── Jobs de fond (Bash `run_in_background`) ───
@@ -342,16 +336,18 @@ class SessionWatcher extends EventEmitter {
         }
       }
 
-      // Filet des jobs de fond : un process tué à la main n'émet jamais sa
-      // <task-notification>, la session resterait cyan et muette pour toujours.
-      // Passé JOB_STALE_MS sans le moindre event, on lâche le job et on retombe
-      // en waiting — qui notifie (mieux vaut une bannière tardive que rien).
+      // Filet des tâches de fond : un process tué à la main n'émet jamais sa
+      // <task-notification>, la session resterait muette (et son chip affiché)
+      // pour toujours. Passé JOB_STALE_MS sans le moindre event, on lâche les
+      // tâches et on notifie (mieux vaut une bannière tardive que rien).
       for (const [id, session] of this.sessions) {
-        if (session.state.name !== 'job') continue;
+        if (session.state.name !== 'waiting' || !this.hasOpenBgTask(id)) continue;
         const last = session.lastEventTime || 0;
         if (last && Date.now() - last > JOB_STALE_MS) {
-          if (session.bgTasks) session.bgTasks.clear();
-          this.setState(id, STATES.WAITING, false, 'job-stale');
+          session.bgTasks.clear();
+          log.info(`[state] ${id.slice(0, 8)} bg tasks lâchés (bg-stale > ${JOB_STALE_MS / 60000} min)`);
+          this.emit('session-updated', session);
+          this.maybeNotifyWaiting(id, session);
         }
       }
 
@@ -577,12 +573,12 @@ class SessionWatcher extends EventEmitter {
       let readStart = 0;
       let scanned = false;
 
-      // Jobs de fond reconstruits DEPUIS LE TAIL SEUL, sans persistance : la
+      // Tâches de fond reconstruites DEPUIS LE TAIL SEUL, sans persistance : la
       // fenêtre est un suffixe du fichier, donc si l'ouverture y est, sa
-      // fermeture éventuelle y est aussi (elle est écrite après) — un job
-      // « ouvert » reconstruit ici ne peut pas être un fantôme. Ouverture hors
-      // fenêtre = job oublié → la session retombe en waiting : dégradation
-      // gracieuse (comportement d'avant l'état job), jamais de blocage cyan.
+      // fermeture éventuelle y est aussi (elle est écrite après) — une tâche
+      // « ouverte » reconstruite ici ne peut pas être un fantôme. Ouverture hors
+      // fenêtre = tâche oubliée → pas de chip et notifs normales : dégradation
+      // gracieuse.
       let openJobs = new Set();
 
       let tailSize = MIN_TAIL;
@@ -669,7 +665,9 @@ class SessionWatcher extends EventEmitter {
         } else if (msg.stop_reason === 'tool_use') {
           computedState = STATES.RUNNING;
         } else if (msg.stop_reason === 'end_turn') {
-          computedState = openJobs.size > 0 ? STATES.JOB : STATES.WAITING;
+          // openJobs reste dans session.bgTasks : l'état est waiting dans tous
+          // les cas, les tâches ouvertes ne pilotent que le chip et le mute.
+          computedState = STATES.WAITING;
         }
       }
 
@@ -806,7 +804,7 @@ class SessionWatcher extends EventEmitter {
       session.gitBranch = event.gitBranch;
     }
 
-    this.trackBgTask(session, event);
+    this.trackBgTask(session, event, isInitial);
 
     switch (event.type) {
       case 'permission-mode':
@@ -940,18 +938,21 @@ class SessionWatcher extends EventEmitter {
     return !!(session && session.bgTasks && session.bgTasks.size > 0);
   }
 
-  trackBgTask(session, event) {
+  // Émet session-updated quand le Set change réellement : une ouverture ou une
+  // fermeture pendant running ne passe par AUCUNE transition d'état (setState
+  // no-op muet) — sans émission le chip « N bg process » resterait figé jusqu'au
+  // prochain changement d'état. Muet en isInitial (replay au chargement ; le
+  // session-added qui suit porte déjà l'état final).
+  trackBgTask(session, event, isInitial) {
+    let changed = false;
     const opened = bgTaskOpened(event);
-    if (opened) this.bgTasksOf(session).add(opened);
+    if (opened) {
+      const set = this.bgTasksOf(session);
+      if (!set.has(opened)) { set.add(opened); changed = true; }
+    }
     const closed = bgTaskClosed(event);
-    if (closed) this.bgTasksOf(session).delete(closed);
-  }
-
-  // end_turn avec un job encore ouvert = tour suspendu à un process, pas à
-  // l'utilisateur (« je te reviens dès que j'ai les mesures »). JOB au lieu de
-  // WAITING : compté busy, et setState ne notifie que waiting/pending → silence.
-  endTurnTarget(sessionId) {
-    return this.hasOpenBgTask(sessionId) ? STATES.JOB : STATES.WAITING;
+    if (closed && session.bgTasks && session.bgTasks.delete(closed)) changed = true;
+    if (changed && !isInitial) this.emit('session-updated', session);
   }
 
   startWaitingTimer(sessionId, isInitial) {
@@ -960,13 +961,15 @@ class SessionWatcher extends EventEmitter {
       // For initial load, check if enough time has passed
       const session = this.sessions.get(sessionId);
       if (session && Date.now() - new Date(session.startedAt).getTime() > WAITING_DELAY) {
-        this.setState(sessionId, this.endTurnTarget(sessionId), isInitial, 'end_turn-initial');
+        this.setState(sessionId, STATES.WAITING, isInitial, 'end_turn-initial');
       }
       return;
     }
     const timer = setTimeout(() => {
-      const target = this.endTurnTarget(sessionId);
-      this.setState(sessionId, target, false, target === STATES.JOB ? 'end_turn-bg-task' : 'end_turn-idle');
+      // Le trigger distingue dans main.log un tour vraiment fini d'un tour
+      // suspendu à une tâche de fond (même état waiting, notif mutée).
+      this.setState(sessionId, STATES.WAITING, false,
+        this.hasOpenBgTask(sessionId) ? 'end_turn-bg-open' : 'end_turn-idle');
     }, WAITING_DELAY);
     this.waitingTimers.set(sessionId, timer);
   }
@@ -1003,21 +1006,17 @@ class SessionWatcher extends EventEmitter {
     // Trigger notification on waiting/pending — with 30s cooldown to avoid spam
     // Handles: stale timer → waiting, end_turn → waiting, permission hook → pending
     if (!isInitial && (newState.name === 'waiting' || newState.name === 'pending')) {
-      // Background (headless) sessions are driven by their own channels
-      // (Telegram workers, cron, …) — stay silent unless the user explicitly
-      // enabled this session's bell. Deliberate exception to the v1.7.2 rule
-      // "compact toast shows even with bell off".
-      let muted = false;
-      if (session.isBackground && this.config) {
-        const p = this.config.getNotificationPrefs(sessionId);
-        muted = !p.modal && !p.sound;
-      }
-      if (!muted) {
-        const lastNotif = this.lastNotifTime.get(sessionId) || 0;
-        if (Date.now() - lastNotif > 30000) {
-          this.lastNotifTime.set(sessionId, Date.now());
-          this.emit('session-waiting', session);
-        }
+      // Tour fini avec une tâche de fond encore ouverte : la conversation est
+      // bien disponible (état waiting, chip « bg process » côté UI) mais on ne
+      // sonne pas — pendant un long build la session reprend seule via la
+      // <task-notification>, et chaque fin de tour re-bannériserait pour rien
+      // (spam TrainBox du 2026-07-25 ; arbitrage Paul 2026-07-27 : badge vert +
+      // chip, silence tant qu'un bg est ouvert). Une permission (pending)
+      // notifie, elle : action requise, bg ou pas.
+      if (newState.name === 'waiting' && this.hasOpenBgTask(sessionId)) {
+        log.info(`[notif] ${sessionId.slice(0, 8)} muet (bg process ouvert)`);
+      } else {
+        this.maybeNotifyWaiting(sessionId, session);
       }
     }
     // Reset cooldown only when the user actually types — THINKING means a
@@ -1026,6 +1025,23 @@ class SessionWatcher extends EventEmitter {
     // the same loop is spam.
     if (stateChanged && newState.name === 'thinking') {
       this.lastNotifTime.delete(sessionId);
+    }
+  }
+
+  // Émet session-waiting sous cooldown 30s. Les sessions headless restent
+  // muettes sauf cloche explicite — leurs propres canaux (Telegram, cron, …)
+  // les couvrent ; exception assumée à la règle v1.7.2 « compact toast shows
+  // even with bell off ». Aussi appelé par la purge bg-stale de scan() :
+  // l'état y est déjà waiting, setState serait un no-op.
+  maybeNotifyWaiting(sessionId, session) {
+    if (session.isBackground && this.config) {
+      const p = this.config.getNotificationPrefs(sessionId);
+      if (!p.modal && !p.sound) return;
+    }
+    const lastNotif = this.lastNotifTime.get(sessionId) || 0;
+    if (Date.now() - lastNotif > 30000) {
+      this.lastNotifTime.set(sessionId, Date.now());
+      this.emit('session-waiting', session);
     }
   }
 
@@ -1151,11 +1167,10 @@ class SessionWatcher extends EventEmitter {
     // permission prompt. An already-waiting session was notified at end_turn —
     // re-ringing it (and flipping it amber) is spam. If end_turn was missed
     // (state still looks busy), use the reminder as a WAITING correction.
-    // `job` est ignoré ici pour la même raison, en plus fort : le rappel idle
-    // est structurellement vrai pendant TOUT le job (l'utilisateur ne tape rien,
-    // c'est normal, ça travaille) — le laisser corriger en waiting rebranche
-    // exactement la bannière parasite que l'état job supprime.
-    if (idle && (session.state.name === 'waiting' || session.state.name === 'job')) return;
+    // Une session suspendue à un bg process est déjà waiting (notif mutée) :
+    // le rappel idle, structurellement vrai pendant tout le bg, tombe donc
+    // dans ce même return et ne rebranche pas la bannière parasite.
+    if (idle && session.state.name === 'waiting') return;
 
     // bypassPermissions skips most hooks (Claude auto-approves and proceeds)
     // — EXCEPT for hooks that signal a genuine user-blocking interaction:

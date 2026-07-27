@@ -41,7 +41,7 @@ function blockingForegroundAgent(session) {
 
 // Un tour fini pendant que des sous-agents (ou un workflow) travaillent encore
 // n'est pas de l'inactivité : la session délègue, et ses délégués la
-// réveilleront — même raisonnement que l'état `job` pour les tâches de fond.
+// réveilleront — même raisonnement que le mute waiting-avec-bg du watcher.
 // Sans ça, la carte affichait « Inactif » en vert sous les lignes des agents
 // encore en cours, et la bannière needs-you partait pour rien.
 function delegatingNow(session) {
@@ -404,7 +404,7 @@ function setupWatcher() {
       return;
     }
     // Tour fini mais délégués au travail : ils réveilleront la session, elle
-    // n'attend rien de l'utilisateur — même silence que l'état `job`.
+    // n'attend rien de l'utilisateur — même silence que le mute waiting-avec-bg.
     if (session.state && session.state.name === 'waiting' && delegatingNow(session)) {
       log.info(`[notif] suppressed for ${session.sessionId.slice(0, 8)} — delegating (subagents/workflow actifs)`);
       return;
@@ -802,6 +802,9 @@ function serializeSession(session) {
     tokens: session.tokens,
     cwd: session.cwd,
     isBackground: !!session.isBackground,
+    // Tâches Bash `run_in_background` encore ouvertes → chip « N bg process »
+    // sur la carte. Propriété orthogonale à l'état : la session est waiting.
+    bgTaskCount: session.bgTasks ? session.bgTasks.size : 0,
     notifEnabled: (() => { const p = config.getNotificationPrefs(session.sessionId); return !!(p.modal || p.sound); })(),
     subagents,
     workflows,

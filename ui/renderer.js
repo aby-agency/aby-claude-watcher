@@ -26,7 +26,7 @@ const ICONS = {
 // États « ça travaille » : spinner au lieu du point, pilule d'outil affichée,
 // cloche obsolète. `job` (tour suspendu à une tâche de fond) en fait partie —
 // la session reprendra seule, elle n'attend personne.
-const ACTIVE_STATES = ['running', 'thinking', 'job', 'delegating'];
+const ACTIVE_STATES = ['running', 'thinking', 'delegating'];
 const isActiveState = (name) => ACTIVE_STATES.includes(name);
 
 const sessions = new Map();
@@ -909,6 +909,14 @@ function getStateLabel(s) {
   return t('state_' + s.state.name);
 }
 
+// Chip « N bg process » : des tâches Bash `run_in_background` sont encore
+// ouvertes. Orthogonal à l'état — la conversation est dispo (waiting), seul le
+// process tourne encore ; les notifs sont mutées côté watcher tant qu'il vit.
+function bgChipHTML(s) {
+  if (!s.bgTaskCount) return '';
+  return `<span class="bg-chip">${t('bg_chip').replace('{n}', s.bgTaskCount)}</span>`;
+}
+
 function subagentRowHTML(sa) {
   const raw = sa.description || sa.agentType || 'subagent';
   return `
@@ -960,6 +968,7 @@ function cardHTML(s) {
   const duration = formatDuration(s.startedAt);
   const tokens = formatTokens(s.tokens);
   const sid = escAttr(s.sessionId);
+  const bgChip = bgChipHTML(s);
 
   return `
     <div class="card${s.isBackground ? ' bg-session' : ''}" data-state="${stateName}" data-session="${sid}"
@@ -983,7 +992,7 @@ onclick="handleCardClick(event, '${sid}')">
       <div class="state-badge ${stateName}">
         ${isActiveState(stateName) ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
         ${stateLabel}
-      </div>
+      </div>${bgChip}
       <div class="card-details">
         <div class="detail">
           <span class="detail-label">${t('branch')}</span>
@@ -1091,6 +1100,7 @@ onclick="handleCardClick(event, '${sid}')">
         </span>
         <span class="compact-meta-sep">·</span>
         <span class="compact-card-tool">${toolDisplay}</span>
+        ${bgChipHTML(s)}
       </div>
       <div class="compact-card-branch">
         <span class="compact-card-branch-icon">${ICONS.branch || '⎇'}</span>

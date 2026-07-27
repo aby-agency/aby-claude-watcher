@@ -21,6 +21,7 @@ function sess(state, opts = {}) {
     isBackground: !!opts.bg,
     lastEventTime: opts.lastEventTime !== undefined ? opts.lastEventTime : NOW - 120000,
     startedAt: new Date(NOW - (opts.age || n) * 60000).toISOString(),
+    stateSince: opts.stateSince !== undefined ? opts.stateSince : null,
   };
 }
 
@@ -107,6 +108,24 @@ test('rows default to empty subagents/workflows when absent', () => {
   const r = buildIsland([sess('running')], {}).rows[0];
   assertEq(r.subagents, []);
   assertEq(r.workflows, []);
+});
+
+console.log('\nrow minutes (durée d\'état):');
+test('minutes = minutes entières depuis stateSince, now injecté', () => {
+  const m = buildIsland([sess('waiting', { stateSince: NOW - 12 * 60000 })], {}, NOW);
+  assertEq(m.rows[0].minutes, 12);
+});
+test('minutes null sous 60 s (jamais de « 0 min »)', () => {
+  const m = buildIsland([sess('waiting', { stateSince: NOW - 59000 })], {}, NOW);
+  assertEq(m.rows[0].minutes, null);
+});
+test('minutes null sans stateSince (config antérieure)', () => {
+  const m = buildIsland([sess('waiting')], {}, NOW);
+  assertEq(m.rows[0].minutes, null);
+});
+test('minutes aussi sur les rangées headless', () => {
+  const m = buildIsland([sess('running', { bg: true, stateSince: NOW - 5 * 60000 })], {}, NOW);
+  assertEq(m.backgroundRows[0].minutes, 5);
 });
 
 console.log('\nislandLayout:');

@@ -45,7 +45,7 @@ function rowHtml(row) {
     <div class="row" data-session="${escAttr(row.sessionId)}" data-bg="${row.isBackground ? '1' : ''}">
       <span class="led${row.isBackground ? ' bg' : ''}" data-state="${escAttr(row.state)}"></span>
       <span class="r-name">${esc(row.name)}</span>
-      <span class="r-state">${esc(window.i18n.t('state_' + row.state))}</span>
+      <span class="r-state">${esc(window.i18n.t('state_' + row.state))}${row.minutes != null ? esc(' · ' + window.stateDuration.formatMinutes(row.minutes)) : ''}</span>
     </div>${subs}`;
 }
 

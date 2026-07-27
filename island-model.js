@@ -111,7 +111,17 @@ function sortSessions(sessions, sessionOrder) {
 // process ouverts compte idle : la conversation, elle, est bien disponible.)
 const BUSY_STATES = ['running', 'thinking', 'delegating'];
 
-function buildIsland(sessions, config) {
+// Durée d'état des rangées du volet : minutes entières depuis stateSince,
+// null sous la minute (pas de « 0 min »). Champ `minutes` réintroduit —
+// retiré lors du compactage des rangées, il revient porté par stateSince.
+function minutesSince(sinceMs, now) {
+  if (typeof sinceMs !== 'number' || !isFinite(sinceMs)) return null;
+  const m = Math.floor((now - sinceMs) / 60000);
+  return m >= 1 ? m : null;
+}
+
+function buildIsland(sessions, config, now) {
+  const nowMs = typeof now === 'number' ? now : Date.now();
   const order = (config && config.sessionOrder) || [];
   const sorted = sortSessions(sessions || [], order);
   const interactive = sorted.filter((s) => !s.isBackground);
@@ -133,6 +143,7 @@ function buildIsland(sessions, config) {
     sessionId: s.sessionId,
     name: s.customName || s.sessionName || s.projectName,
     state: s.state.name,
+    minutes: minutesSince(s.stateSince, nowMs),
     isBackground: !!s.isBackground,
     // Sous-lignes : subagents actifs + runs de workflow (déjà filtrés
     // « running » par serializeSession).

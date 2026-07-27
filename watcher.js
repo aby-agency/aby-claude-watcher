@@ -692,6 +692,10 @@ class SessionWatcher extends EventEmitter {
           // Déjà pending (restauré depuis config.sessions) → setState serait un
           // no-op et n'émettrait rien : on émet nous-mêmes pour que les tokens /
           // model / slug fraîchement relus remontent quand même.
+          if (session.stateSince == null) {
+            const mark = this.config.getPendingMark(sessionId);
+            session.stateSince = (mark && typeof mark.at === 'number') ? mark.at : stat.mtimeMs;
+          }
           this.emit('session-updated', session);
           this.persistSession(session);
         } else {
@@ -1009,6 +1013,18 @@ class SessionWatcher extends EventEmitter {
       // un redémarrage le perd définitivement (cf. config.setPendingMark).
       if (newState.name === 'pending') this.markPendingPersisted(sessionId, session);
       else if (oldState.name === 'pending') this.clearPendingPersisted(sessionId);
+    } else if (session.stateSince == null && typeof at === 'number') {
+      // No-op d'AMORÇAGE : l'état déduit au démarrage est le même que celui
+      // restauré depuis config.sessions, mais la session n'a aucun horodatage
+      // (config écrite par une version antérieure à la feature, ou session
+      // jamais retransitionnée depuis). Sans ce cas, la session la plus
+      // intéressante — inactive depuis des heures, donc justement celle qui ne
+      // transitionne plus — n'afficherait JAMAIS sa durée. `at` n'est passé que
+      // par les chemins de restauration (mtime du JSONL, pendingMark.at), donc
+      // aucun risque de réinitialiser un compteur en cours de route.
+      session.stateSince = at;
+      this.emit('session-updated', session);
+      this.persistSession(session);
     }
 
     // Trigger notification on waiting/pending — with 30s cooldown to avoid spam

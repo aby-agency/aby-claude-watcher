@@ -1145,6 +1145,27 @@ test('setState même état = no-op, stateSince conservé', () => {
   if (w.sessions.get('a').stateSince !== 777) throw new Error('un no-op ne doit pas retoucher stateSince');
 });
 
+test('no-op au démarrage : stateSince absent → amorcé au at de restauration', () => {
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  // Session restaurée d'une config écrite avant la feature : pas de stateSince,
+  // et l'état déduit du JSONL est identique → setState est un no-op.
+  w.sessions.set('a', makeSession('a', { state: STATES.WAITING }));
+  w.sessions.get('a').stateSince = null;
+  w.setState('a', STATES.WAITING, true, 'initial-scan', 4242);
+  if (w.sessions.get('a').stateSince !== 4242) throw new Error('stateSince doit être amorcé au mtime');
+  if (config._data.sessions['a'].stateSince !== 4242) throw new Error('amorçage doit être persisté');
+});
+
+test('no-op sans at (marche courante) : pas d’amorçage fabriqué', () => {
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('a', makeSession('a', { state: STATES.WAITING }));
+  w.sessions.get('a').stateSince = null;
+  w.setState('a', STATES.WAITING, false, 'test');
+  if (w.sessions.get('a').stateSince != null) throw new Error('sans at, un no-op ne doit rien inventer');
+});
+
 runAll().then(() => {
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

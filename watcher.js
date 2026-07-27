@@ -133,6 +133,7 @@ class SessionWatcher extends EventEmitter {
           lastEventTime: Date.now(),
           hasActivity: savedState.name !== 'error',
           agentDispatches: new Map(),
+          stateSince: typeof data.stateSince === 'number' ? data.stateSince : null,
         });
         this.emit('session-added', this.sessions.get(id));
       }
@@ -293,6 +294,7 @@ class SessionWatcher extends EventEmitter {
               lastEventTime: Date.now(),
               hasActivity: false,
               agentDispatches: new Map(),
+              stateSince: Date.now(),
             });
             this.watchJsonl(effectiveId);
             // Persist immediately so a fresh session that hasn't yet transitioned
@@ -693,7 +695,9 @@ class SessionWatcher extends EventEmitter {
           this.emit('session-updated', session);
           this.persistSession(session);
         } else {
-          this.setState(sessionId, STATES.PENDING, true, 'pending-restored');
+          const mark = this.config.getPendingMark(sessionId);
+          this.setState(sessionId, STATES.PENDING, true, 'pending-restored',
+            (mark && typeof mark.at === 'number') ? mark.at : stat.mtimeMs);
         }
         return;
       }
@@ -702,7 +706,7 @@ class SessionWatcher extends EventEmitter {
       // (otherwise the stale restored state survives across restarts and the
       // session looks "stuck running"). isInitial=true skips the notification.
       if (computedState) {
-        this.setState(sessionId, computedState, true, 'initial-scan');
+        this.setState(sessionId, computedState, true, 'initial-scan', stat.mtimeMs);
       } else {
         // No determinable state — still emit so token/model/slug updates land
         this.emit('session-updated', session);
@@ -982,7 +986,7 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
-  setState(sessionId, newState, isInitial, trigger) {
+  setState(sessionId, newState, isInitial, trigger, at) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
@@ -994,6 +998,10 @@ class SessionWatcher extends EventEmitter {
       // stuck-running) — relive the sequence from main.log instead of repro.
       log.info(`[state] ${sessionId.slice(0, 8)} ${oldState.name}→${newState.name} (${trigger || '?'}${isInitial ? ', initial' : ''})`);
       session.state = newState;
+      // Horodate la transition — la durée d'état affichée (« Inactif · 12 min »)
+      // part d'ici. `at` explicite = restauration (mtime JSONL, pendingMark.at) ;
+      // un no-op ne passe jamais ici, le compteur ne repart donc pas à zéro.
+      session.stateSince = typeof at === 'number' ? at : Date.now();
       this.emit('session-updated', session);
       this.persistSession(session);
       // Le pending est le SEUL état invisible dans le JSONL (rien n'y est écrit
@@ -1062,6 +1070,7 @@ class SessionWatcher extends EventEmitter {
       terminalApp: session.terminalApp,
       terminalId: session.terminalId,
       isBackground: !!session.isBackground,
+      stateSince: session.stateSince || null,
     });
   }
 

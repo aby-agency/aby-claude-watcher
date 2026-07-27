@@ -1115,6 +1115,36 @@ test('caractères de contrôle strippés, longueur capée à 60', () => {
   if (long.length !== 60) throw new Error(`got ${long.length}`);
 });
 
+// ─── stateSince ───────────────────────────────────────────────────
+section('stateSince');
+
+test('setState pose stateSince à la transition (at explicite) et le persiste', () => {
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('a', makeSession('a', { state: STATES.RUNNING }));
+  w.setState('a', STATES.WAITING, false, 'test', 12345);
+  if (w.sessions.get('a').stateSince !== 12345) throw new Error('stateSince doit valoir le at explicite');
+  if (config._data.sessions['a'].stateSince !== 12345) throw new Error('stateSince doit être persisté');
+});
+
+test('setState sans at → Date.now() approx', () => {
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('a', makeSession('a', { state: STATES.RUNNING }));
+  const before = Date.now();
+  w.setState('a', STATES.WAITING, false, 'test');
+  const since = w.sessions.get('a').stateSince;
+  if (!(since >= before && since <= Date.now())) throw new Error('stateSince doit dater de maintenant');
+});
+
+test('setState même état = no-op, stateSince conservé', () => {
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('a', makeSession('a', { state: STATES.WAITING, stateSince: 777 }));
+  w.setState('a', STATES.WAITING, false, 'test', 99999);
+  if (w.sessions.get('a').stateSince !== 777) throw new Error('un no-op ne doit pas retoucher stateSince');
+});
+
 runAll().then(() => {
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);

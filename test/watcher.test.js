@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName } = require('../watcher');
+const { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName, isRealModel } = require('../watcher');
 
 function makeMockConfig() {
   const data = { sessions: {}, notifications: {}, customNames: {}, sessionOrder: [], pendingMarks: {} };
@@ -1204,6 +1204,42 @@ test('no-op sans at (marche courante) : pas d’amorçage fabriqué', () => {
   w.sessions.get('a').stateSince = null;
   w.setState('a', STATES.WAITING, false, 'test');
   if (w.sessions.get('a').stateSince != null) throw new Error('sans at, un no-op ne doit rien inventer');
+});
+
+// ═══ isRealModel ═══
+
+test('isRealModel : un vrai slug de modèle est retenu', () => {
+  if (!isRealModel('claude-opus-5')) throw new Error('claude-opus-5 doit être retenu');
+});
+
+test('isRealModel : <synthetic> rejeté (n’écrase pas le modèle réel)', () => {
+  if (isRealModel('<synthetic>')) throw new Error('<synthetic> ne doit jamais écraser le modèle');
+});
+
+test('isRealModel : vide / absent / non-string rejetés', () => {
+  if (isRealModel('') || isRealModel(null) || isRealModel(undefined) || isRealModel(42)) {
+    throw new Error('valeurs non exploitables à rejeter');
+  }
+});
+
+test('un changement de modèle EN COURS de session est repris (Opus 4.8 → Opus 5)', () => {
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  const s = makeSession('a', { state: STATES.RUNNING });
+  s.model = 'claude-opus-4-8';
+  w.sessions.set('a', s);
+  w.processAssistantEvent('a', s, { message: { model: 'claude-opus-5', content: [] } }, false);
+  if (s.model !== 'claude-opus-5') throw new Error(`modèle figé sur ${s.model}`);
+});
+
+test('un event assistant synthétique ne remplace pas le modèle de la session', () => {
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  const s = makeSession('a', { state: STATES.RUNNING });
+  s.model = 'claude-opus-5';
+  w.sessions.set('a', s);
+  w.processAssistantEvent('a', s, { message: { model: '<synthetic>', content: [] } }, false);
+  if (s.model !== 'claude-opus-5') throw new Error(`modèle écrasé : ${s.model}`);
 });
 
 runAll().then(() => {

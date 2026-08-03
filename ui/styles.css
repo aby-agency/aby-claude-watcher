@@ -1099,6 +1099,25 @@ body.micro-mode .uring-text { font-size: 9px; }
   align-self: flex-start;
 }
 
+/* Ligne modèle de la vue compacte — même gabarit que la branche/session, en
+   plus discret : c'est une info de contexte, pas une info d'état. */
+.compact-card-model {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  min-width: 0;
+  align-self: flex-start;
+}
+
+.compact-card-model-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Fixed-size slot for the leading indicator: dot, pending bell or bell-flash
    all live inside this container, so swapping between them never shifts the
    label sideways. */

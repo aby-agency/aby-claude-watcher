@@ -30,6 +30,14 @@ const PENDING_DELAY = 1000; // defer interactive-tool PENDING so a same-batch to
 // Contrôles/longueur alignés sur config.setCustomName (mêmes garanties d'affichage).
 const AUTO_NAME_SOURCES = ['derived', 'auto'];
 
+// Les events synthétisés par Claude Code (erreurs API notamment) portent
+// `model: "<synthetic>"`. Sans garde ils ÉCRASENT définitivement le modèle
+// réel de la session : une session passée en erreur affichait « <synthetic> »
+// jusqu'à sa fin. Tout pseudo-modèle entre chevrons est ignoré.
+function isRealModel(model) {
+  return typeof model === 'string' && model.length > 0 && !model.startsWith('<');
+}
+
 function explicitSessionName(data) {
   if (!data || typeof data.name !== 'string') return null;
   if (AUTO_NAME_SOURCES.includes(data.nameSource)) return null;
@@ -624,7 +632,7 @@ class SessionWatcher extends EventEmitter {
 
             if (event.type === 'assistant') {
               lastAssistant = event;
-              if (event.message && event.message.model) {
+              if (event.message && isRealModel(event.message.model)) {
                 session.model = event.message.model;
               }
               if (event.message && event.message.usage) {
@@ -881,7 +889,7 @@ class SessionWatcher extends EventEmitter {
     if (!message) return;
 
     // Extract model name
-    if (message.model) {
+    if (isRealModel(message.model)) {
       session.model = message.model;
     }
 
@@ -1300,4 +1308,4 @@ getSessions() {
   }
 }
 
-module.exports = { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName };
+module.exports = { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName, isRealModel };

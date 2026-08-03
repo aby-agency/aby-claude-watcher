@@ -4,6 +4,26 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] — 2026-08-03
+
+### Added
+- **Chaque carte indique sur quel modèle tourne la session.** La vue compacte
+  gagne une ligne « ✦ Opus 5 » sous l'identifiant de session, dans le même
+  registre discret que la branche ; la vue grille avait déjà sa case
+  « Modèle ». La ligne disparaît quand le modèle est inconnu plutôt que
+  d'afficher un tiret.
+
+### Fixed
+- **Le nom du modèle s'affichait brut pour toute la génération 5.** Les cartes
+  montraient « claude-opus-5 » au lieu de « Opus 5 », et Fable n'était pas
+  reconnu du tout. Les alias courts des sessions headless (« opus ») et les
+  variantes à contexte étendu (« claude-opus-5[1m] ») rendent désormais un
+  libellé propre. Un modèle inconnu reste affiché tel quel plutôt qu'escamoté.
+- **Une session passée en erreur perdait définitivement son modèle.** Les
+  événements internes de Claude Code marqués « <synthetic> » écrasaient le
+  modèle réel de la session, qui affichait alors « <synthetic> » jusqu'à sa
+  fermeture. Ces pseudo-modèles sont maintenant ignorés.
+
 ## [2.9.0] — 2026-07-27
 
 ### Added

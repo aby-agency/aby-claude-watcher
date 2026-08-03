@@ -20,6 +20,7 @@ const ICONS = {
   edit: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
   moreVertical: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>`,
   branch: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>`,
+  model: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2L12 3z"/></svg>`,
   wrench: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
 };
 
@@ -1131,7 +1132,7 @@ onclick="handleCardClick(event, '${sid}')">
       <div class="compact-card-session session-id-value" onclick="handleCopyId(event, '${sid}')" title="${t('action_copy_id')}">
         <span class="compact-card-branch-icon">${ICONS.copy}</span>
         <span class="session-id-text">${esc(s.sessionId)}</span>
-      </div>
+      </div>${modelLineHTML(s)}
       ${subagentsBlockHTML(s)}
     </div>
   `;
@@ -1565,18 +1566,23 @@ function formatDuration(startedAt) {
   return `${s}s`;
 }
 
+// Libellé de modèle pour la grille de détails (cases de largeur fixe : un
+// modèle inconnu y garde sa case avec un tiret). La vue compacte, elle, masque
+// sa ligne — cf. modelLineHTML.
 function formatModel(model) {
-  if (!model) return '—';
-  // "claude-opus-4-6" → "Opus 4.6"
-  // "claude-sonnet-4-6" → "Sonnet 4.6"
-  // "claude-haiku-4-5-20251001" → "Haiku 4.5"
-  const m = model.replace('claude-', '');
-  const match = m.match(/^(opus|sonnet|haiku)-(\d+)-(\d+)/i);
-  if (match) {
-    const name = match[1].charAt(0).toUpperCase() + match[1].slice(1);
-    return `${name} ${match[2]}.${match[3]}`;
-  }
-  return model;
+  return window.modelLabel.formatModel(model) || '—';
+}
+
+// Ligne « ✦ Opus 5 » de la vue compacte — omise quand le modèle est inconnu
+// plutôt que rendue vide.
+function modelLineHTML(s) {
+  const label = window.modelLabel.formatModel(s.model);
+  if (!label) return '';
+  return `
+      <div class="compact-card-model" title="${escAttr(t('model'))}">
+        <span class="compact-card-branch-icon">${ICONS.model}</span>
+        <span class="compact-card-model-value">${esc(label)}</span>
+      </div>`;
 }
 
 function formatTokens(tokens) {

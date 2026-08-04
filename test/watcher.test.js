@@ -681,6 +681,51 @@ test('scan: migration preserves sessionOrder slot, custom name, notification pre
   if (config._data.notifications['OLD']) throw new Error('OLD notif prefs must be cleared');
 });
 
+// ─── readNewLines (lignes partielles) ──────────────────
+section('readNewLines (lignes partielles):');
+
+function makeReadWatcher(events) {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('sid-partial', makeSession('sid-partial'));
+  w.processEvent = (id, ev) => events.push(ev);
+  return w;
+}
+
+test('readNewLines: ligne partielle en fin de chunk → offset non avancé, event lu entier au poll suivant', () => {
+  const file = path.join(os.tmpdir(), `aby-partial-${Date.now()}.jsonl`);
+  const full = JSON.stringify({ type: 'assistant', message: { content: 'été noël ✓' } });
+  const events = [];
+  const w = makeReadWatcher(events);
+  try {
+    // Poll 1 : une ligne complète + le début d'une seconde (écriture en cours).
+    fs.writeFileSync(file, '{"type":"user"}\n' + full.slice(0, 20));
+    w.fileOffsets.set(file, 0);
+    w.readNewLines('sid-partial', file);
+    if (events.length !== 1) throw new Error(`1 event attendu au poll 1, reçu ${events.length}`);
+    // Poll 2 : la ligne s'est terminée.
+    fs.appendFileSync(file, full.slice(20) + '\n');
+    w.readNewLines('sid-partial', file);
+    if (events.length !== 2) throw new Error(`2 events attendus au poll 2, reçu ${events.length}`);
+    if (events[1].message.content !== 'été noël ✓') throw new Error('event reconstruit corrompu (découpe UTF-8 ?)');
+  } finally { fs.rmSync(file, { force: true }); }
+});
+
+test('readNewLines: chunk sans aucun \\n → offset inchangé, rien de perdu', () => {
+  const file = path.join(os.tmpdir(), `aby-nonl-${Date.now()}.jsonl`);
+  const events = [];
+  const w = makeReadWatcher(events);
+  try {
+    fs.writeFileSync(file, '{"type":"user","messa');
+    w.fileOffsets.set(file, 0);
+    w.readNewLines('sid-partial', file);
+    if (events.length !== 0) throw new Error('rien ne doit être parsé');
+    if (w.fileOffsets.get(file) !== 0) throw new Error(`offset doit rester 0, vaut ${w.fileOffsets.get(file)}`);
+    fs.appendFileSync(file, 'ge":{"content":"ok"}}\n');
+    w.readNewLines('sid-partial', file);
+    if (events.length !== 1) throw new Error('l\'event complet doit être parsé au poll suivant');
+  } finally { fs.rmSync(file, { force: true }); }
+});
+
 // ─── attachment doesn't kill waiting transition ──────────────────
 section('attachment + end_turn race:');
 

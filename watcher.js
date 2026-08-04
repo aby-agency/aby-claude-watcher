@@ -13,6 +13,10 @@ const POLL_INTERVAL = 250;
 const WAITING_DELAY = 2000;
 const PENDING_DELAY = 1000; // defer interactive-tool PENDING so a same-batch tool_result can cancel it
 
+// Garde-fou readNewLines : une ligne JSONL sans \n au-delà de cette taille est
+// pathologique (aligné sur MAX_TAIL de fastInitialLoad) — on l'abandonne.
+const MAX_PARTIAL_BYTES = 16 * 1024 * 1024;
+
 // Nom de session EXPLICITE (claude -n "…" ou /name) tel que Claude Code l'écrit
 // dans ~/.claude/sessions/<pid>.json. On EXCLUT, on ne sélectionne pas :
 //   - "derived" → nom fabriqué depuis le dossier (« aby-claude-watcher-9a ») =
@@ -804,9 +808,22 @@ class SessionWatcher extends EventEmitter {
       fs.readSync(fd, buffer, 0, buffer.length, currentOffset);
       fs.closeSync(fd);
 
-      this.fileOffsets.set(jsonlPath, stat.size);
+      // Ne consommer que jusqu'au dernier \n : la dernière ligne peut être en
+      // cours d'écriture (gros tool_result, ex. screenshots claude-in-chrome
+      // de 100-400 KB) — avancer l'offset au-delà la perdrait pour toujours
+      // (parse fail skippé + offset déjà avancé). Positions en BYTES sur le
+      // buffer brut : décoder d'abord fausserait les offsets sur l'UTF-8.
+      const lastNL = buffer.lastIndexOf(0x0A);
+      if (lastNL === -1) {
+        // Aucune ligne complète dans le chunk. Garde-fou : une « ligne » qui
+        // dépasse MAX_PARTIAL_BYTES sans \n est pathologique — on la saute
+        // plutôt que de relire un chunk géant à chaque poll pour toujours.
+        if (buffer.length > MAX_PARTIAL_BYTES) this.fileOffsets.set(jsonlPath, stat.size);
+        return;
+      }
+      this.fileOffsets.set(jsonlPath, currentOffset + lastNL + 1);
 
-      const lines = buffer.toString('utf-8').split('\n').filter(Boolean);
+      const lines = buffer.toString('utf-8', 0, lastNL).split('\n').filter(Boolean);
       for (const line of lines) {
         try {
           const event = JSON.parse(line);

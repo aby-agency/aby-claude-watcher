@@ -155,7 +155,6 @@ class SessionWatcher extends EventEmitter {
           hasActivity: savedState.name !== 'error',
           agentDispatches: new Map(),
           stateSince: typeof data.stateSince === 'number' ? data.stateSince : null,
-          chromeLastUsedAt: typeof data.chromeLastUsedAt === 'number' ? data.chromeLastUsedAt : null,
         });
         this.emit('session-added', this.sessions.get(id));
       }
@@ -1164,7 +1163,6 @@ class SessionWatcher extends EventEmitter {
       terminalId: session.terminalId,
       isBackground: !!session.isBackground,
       stateSince: session.stateSince || null,
-      chromeLastUsedAt: session.chromeLastUsedAt || null,
     });
   }
 

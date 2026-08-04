@@ -4,6 +4,32 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0] — 2026-08-04
+
+### Added
+- **Un chip « Chrome » signale qu'une session pilote votre navigateur.** Dès
+  qu'une session utilise l'extension Claude in Chrome, ses cartes (vues grille
+  et compacte) affichent un chip cyan « Chrome » pendant les 5 minutes qui
+  suivent le dernier échange avec le navigateur. Une session « Inactif » qui
+  porte encore le chip attend probablement une action côté Chrome — accepter
+  une URL, reconnecter l'extension — là où rien ne le laissait deviner
+  auparavant. Le chip est purement indicatif : aucun nouvel état, aucune
+  notification supplémentaire.
+
+### Fixed
+- **Une session reprise avec `--resume` pouvait rester figée « Inactif » pour
+  toujours.** Au relancement de Claude Code, un identifiant de session
+  provisoire — qui n'aura jamais de journal — pouvait capter le suivi à la
+  place du vrai : la carte ne bougeait plus, aucune notification ne partait,
+  pendant que la session travaillait réellement (constaté en live : 20 minutes
+  de navigation Chrome invisibles). Le watcher adopte désormais le bon
+  identifiant et journalise l'opération.
+- **Un événement écrit au moment précis du poll pouvait être perdu.** La
+  lecture incrémentale du journal s'arrête maintenant à la dernière ligne
+  complète au lieu de consommer un fragment — les gros résultats d'outils
+  (captures d'écran Claude in Chrome de plusieurs centaines de Ko) rendaient
+  cette fenêtre de collision bien réelle.
+
 ## [2.10.0] — 2026-08-03
 
 ### Added

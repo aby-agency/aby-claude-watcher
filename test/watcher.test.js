@@ -570,6 +570,42 @@ test('scan: brand-new Claude (no tracked entry, fresh jsonl) → added directly,
   if (added.length !== 1) throw new Error(`expected one added('fresh-id'), got ${JSON.stringify(events)}`);
 });
 
+test('scan: tracked sid sans JSONL + session.json sur un autre sid avec JSONL frais → adoption (fantôme de resume)', () => {
+  // Scénario TrainBox/Agnès 2026-08-04 : quit → relance → resume. Le CLI a
+  // d'abord écrit session.json avec un sid provisoire (jamais de JSONL), puis
+  // l'a remplacé par le vrai sid au resume. Le watcher doit lâcher le fantôme.
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/proj-resume-adopt';
+  const PHANTOM = 'phantom0-0000-4000-8000-000000000001';
+  const REAL = 'real0000-0000-4000-8000-000000000002';
+  writeSessionJson(tree.sessions, 4242, REAL, cwd);          // session.json → REAL
+  writeJsonl(tree.projects, cwd, REAL, Date.now() - 5000);   // REAL.jsonl frais
+  // PHANTOM n'a AUCUN jsonl sur disque.
+  const w = freshScanWatcher(tree.root);
+  w.sessions.set(PHANTOM, makeSession(PHANTOM, { pid: 4242, cwd }));
+  w.scan();
+  if (w.sessions.has(PHANTOM)) throw new Error('le fantôme aurait dû être migré/retiré');
+  if (!w.sessions.has(REAL)) throw new Error('le vrai sid aurait dû être adopté');
+  fs.rmSync(tree.root, { recursive: true, force: true });
+});
+
+test('scan: sid provisoire sans JSONL, session.json rapporte le MÊME sid → aucun churn (session neuve)', () => {
+  // Cas légitime : session qui vient de démarrer, premier prompt pas encore
+  // envoyé — le JSONL n'existe pas ENCORE. session.json et le tracking
+  // pointent le même sid : on ne touche à rien.
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/proj-resume-fresh';
+  const NEW = 'newsid00-0000-4000-8000-000000000003';
+  writeSessionJson(tree.sessions, 4343, NEW, cwd);
+  fs.mkdirSync(path.join(tree.projects, cwd.replace(/\//g, '-')), { recursive: true });
+  const w = freshScanWatcher(tree.root);
+  w.sessions.set(NEW, makeSession(NEW, { pid: 4343, cwd }));
+  w.scan();
+  if (!w.sessions.has(NEW)) throw new Error('la session neuve doit rester trackée telle quelle');
+  if (w.sessions.size !== 1) throw new Error(`une seule session attendue, trouvé ${w.sessions.size}`);
+  fs.rmSync(tree.root, { recursive: true, force: true });
+});
+
 test('scan: nouvelle session découverte + initial-scan no-op → stateSince amorcé au mtime JSONL, pas Date.now() (finding I1)', () => {
   // Régression ciblée : la branche de découverte de scan() posait autrefois
   // stateSince: Date.now() sur le pré-seed. Ici l'état déduit du JSONL (end_turn

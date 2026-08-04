@@ -251,7 +251,17 @@ class SessionWatcher extends EventEmitter {
           //     unless it's stale, in which case look for a fresh unclaimed JSONL.
           let effectiveId = sessionId;
           if (trackedId) {
-            if (!this._isSidStale(trackedId, cwd)) {
+            if (!this._jsonlExists(trackedId, cwd) && sessionId !== trackedId
+                && this._jsonlExists(sessionId, cwd)) {
+              // Fantôme de resume : le trackedId n'a pas (plus) de JSONL — sid
+              // provisoire écrit par le CLI au lancement, remplacé ensuite par
+              // le vrai sid dans session.json. Sans cette branche, « absent »
+              // n'étant pas « stale », le fantôme gagnait l'attribution à
+              // chaque scan et le vrai JSONL n'était plus jamais lu (session
+              // figée « Inactif », constaté le 2026-08-04 sur Agnès Guédeu).
+              effectiveId = sessionId;
+              log.info(`[watcher] resume adopt ${trackedId.slice(0, 8)} → ${sessionId.slice(0, 8)} (pid=${pid})`);
+            } else if (!this._isSidStale(trackedId, cwd)) {
               effectiveId = trackedId;
             } else if (sessionId !== trackedId) {
               // trackedId is stale and session.json reports a different sid —
@@ -402,6 +412,16 @@ class SessionWatcher extends EventEmitter {
         log.error('SessionWatcher scan error:', e.message);
       }
     }
+  }
+
+  // Le JSONL de ce sid existe-t-il sur disque ? Distinct de _isSidStale :
+  // « absent » n'est PAS « stale » (contrat conservé), mais l'attribution de
+  // scan() doit savoir qu'un trackedId sans JSONL ne peut pas gagner contre
+  // un sid de session.json dont le JSONL existe.
+  _jsonlExists(sid, cwd) {
+    const projDir = this._cwdToProjectDir(cwd);
+    if (!projDir) return false;
+    return fs.existsSync(path.join(projDir, `${sid}.jsonl`));
   }
 
   // True if the JSONL for `sid` exists in `cwd`'s project dir but hasn't been
@@ -1167,6 +1187,7 @@ class SessionWatcher extends EventEmitter {
   }
 
   removeSession(sessionId) {
+    log.info(`[watcher] removed ${String(sessionId).slice(0, 8)}`);
     const watcher = this.fileWatchers.get(sessionId);
     if (watcher) { watcher.close(); this.fileWatchers.delete(sessionId); }
     this.clearWaitingTimer(sessionId);

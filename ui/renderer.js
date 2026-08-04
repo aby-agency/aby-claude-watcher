@@ -940,6 +940,14 @@ function bgChipHTML(s) {
   return `<span class="bg-chip">${t('bg_chip').replace('{n}', s.bgTaskCount)}</span>`;
 }
 
+// Chip « Chrome » : la session a piloté le navigateur il y a < 5 min. Même
+// famille visuelle que .bg-chip ; data-chrome-since permet au ticker 1 s de
+// retirer le chip à l'expiration sans re-render (le main n'émet rien).
+function chromeChipHTML(s) {
+  if (!window.chromeChip.chromeChipVisible(s.chromeLastUsedAt, Date.now())) return '';
+  return `<span class="bg-chip chrome-chip" data-chrome-since="${s.chromeLastUsedAt}">${t('chrome_chip')}</span>`;
+}
+
 function subagentRowHTML(sa) {
   const raw = sa.description || sa.agentType || 'subagent';
   return `
@@ -1015,7 +1023,7 @@ onclick="handleCardClick(event, '${sid}')">
       <div class="state-badge ${stateName}"${stateSinceTitle(s)}>
         ${isActiveState(stateName) ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
         ${stateLabel}${stateDurationHTML(s)}
-      </div>${bgChip}
+      </div>${bgChip}${chromeChipHTML(s)}
       <div class="card-details">
         <div class="detail">
           <span class="detail-label">${t('branch')}</span>
@@ -1123,7 +1131,7 @@ onclick="handleCardClick(event, '${sid}')">
         </span>
         <span class="compact-meta-sep">·</span>
         <span class="compact-card-tool">${toolDisplay}</span>
-        ${bgChipHTML(s)}
+        ${bgChipHTML(s)}${chromeChipHTML(s)}
       </div>
       <div class="compact-card-branch">
         <span class="compact-card-branch-icon">${ICONS.branch || '⎇'}</span>
@@ -1153,6 +1161,13 @@ function updateDurations() {
     const txt = window.stateDuration.formatStateDuration(since);
     const next = txt ? ' · ' + txt : '';
     if (el.textContent !== next) el.textContent = next;
+  });
+  // Expiration du chip Chrome — retrait pur DOM : aucun event main à
+  // l'expiration, c'est le ticker qui fait foi (même approche que la durée
+  // d'état). Un nouvel usage re-rendra la carte avec un chip frais.
+  document.querySelectorAll('.chrome-chip[data-chrome-since]').forEach(el => {
+    const since = Number(el.dataset.chromeSince);
+    if (!window.chromeChip.chromeChipVisible(since, Date.now())) el.remove();
   });
 }
 

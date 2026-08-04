@@ -776,6 +776,13 @@ body.micro-mode .uring-text { font-size: 9px; }
 }
 .compact-card-row .bg-chip { margin-left: 0; padding: 1px 6px; }
 
+/* Chip Chrome : même gabarit que bg-chip (famille « ça se passe ailleurs »),
+   teinte cyan légèrement distincte pour le différencier d'un bg process.
+   .bg-chip ne pose ni border ni box-shadow (background + color seulement) —
+   la variante décline les mêmes propriétés, sans halo : le chip n'appelle
+   aucune action. */
+.chrome-chip { background: rgba(34, 211, 238, 0.15); color: #22d3ee; }
+
 /* Badges calmes (thinking/running/waiting) : sobres, discrets. waiting rendu
    sobre (retour Paul) — le vert « inactif » ne doit pas rayonner, il n'appelle
    aucune action. */

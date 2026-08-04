@@ -809,6 +809,10 @@ function serializeSession(session) {
     // Tâches Bash `run_in_background` encore ouvertes → chip « N bg process »
     // sur la carte. Propriété orthogonale à l'état : la session est waiting.
     bgTaskCount: session.bgTasks ? session.bgTasks.size : 0,
+    // Usage récent de l'extension Claude in Chrome → chip « Chrome » sur la
+    // carte (renderer.js, expiration côté ticker). L'île le reçoit sans le
+    // consommer.
+    chromeLastUsedAt: session.chromeLastUsedAt || null,
     notifEnabled: (() => { const p = config.getNotificationPrefs(session.sessionId); return !!(p.modal || p.sound); })(),
     subagents,
     workflows,

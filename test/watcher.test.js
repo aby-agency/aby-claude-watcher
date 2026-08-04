@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName, isRealModel } = require('../watcher');
+const { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName, isRealModel, isChromeToolUse } = require('../watcher');
 
 function makeMockConfig() {
   const data = { sessions: {}, notifications: {}, customNames: {}, sessionOrder: [], pendingMarks: {} };
@@ -1321,6 +1321,61 @@ test('un event assistant synthétique ne remplace pas le modèle de la session',
   w.sessions.set('a', s);
   w.processAssistantEvent('a', s, { message: { model: '<synthetic>', content: [] } }, false);
   if (s.model !== 'claude-opus-5') throw new Error(`modèle écrasé : ${s.model}`);
+});
+
+// ═══ chip Chrome (détection) ═══
+
+section('chip Chrome (détection):');
+
+test('isChromeToolUse: prefixe mcp__claude-in-chrome__ uniquement', () => {
+  if (!isChromeToolUse('mcp__claude-in-chrome__navigate')) throw new Error('navigate doit matcher');
+  if (!isChromeToolUse('mcp__claude-in-chrome__browser_batch')) throw new Error('browser_batch doit matcher');
+  if (isChromeToolUse('Bash')) throw new Error('Bash ne doit pas matcher');
+  if (isChromeToolUse('mcp__browsermcp__browser_click')) throw new Error('browsermcp ne doit pas matcher');
+  if (isChromeToolUse(undefined)) throw new Error('undefined ne doit pas matcher');
+});
+
+test('processAssistantEvent: tool_use chrome pose chromeLastUsedAt au timestamp de l\'event', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  const s = makeSession('sid-chrome', { chromeLastUsedAt: null });
+  w.sessions.set('sid-chrome', s);
+  const ts = '2026-08-04T08:30:10.448Z';
+  w.processAssistantEvent('sid-chrome', s, {
+    type: 'assistant', timestamp: ts,
+    message: { stop_reason: 'tool_use', content: [
+      { type: 'text', text: 'go' },
+      { type: 'tool_use', name: 'mcp__claude-in-chrome__navigate', input: {} },
+    ] },
+  }, true);
+  if (s.chromeLastUsedAt !== Date.parse(ts)) throw new Error(`attendu ${Date.parse(ts)}, reçu ${s.chromeLastUsedAt}`);
+});
+
+test('processAssistantEvent: tool_use non-chrome ne touche pas chromeLastUsedAt', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  const s = makeSession('sid-nochrome', { chromeLastUsedAt: 12345 });
+  w.sessions.set('sid-nochrome', s);
+  w.processAssistantEvent('sid-nochrome', s, {
+    type: 'assistant', timestamp: '2026-08-04T09:00:00.000Z',
+    message: { stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'Bash', input: {} }] },
+  }, true);
+  if (s.chromeLastUsedAt !== 12345) throw new Error('chromeLastUsedAt ne doit pas bouger');
+});
+
+test('fastInitialLoad: restaure chromeLastUsedAt depuis le tail', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aby-chrome-tail-'));
+  const file = path.join(dir, 'sid-tail.jsonl');
+  const ts = '2026-08-04T08:20:15.677Z';
+  fs.writeFileSync(file, [
+    JSON.stringify({ type: 'user', timestamp: '2026-08-04T08:20:00.000Z', message: { role: 'user', content: 'vas-y' } }),
+    JSON.stringify({ type: 'assistant', timestamp: ts, message: { stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'mcp__claude-in-chrome__browser_batch', input: {} }] } }),
+  ].join('\n') + '\n');
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('sid-tail', makeSession('sid-tail', { chromeLastUsedAt: null }));
+  w.findJsonlPath = () => file;
+  w.fastInitialLoad('sid-tail', file);
+  const s = w.sessions.get('sid-tail');
+  if (s.chromeLastUsedAt !== Date.parse(ts)) throw new Error(`attendu ${Date.parse(ts)}, reçu ${s.chromeLastUsedAt}`);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 runAll().then(() => {

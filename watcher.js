@@ -100,6 +100,15 @@ function bgTaskClosed(event) {
   return m ? m[1].trim() : null;
 }
 
+const CHROME_TOOL_PREFIX = 'mcp__claude-in-chrome__';
+
+// Tool de l'extension Claude in Chrome ? Sert au chip « Chrome » : usage
+// récent = la session pilote le navigateur de l'utilisateur — combiné à
+// « Inactif », l'action attendue est probablement côté Chrome.
+function isChromeToolUse(name) {
+  return typeof name === 'string' && name.startsWith(CHROME_TOOL_PREFIX);
+}
+
 class SessionWatcher extends EventEmitter {
   constructor(configModule) {
     super();
@@ -146,6 +155,7 @@ class SessionWatcher extends EventEmitter {
           hasActivity: savedState.name !== 'error',
           agentDispatches: new Map(),
           stateSince: typeof data.stateSince === 'number' ? data.stateSince : null,
+          chromeLastUsedAt: typeof data.chromeLastUsedAt === 'number' ? data.chromeLastUsedAt : null,
         });
         this.emit('session-added', this.sessions.get(id));
       }
@@ -326,6 +336,7 @@ class SessionWatcher extends EventEmitter {
               // l'amorce au mtime du JSONL ; indéterminable → rien d'affiché,
               // dégradation honnête.
               stateSince: null,
+              chromeLastUsedAt: null,
             });
             this.watchJsonl(effectiveId);
             // Persist immediately so a fresh session that hasn't yet transitioned
@@ -663,6 +674,11 @@ class SessionWatcher extends EventEmitter {
                 session.tokens.input += event.message.usage.input_tokens || 0;
                 session.tokens.output += event.message.usage.output_tokens || 0;
               }
+              const evContent = (event.message && event.message.content) || [];
+              if (Array.isArray(evContent) && evContent.some(c => c.type === 'tool_use' && isChromeToolUse(c.name))) {
+                const at = event.timestamp ? Date.parse(event.timestamp) : NaN;
+                if (Number.isFinite(at)) session.chromeLastUsedAt = at;
+              }
               this.captureAgentDispatches(session, event);
             } else if (event.type === 'user') {
               lastUser = event;
@@ -951,6 +967,13 @@ class SessionWatcher extends EventEmitter {
     const hasToolUse = content.some(c => c.type === 'tool_use');
     const lastToolUse = [...content].reverse().find(c => c.type === 'tool_use');
 
+    if (content.some(c => c.type === 'tool_use' && isChromeToolUse(c.name))) {
+      // Timestamp de l'EVENT, jamais Date.now() : au replay initial (tail),
+      // l'horodatage réel de l'usage est ce qui décide de l'expiration du chip.
+      const at = event.timestamp ? Date.parse(event.timestamp) : NaN;
+      if (Number.isFinite(at)) session.chromeLastUsedAt = at;
+    }
+
     if (lastToolUse && lastToolUse.name !== session.lastTool) {
       session.lastTool = lastToolUse.name;
       // Tool changed — emit update even if state stays the same
@@ -1141,6 +1164,7 @@ class SessionWatcher extends EventEmitter {
       terminalId: session.terminalId,
       isBackground: !!session.isBackground,
       stateSince: session.stateSince || null,
+      chromeLastUsedAt: session.chromeLastUsedAt || null,
     });
   }
 
@@ -1346,4 +1370,4 @@ getSessions() {
   }
 }
 
-module.exports = { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName, isRealModel };
+module.exports = { SessionWatcher, STATES, bgTaskOpened, bgTaskClosed, explicitSessionName, isRealModel, isChromeToolUse };

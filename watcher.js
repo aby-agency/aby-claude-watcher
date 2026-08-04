@@ -206,7 +206,13 @@ class SessionWatcher extends EventEmitter {
 
   scan() {
     try {
-      if (!fs.existsSync(SESSIONS_DIR)) return;
+      // La purge bg-stale ne dépend pas des session.json : elle doit tourner
+      // même sans SESSIONS_DIR (machine sans ~/.claude/sessions, CI), sinon un
+      // chip zombie survivrait pour toujours à la disparition du dossier.
+      if (!fs.existsSync(SESSIONS_DIR)) {
+        this.purgeStaleBgTasks();
+        return;
+      }
 
       const activeSessionIds = new Set();
       const files = fs.readdirSync(SESSIONS_DIR).filter(f => f.endsWith('.json'));
@@ -379,20 +385,7 @@ class SessionWatcher extends EventEmitter {
         }
       }
 
-      // Filet des tâches de fond : un process tué à la main n'émet jamais sa
-      // <task-notification>, la session resterait muette (et son chip affiché)
-      // pour toujours. Passé JOB_STALE_MS sans le moindre event, on lâche les
-      // tâches et on notifie (mieux vaut une bannière tardive que rien).
-      for (const [id, session] of this.sessions) {
-        if (session.state.name !== 'waiting' || !this.hasOpenBgTask(id)) continue;
-        const last = session.lastEventTime || 0;
-        if (last && Date.now() - last > JOB_STALE_MS) {
-          session.bgTasks.clear();
-          log.info(`[state] ${id.slice(0, 8)} bg tasks lâchés (bg-stale > ${JOB_STALE_MS / 60000} min)`);
-          this.emit('session-updated', session);
-          this.maybeNotifyWaiting(id, session);
-        }
-      }
+      this.purgeStaleBgTasks();
 
       // Sessions not in active files: check PID with a grace window
       // (session file can briefly disappear during atomic rewrites)
@@ -1015,6 +1008,23 @@ class SessionWatcher extends EventEmitter {
   bgTasksOf(session) {
     if (!session.bgTasks) session.bgTasks = new Set();
     return session.bgTasks;
+  }
+
+  // Filet des tâches de fond : un process tué à la main n'émet jamais sa
+  // <task-notification>, la session resterait muette (et son chip affiché)
+  // pour toujours. Passé JOB_STALE_MS sans le moindre event, on lâche les
+  // tâches et on notifie (mieux vaut une bannière tardive que rien).
+  purgeStaleBgTasks() {
+    for (const [id, session] of this.sessions) {
+      if (session.state.name !== 'waiting' || !this.hasOpenBgTask(id)) continue;
+      const last = session.lastEventTime || 0;
+      if (last && Date.now() - last > JOB_STALE_MS) {
+        session.bgTasks.clear();
+        log.info(`[state] ${id.slice(0, 8)} bg tasks lâchés (bg-stale > ${JOB_STALE_MS / 60000} min)`);
+        this.emit('session-updated', session);
+        this.maybeNotifyWaiting(id, session);
+      }
+    }
   }
 
   hasOpenBgTask(sessionId) {

@@ -834,6 +834,47 @@ test('startFileWatch stores jsonlPath on session (for sessionDirFor downstream)'
   w.stop();
 });
 
+test('poller re-resolves a moved JSONL (EnterWorktree) and keeps reading', async () => {
+  // EnterWorktree change le cwd de la session : Claude Code DÉPLACE le JSONL
+  // vers le dossier projet du nouveau cwd (rename, même sid). Le poller doit
+  // re-résoudre le chemin au lieu d'avaler ENOENT à vie.
+  const dirA = fs.mkdtempSync(path.join(os.tmpdir(), 'aby-mv-a-'));
+  const dirB = fs.mkdtempSync(path.join(os.tmpdir(), 'aby-mv-b-'));
+  const fileA = path.join(dirA, 'MV.jsonl');
+  const fileB = path.join(dirB, 'MV.jsonl');
+  fs.writeFileSync(fileA, JSON.stringify({
+    type: 'assistant',
+    message: { role: 'assistant', content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn' },
+    timestamp: '2026-08-05T12:00:00.000Z',
+  }) + '\n');
+
+  const config = makeMockConfig();
+  const w = new SessionWatcher(config);
+  w.sessions.set('MV', makeSession('MV', { state: STATES.WAITING }));
+  w.startFileWatch('MV', fileA);
+
+  try {
+    // Le déménagement : rename + le prochain findJsonlPath trouve le nouveau chemin.
+    fs.renameSync(fileA, fileB);
+    w.findJsonlPath = (sid) => (sid === 'MV' ? fileB : null);
+    fs.appendFileSync(fileB, JSON.stringify({
+      type: 'assistant',
+      message: { role: 'assistant', content: [{ type: 'tool_use', name: 'Bash', input: {} }], stop_reason: 'tool_use' },
+      timestamp: '2026-08-05T12:00:05.000Z',
+    }) + '\n');
+
+    await sleep(700); // > 2 ticks de poll : ENOENT constaté puis re-résolution
+
+    const s = w.sessions.get('MV');
+    if (s.jsonlPath !== fileB) throw new Error(`jsonlPath not re-resolved: ${s.jsonlPath}`);
+    if (s.state.name !== 'running') throw new Error(`expected running after move, got ${s.state.name}`);
+  } finally {
+    w.stop();
+    try { fs.rmSync(dirA, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(dirB, { recursive: true, force: true }); } catch {}
+  }
+});
+
 section('isBackground detection:');
 
 test('scan: entrypoint sdk-cli → isBackground true', () => {

@@ -10,6 +10,9 @@ const PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
 
 const SCAN_INTERVAL = 2000;
 const POLL_INTERVAL = 250;
+// Throttle de re-résolution d'un JSONL introuvable (déplacé par EnterWorktree,
+// cf. poller) : première tentative immédiate, puis au plus une toutes les 2 s.
+const JSONL_RESOLVE_RETRY_MS = 2000;
 const WAITING_DELAY = 2000;
 const PENDING_DELAY = 1000; // defer interactive-tool PENDING so a same-batch tool_result can cancel it
 
@@ -582,6 +585,7 @@ class SessionWatcher extends EventEmitter {
     } catch (e) {}
 
     // Poll file size every 250ms — more reliable than fs.watch on macOS
+    let lastResolveAttempt = 0;
     const poller = setInterval(() => {
       try {
         const stat = fs.statSync(jsonlPath);
@@ -590,7 +594,24 @@ class SessionWatcher extends EventEmitter {
           this.readNewLines(sessionId, jsonlPath);
         }
       } catch (e) {
-        // file might have been deleted
+        // Fichier illisible. Deux cas : vraiment disparu (fin de session — on ne
+        // force rien, scan() gère la complétion), ou DÉPLACÉ par EnterWorktree /
+        // ExitWorktree — le CLI déménage le JSONL vers le dossier projet du
+        // nouveau cwd (rename, même sid). findJsonlPath est cwd-indépendante :
+        // on re-résout (throttlé — un readdir de tous les projets à 4 Hz pour
+        // une session finie serait du gâchis) et on rebranche le suivi.
+        const now = Date.now();
+        if (now - lastResolveAttempt < JSONL_RESOLVE_RETRY_MS) return;
+        lastResolveAttempt = now;
+        const movedPath = this.findJsonlPath(sessionId);
+        if (movedPath && movedPath !== jsonlPath) {
+          log.info(`[watcher] jsonl moved ${sessionId.slice(0, 8)} ${jsonlPath} → ${movedPath}`);
+          clearInterval(poller);
+          this.fileOffsets.delete(jsonlPath);
+          // fastInitialLoad relit le tail du nouveau fichier : l'état gelé
+          // pendant l'aveuglement se remet d'aplomb au rebranchement.
+          this.startFileWatch(sessionId, movedPath);
+        }
       }
     }, POLL_INTERVAL);
     this.fileWatchers.set(sessionId, { close: () => clearInterval(poller) });

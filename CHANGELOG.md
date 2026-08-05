@@ -4,6 +4,21 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.1] — 2026-08-05
+
+### Fixed
+- **`EnterWorktree` rendait le watcher aveugle : la carte restait « Inactif »
+  pendant que la session travaillait.** Quand une session change de répertoire
+  en cours de route (tool `EnterWorktree`/`ExitWorktree`), Claude Code
+  **déménage** son journal vers le dossier projet du nouveau cwd. Le watcher
+  continuait de surveiller l'ancien chemin, avalait l'erreur en silence et ne
+  lisait plus jamais rien : plus de transitions, plus de notifications, état
+  figé sur le dernier connu (constaté en live sur agents-platform : plus d'une
+  heure de revue de branche avec sous-agents affichée « Inactif »). Le poller
+  re-résout désormais le chemin du journal quand le fichier disparaît et
+  rebranche le suivi sur le nouveau — la relecture du tail remet l'état
+  d'aplomb au passage.
+
 ## [2.11.0] — 2026-08-04
 
 ### Added

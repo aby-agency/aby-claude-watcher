@@ -541,17 +541,30 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
-  findJsonlPath(sessionId) {
+  // Résout le JSONL d'un sid en scannant TOUS les dossiers projet (indépendant
+  // du cwd). Un même sid peut exister dans PLUSIEURS dossiers : projet renommé
+  // ou déplacé puis session reprise (`--resume`) depuis le nouveau chemin — le
+  // CLI écrit dans le nouveau slug, l'ancien garde une copie figée. Le
+  // premier-trouvé (ordre readdir, lexicographique) renvoyait la copie
+  // PÉRIMÉE dès que l'ancien slug triait avant (« Priv-e » < « agents ») : plus
+  // aucun event lu, seuls les hooks bougeaient la session, qui restait
+  // « Action requise » pendant des jours. Le plus récemment écrit gagne.
+  findJsonlPath(sessionId, projectsDir = PROJECTS_DIR) {
+    const found = [];
     try {
-      const dirs = fs.readdirSync(PROJECTS_DIR);
-      for (const dir of dirs) {
-        const jsonlPath = path.join(PROJECTS_DIR, dir, `${sessionId}.jsonl`);
-        if (fs.existsSync(jsonlPath)) return jsonlPath;
+      for (const dir of fs.readdirSync(projectsDir)) {
+        const jsonlPath = path.join(projectsDir, dir, `${sessionId}.jsonl`);
+        try { found.push({ jsonlPath, mtimeMs: fs.statSync(jsonlPath).mtimeMs }); } catch { /* absent */ }
       }
     } catch (e) {
       // projects dir might not exist
     }
-    return null;
+    if (!found.length) return null;
+    found.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    if (found.length > 1) {
+      log.info(`[watcher] jsonl ambiguous ${sessionId.slice(0, 8)}: ${found.length} copies, newest ${path.basename(path.dirname(found[0].jsonlPath))}`);
+    }
+    return found[0].jsonlPath;
   }
 
   watchJsonl(sessionId) {

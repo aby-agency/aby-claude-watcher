@@ -4,6 +4,33 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0] — 2026-09-02
+
+### Fixed
+- **« Action requise » affiché sans qu'aucune action ne soit requise.** Le
+  hook qui signalait un prompt de permission était `PreToolUse`, qui part pour
+  CHAQUE outil — auto-approuvé, en mode bypass, et pour les outils des
+  sous-agents (même identifiant de session que le parent). L'event `tool_use`
+  n'apparaissant dans le journal que 1 à 12 s après le ping, le garde-fou de
+  1 s ne filtrait rien : une session bypass a produit 128 passages en ambre
+  fantômes en une journée, et un parent bloqué sur une rafale d'agents restait
+  « Action requise · N min » tant qu'aucun agent n'écrivait (remonté par
+  Etienne : « depuis toujours les status sont jamais vraiment justes »). Le
+  hook installé est désormais `PermissionRequest` (Claude Code ≥ 2.0.45), qui
+  ne part QUE devant un vrai prompt ; l'ancien bloc `PreToolUse` est retiré de
+  `~/.claude/settings.json` au premier lancement (hooks tiers intacts), et un
+  résidu per-projet est ignoré par le watcher.
+- **Les notifications non bloquantes ne passent plus la carte en ambre.** Le
+  hook `Notification` transmet son `notification_type` : seuls
+  `permission_prompt`, les dialogues d'elicitation MCP et `agent_needs_input`
+  valent « action requise » ; `idle_prompt` corrige en « Inactif » ;
+  `auth_success`, `agent_completed`, `quota_*`… sont ignorés.
+- **Session figée « Action requise » pendant des jours quand un projet a été
+  renommé.** Un même journal peut exister dans deux dossiers projet (ancien et
+  nouveau chemin après un `--resume`) ; le watcher prenait le premier trouvé,
+  souvent la copie périmée, et ne lisait plus rien. Le journal le plus
+  récemment écrit gagne désormais (log `[watcher] jsonl ambiguous`).
+
 ## [2.11.1] — 2026-08-05
 
 ### Fixed

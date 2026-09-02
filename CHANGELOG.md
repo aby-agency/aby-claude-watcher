@@ -4,6 +4,17 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.1] — 2026-09-02
+
+### Fixed
+- **Le volet de l'île était coupé en bas, sans scroll, dès qu'une session
+  lançait beaucoup d'agents.** Une quarantaine de lignes d'audits sur deux
+  sessions poussaient les jauges de conso et le pied de version hors de la
+  fenêtre (remonté par Etienne). Les lignes d'agents sont désormais plafonnées
+  à 6 par session dans l'île, avec une ligne « +N autres » — la liste complète
+  reste sur la carte du dashboard — et le volet devient scrollable au trackpad
+  (sans barre visible) s'il déborde encore.
+
 ## [2.12.0] — 2026-09-02
 
 ### Fixed

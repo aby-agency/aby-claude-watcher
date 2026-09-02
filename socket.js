@@ -78,14 +78,18 @@ class SocketServer extends EventEmitter {
         break;
 
       case 'permission-pending':
-        // Claude hook fired (PreToolUse / Notification) — session is waiting
-        // for the user to answer a permission prompt or a question.
-        // toolName is set on PreToolUse (Bash, AskUserQuestion, …); empty for Notification.
+        // Claude hook fired (PermissionRequest / Notification) — session is
+        // waiting for the user to answer a permission prompt or a question.
+        // toolName is set on PermissionRequest (Bash, Edit, …); empty for Notification.
+        // notificationType = champ `notification_type` du hook Notification
+        // (permission_prompt, idle_prompt, auth_success, …) ; null si le CLI
+        // ne le fournit pas.
         this.emit('permission-pending', {
           sessionId: msg.sessionId,
           hookEvent: msg.hookEvent,
           toolName: msg.toolName || null,
           idle: !!msg.idle, // Notification idle reminder (not a permission)
+          notificationType: typeof msg.notificationType === 'string' && msg.notificationType ? msg.notificationType : null,
         });
         conn.write(JSON.stringify({ status: 'ok' }) + '\n');
         break;

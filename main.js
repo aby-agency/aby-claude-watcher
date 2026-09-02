@@ -471,7 +471,7 @@ function setupSocket() {
   });
 
   socketServer.on('permission-pending', (data) => {
-    if (data.sessionId) watcher.markPending(data.sessionId, data.hookEvent, data.toolName, data.idle);
+    if (data.sessionId) watcher.markPending(data.sessionId, data.hookEvent, data.toolName, data.idle, data.notificationType);
   });
 
   // Resolve pending registrations when sessions are discovered

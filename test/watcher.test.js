@@ -1203,11 +1203,92 @@ test('une vraie demande de permission pendant un bg passe pending ET notifie', a
   w.sessions.set('J9', makeSession('J9', { state: STATES.WAITING, lastEventTime: Date.now() - 10000, bgTasks: new Set(['vivant']) }));
   let notified = 0;
   w.on('session-waiting', () => { notified++; });
-  w.markPending('J9', 'PreToolUse', 'Bash', false);
+  w.markPending('J9', 'PermissionRequest', 'Bash', false);
   await sleep(1200);
   const got = w.sessions.get('J9').state.name;
   if (got !== 'pending') throw new Error(`attendu pending, obtenu ${got}`);
   if (notified !== 1) throw new Error(`une permission notifie, bg ouvert ou pas (${notified} émise(s))`);
+});
+
+section('markPending — quels pings valent « action requise »');
+
+test('PreToolUse ne vaut plus pending : il part pour CHAQUE outil, auto-approuvé ou lancé par un sous-agent', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  // Parent muet depuis 10 s (bloqué sur un fan-out d'agents) : c'est exactement
+  // le cas où l'ancien ping PreToolUse basculait la carte en ambre pour rien.
+  w.sessions.set('P1', makeSession('P1', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000 }));
+  let notified = 0;
+  w.on('session-waiting', () => { notified++; });
+  w.markPending('P1', 'PreToolUse', 'Bash', false);
+  await sleep(1200);
+  const got = w.sessions.get('P1').state.name;
+  if (got !== 'running') throw new Error(`PreToolUse ne doit rien changer, obtenu ${got}`);
+  if (notified !== 0) throw new Error('PreToolUse ne doit pas notifier');
+});
+
+test('PermissionRequest → pending, même en bypass (il ne part que devant un vrai prompt)', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('P2', makeSession('P2', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000, permissionMode: 'bypassPermissions' }));
+  w.markPending('P2', 'PermissionRequest', 'Bash', false);
+  await sleep(1200);
+  const got = w.sessions.get('P2').state.name;
+  if (got !== 'pending') throw new Error(`attendu pending, obtenu ${got}`);
+});
+
+test('Notification typée hors prompt (auth_success, agent_completed…) → ignorée', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('P3', makeSession('P3', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000 }));
+  w.markPending('P3', 'Notification', null, false, 'auth_success');
+  w.markPending('P3', 'Notification', null, false, 'agent_completed');
+  await sleep(1200);
+  const got = w.sessions.get('P3').state.name;
+  if (got !== 'running') throw new Error(`une notif non bloquante ne doit rien changer, obtenu ${got}`);
+});
+
+test('Notification permission_prompt / elicitation_dialog → pending', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('P4', makeSession('P4', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000 }));
+  w.markPending('P4', 'Notification', null, false, 'permission_prompt');
+  await sleep(1200);
+  if (w.sessions.get('P4').state.name !== 'pending') throw new Error('permission_prompt doit passer pending');
+  w.sessions.set('P5', makeSession('P5', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000 }));
+  w.markPending('P5', 'Notification', null, false, 'elicitation_dialog');
+  await sleep(1200);
+  if (w.sessions.get('P5').state.name !== 'pending') throw new Error('elicitation_dialog doit passer pending');
+});
+
+test('Notification idle_prompt → correction en waiting (jamais pending), même sans le flag idle', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('P6', makeSession('P6', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000 }));
+  w.markPending('P6', 'Notification', null, false, 'idle_prompt');
+  await sleep(1200);
+  const got = w.sessions.get('P6').state.name;
+  if (got !== 'waiting') throw new Error(`idle_prompt doit corriger en waiting, obtenu ${got}`);
+});
+
+test('Notification sans type (CLI ancien) → comportement historique : pending', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('P7', makeSession('P7', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000 }));
+  w.markPending('P7', 'Notification', null, false);
+  await sleep(1200);
+  if (w.sessions.get('P7').state.name !== 'pending') throw new Error('sans type, une Notification reste un pending');
+});
+
+section('findJsonlPath — plusieurs dossiers projet pour un même sid');
+
+test('le journal le plus récemment écrit gagne (dossier projet renommé → copie périmée dans l\'ancien slug)', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aby-jsonl-dup-'));
+  const projects = path.join(root, 'projects');
+  const now = Date.now();
+  // L'ancien slug trie AVANT le nouveau (readdir lexicographique : « Priv-e » < « agents »),
+  // c'est lui que le premier-trouvé renvoyait — copie figée depuis 3 semaines.
+  const stale = writeJsonl(projects, '/Users/p/Project/Priv-e/agents-platform', 'dup-id', now - 21 * 86400 * 1000);
+  const live = writeJsonl(projects, '/Users/p/Project/agents-platform', 'dup-id', now - 60 * 1000);
+  const w = new SessionWatcher(makeMockConfig());
+  const got = w.findJsonlPath('dup-id', projects);
+  if (got !== live) throw new Error(`attendu la copie vivante ${live}, obtenu ${got}`);
+  if (got === stale) throw new Error('la copie périmée a été choisie');
+  if (w.findJsonlPath('absent-id', projects) !== null) throw new Error('sid inconnu → null');
 });
 
 test('garde-fou : bg muet depuis > 45 min → tâches lâchées + notif tardive', () => {

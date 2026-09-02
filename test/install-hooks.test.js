@@ -26,30 +26,60 @@ const Q = (p) => `'${p}'`;
 function read(p) { return JSON.parse(fs.readFileSync(p, 'utf-8')); }
 
 console.log('\ninstallHooksIntoFile:');
-test('fichier neuf → PreToolUse(*) + Notification("") pointant sur le hook', () => {
+test('fichier neuf → PermissionRequest(*) + Notification("") pointant sur le hook, PAS de PreToolUse', () => {
   const p = tmpFile();
   const r = installHooksIntoFile(p, HOOK);
   assertEq(r.installed, true);
   const d = read(p);
-  assertEq(d.hooks.PreToolUse[0].matcher, '*');
+  assertEq(d.hooks.PermissionRequest[0].matcher, '*');
   assertEq(d.hooks.Notification[0].matcher, '');
-  assertEq(d.hooks.PreToolUse[0].hooks[0].command, Q(HOOK));
+  assertEq(d.hooks.PermissionRequest[0].hooks[0].command, Q(HOOK));
   assertEq(d.hooks.Notification[0].hooks[0].command, Q(HOOK));
+  assert(!('PreToolUse' in d.hooks), 'PreToolUse ne doit plus être installé (il part pour chaque outil, sous-agents compris)');
+});
+test('migration : notre ancien bloc PreToolUse (≤ 2.11.x) est retiré, les PreToolUse tiers restent', () => {
+  const p = tmpFile();
+  fs.writeFileSync(p, JSON.stringify({
+    hooks: {
+      PreToolUse: [
+        { matcher: '*', hooks: [{ type: 'command', command: Q(HOOK) }] },
+        { matcher: 'Bash', hooks: [{ type: 'command', command: '/user/own.sh' }] },
+      ],
+      Notification: [{ matcher: '', hooks: [{ type: 'command', command: Q(HOOK) }] }],
+    },
+  }));
+  const r = installHooksIntoFile(p, HOOK);
+  assertEq(r.reason, 'written');
+  const d = read(p);
+  assertEq(d.hooks.PreToolUse.length, 1);
+  assertEq(d.hooks.PreToolUse[0].hooks[0].command, '/user/own.sh');
+  assertEq(d.hooks.PermissionRequest.length, 1);
+  assertEq(installHooksIntoFile(p, HOOK).reason, 'already-present'); // stable
+});
+test('migration : ancien bloc PreToolUse seul (nu, ≤ 2.4.x) → clé PreToolUse supprimée', () => {
+  const p = tmpFile();
+  fs.writeFileSync(p, JSON.stringify({
+    hooks: { PreToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: HOOK }] }] },
+  }));
+  installHooksIntoFile(p, HOOK);
+  const d = read(p);
+  assert(!('PreToolUse' in d.hooks), 'clé PreToolUse vide supprimée');
+  assertEq(d.hooks.PermissionRequest[0].hooks[0].command, Q(HOOK));
 });
 test('idempotent : 2e appel → already-present, aucun doublon', () => {
   const p = tmpFile();
   installHooksIntoFile(p, HOOK);
   const r = installHooksIntoFile(p, HOOK);
   assertEq(r.reason, 'already-present');
-  assertEq(read(p).hooks.PreToolUse.length, 1);
+  assertEq(read(p).hooks.PermissionRequest.length, 1);
 });
 test('self-heal : chemin périmé mis à jour en place', () => {
   const p = tmpFile();
   installHooksIntoFile(p, '/old/path/aby-permission-hook.sh');
   installHooksIntoFile(p, HOOK);
   const d = read(p);
-  assertEq(d.hooks.PreToolUse.length, 1);
-  assertEq(d.hooks.PreToolUse[0].hooks[0].command, Q(HOOK));
+  assertEq(d.hooks.PermissionRequest.length, 1);
+  assertEq(d.hooks.PermissionRequest[0].hooks[0].command, Q(HOOK));
 });
 test('non destructif : préserve les autres hooks et les autres clés', () => {
   const p = tmpFile();
@@ -60,8 +90,9 @@ test('non destructif : préserve les autres hooks et les autres clés', () => {
   installHooksIntoFile(p, HOOK);
   const d = read(p);
   assertEq(d.model, 'opus');
-  assertEq(d.hooks.PreToolUse.length, 2); // le hook user + le nôtre
+  assertEq(d.hooks.PreToolUse.length, 1); // le hook user, intact
   assert(d.hooks.PreToolUse.some(b => b.hooks[0].command === '/user/own.sh'), 'hook user préservé');
+  assertEq(d.hooks.PermissionRequest.length, 1); // le nôtre, à côté
 });
 test('fichier illisible → bail, aucune écriture', () => {
   const p = tmpFile();
@@ -73,11 +104,14 @@ test('fichier illisible → bail, aucune écriture', () => {
 });
 
 console.log('\nremoveHookFromFile:');
-test('retire nos blocs, garde les autres hooks et clés', () => {
+test('retire nos blocs (PermissionRequest, Notification ET l\'ancien PreToolUse), garde les autres hooks et clés', () => {
   const p = tmpFile();
   fs.writeFileSync(p, JSON.stringify({
     model: 'opus',
-    hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: '/user/own.sh' }] }] },
+    hooks: { PreToolUse: [
+      { matcher: 'Bash', hooks: [{ type: 'command', command: '/user/own.sh' }] },
+      { matcher: '*', hooks: [{ type: 'command', command: Q(HOOK) }] }, // legacy ours
+    ] },
   }));
   installHooksIntoFile(p, HOOK);
   const r = removeHookFromFile(p);
@@ -87,6 +121,7 @@ test('retire nos blocs, garde les autres hooks et clés', () => {
   assertEq(d.hooks.PreToolUse.length, 1);
   assertEq(d.hooks.PreToolUse[0].hooks[0].command, '/user/own.sh');
   assert(!('Notification' in d.hooks) || d.hooks.Notification.length === 0, 'notre Notification retiré');
+  assert(!('PermissionRequest' in d.hooks), 'notre PermissionRequest retiré');
 });
 test('fichier absent → no-op', () => {
   const p = tmpFile();
@@ -100,7 +135,7 @@ const SPACED = '/Applications/Aby Claude Watcher.app/Contents/Resources/app.asar
 test('chemin à espaces → commande quotée (sinon sh coupe à « /Applications/Aby »)', () => {
   const p = tmpFile();
   installHooksIntoFile(p, SPACED);
-  const cmd = read(p).hooks.PreToolUse[0].hooks[0].command;
+  const cmd = read(p).hooks.PermissionRequest[0].hooks[0].command;
   assertEq(cmd, `'${SPACED}'`);
   // La commande DOIT désigner le script en entier, pas son premier mot.
   assertEq(cmd.split(' ')[0] === "'/Applications/Aby", true);
@@ -115,8 +150,10 @@ test('migration : une commande nue écrite par une version ≤2.4.x est re-quot�
   const r = installHooksIntoFile(p, SPACED);
   assertEq(r.reason, 'written');
   const d = read(p);
-  assertEq(d.hooks.PreToolUse.length, 1); // reconnu comme le nôtre → pas de doublon
-  assertEq(d.hooks.PreToolUse[0].hooks[0].command, `'${SPACED}'`);
+  // Reconnu comme le nôtre malgré la forme nue → migré vers PermissionRequest, quoté, sans doublon.
+  assertEq(d.hooks.PreToolUse, undefined);
+  assertEq(d.hooks.PermissionRequest.length, 1);
+  assertEq(d.hooks.PermissionRequest[0].hooks[0].command, `'${SPACED}'`);
 });
 
 test('idempotent sur la forme quotée (pas de réécriture à chaque démarrage)', () => {
@@ -129,7 +166,7 @@ test('removeHookFromFile reconnaît la forme quotée', () => {
   const p = tmpFile();
   installHooksIntoFile(p, SPACED);
   assertEq(removeHookFromFile(p).removed, true);
-  assertEq(read(p).hooks.PreToolUse, undefined);
+  assertEq(read(p).hooks.PermissionRequest, undefined);
 });
 
 test('doublon des nôtres → réduit à une seule entrée, les hooks tiers préservés', () => {
@@ -147,10 +184,13 @@ test('doublon des nôtres → réduit à une seule entrée, les hooks tiers pré
   }, null, 2));
   const r = installHooksIntoFile(p, SPACED);
   assertEq(r.reason, 'written');
-  const arr = read(p).hooks.PreToolUse;
-  assertEq(arr.length, 2); // le nôtre (dédoublonné) + celui de l'utilisateur
-  assertEq(arr.filter(b => b.hooks[0].command.includes('aby-permission-hook')).length, 1);
-  assertEq(arr.some(b => b.hooks[0].command === '/user/own.sh'), true);
+  const d = read(p);
+  // Nos deux entrées PreToolUse (une quotée, une nue) → retirées, remplacées par
+  // UNE entrée PermissionRequest ; le hook tiers reste seul sous PreToolUse.
+  assertEq(d.hooks.PreToolUse.length, 1);
+  assertEq(d.hooks.PreToolUse[0].hooks[0].command, '/user/own.sh');
+  assertEq(d.hooks.PermissionRequest.length, 1);
+  assertEq(d.hooks.PermissionRequest[0].hooks[0].command, `'${SPACED}'`);
   assertEq(installHooksIntoFile(p, SPACED).reason, 'already-present'); // stable
 });
 
@@ -158,7 +198,7 @@ test('apostrophe dans le chemin → échappement shell correct', () => {
   const p = tmpFile();
   const weird = "/Users/paul/Claude's apps/bin/aby-permission-hook.sh";
   installHooksIntoFile(p, weird);
-  assertEq(read(p).hooks.PreToolUse[0].hooks[0].command, `'/Users/paul/Claude'\\''s apps/bin/aby-permission-hook.sh'`);
+  assertEq(read(p).hooks.PermissionRequest[0].hooks[0].command, `'/Users/paul/Claude'\\''s apps/bin/aby-permission-hook.sh'`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

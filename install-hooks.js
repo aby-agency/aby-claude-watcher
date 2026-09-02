@@ -17,7 +17,14 @@ const path = require('path');
 const os = require('os');
 
 const HOOK_FILENAME = 'aby-permission-hook.sh';
-const HOOK_EVENTS = ['PreToolUse', 'Notification'];
+// PermissionRequest = « un prompt de permission va s'afficher » — le seul hook
+// qui ne part QUE quand l'utilisateur est réellement sollicité. L'ex-PreToolUse
+// (≤ 2.11.x) partait pour CHAQUE outil, auto-approuvé ou non, sous-agents
+// compris (même session_id) : chaque fan-out d'agents ou session en bypass
+// finissait « Action requise » pour rien. Il est retiré des settings à la
+// migration (LEGACY_EVENTS) et ignoré par le watcher s'il traîne encore.
+const HOOK_EVENTS = ['PermissionRequest', 'Notification'];
+const LEGACY_EVENTS = ['PreToolUse'];
 
 // Claude Code exécute la commande d'un hook via `/bin/sh -c` : un chemin NON
 // QUOTÉ est découpé au premier espace. Le bundle installé vit sous
@@ -84,7 +91,7 @@ function ensureBlock(entries, event, hookPath) {
   }
   if (!found) {
     kept.push({
-      matcher: event === 'PreToolUse' ? '*' : '',
+      matcher: event === 'PermissionRequest' ? '*' : '',
       hooks: [{ type: 'command', command }],
     });
     changed = true;
@@ -105,7 +112,8 @@ function readSettings(settingsPath) {
   }
 }
 
-// Merge our PreToolUse + Notification hooks into an arbitrary settings file.
+// Merge our PermissionRequest + Notification hooks into an arbitrary settings
+// file, and drop our own blocks left under legacy events by older versions.
 function installHooksIntoFile(settingsPath, hookPath) {
   if (!settingsPath || typeof settingsPath !== 'string') return { installed: false, reason: 'invalid-path' };
   const data = readSettings(settingsPath);
@@ -119,6 +127,7 @@ function installHooksIntoFile(settingsPath, hookPath) {
     hooks[event] = out.entries;
     if (out.changed) changed = true;
   }
+  if (dropLegacyBlocks(hooks)) changed = true;
 
   if (!changed) return { installed: true, reason: 'already-present' };
 
@@ -133,6 +142,22 @@ function installHooksIntoFile(settingsPath, hookPath) {
   }
 }
 
+// Retire nos blocs des événements que nous n'installons PLUS (migration) ; les
+// hooks tiers sous ces mêmes événements sont intouchés, la clé est supprimée
+// si elle ne contenait que nous.
+function dropLegacyBlocks(hooks) {
+  let changed = false;
+  for (const event of LEGACY_EVENTS) {
+    if (!Array.isArray(hooks[event])) continue;
+    const kept = hooks[event].filter(b => !isOurHook(b));
+    if (kept.length === hooks[event].length) continue;
+    changed = true;
+    if (kept.length) hooks[event] = kept;
+    else delete hooks[event];
+  }
+  return changed;
+}
+
 // Remove ONLY our hook blocks from a settings file; leave everything else.
 function removeHookFromFile(settingsPath) {
   if (!settingsPath || typeof settingsPath !== 'string') return { removed: false, reason: 'invalid-path' };
@@ -143,7 +168,7 @@ function removeHookFromFile(settingsPath) {
   if (!hooks) return { removed: false, reason: 'no-hooks' };
 
   let changed = false;
-  for (const event of HOOK_EVENTS) {
+  for (const event of [...HOOK_EVENTS, ...LEGACY_EVENTS]) {
     if (!Array.isArray(hooks[event])) continue;
     const kept = hooks[event].filter(b => !isOurHook(b));
     if (kept.length !== hooks[event].length) changed = true;

@@ -15,6 +15,12 @@ const POLL_INTERVAL = 250;
 const JSONL_RESOLVE_RETRY_MS = 2000;
 const WAITING_DELAY = 2000;
 const PENDING_DELAY = 1000; // defer interactive-tool PENDING so a same-batch tool_result can cancel it
+// `notification_type` du hook Notification qui valent « action requise ». Tout
+// autre type (auth_success, agent_completed, quota_auto_resume_*, elicitation_
+// complete/response…) est du bruit : la session n'attend rien de l'utilisateur.
+const PENDING_NOTIFICATION_TYPES = new Set([
+  'permission_prompt', 'elicitation_dialog', 'elicitation_url_dialog', 'agent_needs_input',
+]);
 
 // Garde-fou readNewLines : une ligne JSONL sans \n au-delà de cette taille est
 // pathologique (aligné sur MAX_TAIL de fastInitialLoad) — on l'abandonne.
@@ -1297,15 +1303,30 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
-  // Called by SocketServer when the permission hook fires (PreToolUse / Notification).
-  // The session is waiting for the user to answer something and no JSONL event
-  // will land until the user does — so we surface it explicitly.
+  // Called by SocketServer when the permission hook fires (PermissionRequest /
+  // Notification). The session is waiting for the user to answer something and
+  // no JSONL event will land until the user does — so we surface it explicitly.
   // Defer the pending transition by ~1s. If Claude writes any JSONL event
-  // in that window (auto-approved tool, immediate continuation, …), we cancel.
+  // in that window (immediate continuation, …), we cancel.
   // Real permission prompts idle for seconds, so they comfortably survive.
-  markPending(sessionId, hookEvent, toolName, idle = false) {
+  //
+  // PreToolUse n'est PLUS un signal (v2.12.0). Il part pour CHAQUE outil —
+  // auto-approuvé, en bypass, ET pour les outils des sous-agents (même
+  // session_id, cf. docs hooks `agent_id`) — et l'event tool_use n'atterrit dans
+  // le JSONL que 1 à 12 s plus tard (médiane 3 s mesurée sur main.log), donc le
+  // défèrement 1 s ne filtrait rien : 128 « Action requise » fantômes sur une
+  // seule session bypass, et un parent bloqué sur un fan-out d'agents restait
+  // ambre tant qu'aucun agent n'était « running » frais (Etienne, 2026-09-02).
+  // Le hook installé est désormais PermissionRequest ; un PreToolUse résiduel
+  // (settings.local.json per-projet posé par un ancien `cc`) est ignoré ici.
+  markPending(sessionId, hookEvent, toolName, idle = false, notificationType = null) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+    if (hookEvent === 'PreToolUse') return;
+    if (hookEvent === 'Notification' && notificationType) {
+      if (notificationType === 'idle_prompt') idle = true;
+      else if (!PENDING_NOTIFICATION_TYPES.has(notificationType)) return; // auth_success, agent_completed, quota_*…
+    }
     if (session.state.name === 'pending') return;
     if (this.pendingTimers.has(sessionId)) return; // already scheduled
 
@@ -1318,17 +1339,9 @@ class SessionWatcher extends EventEmitter {
     // dans ce même return et ne rebranche pas la bannière parasite.
     if (idle && session.state.name === 'waiting') return;
 
-    // bypassPermissions skips most hooks (Claude auto-approves and proceeds)
-    // — EXCEPT for hooks that signal a genuine user-blocking interaction:
-    //   - PreToolUse for AskUserQuestion / ExitPlanMode (always blocks the user)
-    //   - Notification in bypass mode (no permission_prompt would fire here, so
-    //     it's idle_prompt or an MCP elicitation_dialog — both block the user)
-    const INTERACTIVE_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
-    const isInteractiveTool = hookEvent === 'PreToolUse' && INTERACTIVE_TOOLS.has(toolName);
-    const isNotification = hookEvent === 'Notification';
-    if (session.permissionMode === 'bypassPermissions' && !isInteractiveTool && !isNotification) {
-      return;
-    }
+    // Pas de garde bypassPermissions ici : PermissionRequest ne part jamais en
+    // bypass (rien à demander), et une Notification bloquante (elicitation MCP,
+    // idle) sollicite l'utilisateur quel que soit le mode.
 
     const lastEvent = session.lastEventTime || 0;
     if (Date.now() - lastEvent < 1000) return; // Claude is actively writing — ignore

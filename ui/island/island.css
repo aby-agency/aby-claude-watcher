@@ -292,18 +292,30 @@ body.expanded .panel {
 /* Le contenu se pose une fraction de seconde APRÈS le pli (délais .03/.06) :
    le noir s'ouvre d'abord, le contenu s'installe dedans — l'inverse donnerait
    du texte qui court devant son fond. */
+.panel-inner {
+  /* 100vh = hauteur de la fenêtre île (islandLayout.h) ; on retire la pilule. */
+  max-height: calc(100vh - 34px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.panel-inner::-webkit-scrollbar { display: none; }
 body.expanded .panel-inner {
   opacity: 1;
   transform: none;
   transition: opacity .18s ease .06s, transform .28s cubic-bezier(.33, 1, .68, 1) .03s;
 }
-/* Pas de cap ni de scrollbar sur la liste : elle prend sa hauteur naturelle,
-   une ligne par session — quitte à déborder de la fenêtre si beaucoup de
-   sessions (choix Paul : on accepte que ça sorte plutôt qu'une scrollbar).
-   La fenêtre fait 800pt (island-model WIN_H_MAX — l'ex-340 rognait jauges et
-   footer dès ~5 sessions) : le débordement ne redevient possible qu'au-delà
-   d'une quinzaine de sessions. */
+/* Pas de cap sur la liste des SESSIONS : une ligne par session, hauteur
+   naturelle. Les sous-lignes d'agents, elles, sont plafonnées par session dans
+   island-model (ISLAND_MAX_SUBROWS, « +N autres ») — un fan-out de 20 audits
+   par session poussait jauges et pied hors de la fenêtre de 800pt (Etienne,
+   2026-09-02). Filet de sécurité si ça déborde quand même (beaucoup de
+   sessions, petit écran clampé) : .panel-inner scrolle au trackpad, SANS barre
+   visible (l'esthétique Dynamic Island reste, le contenu devient atteignable).
+   PAS d'overflow sur .rows : overflow-y:auto y force overflow-x:auto et le
+   pouce horizontal fantôme revient (cf. commentaire .panel-inner). */
 .rows { }
+.subrow-more { color: #6b7385; font-style: italic; }
+.subrow-more .subrow-label { padding-left: 13px; } /* aligne sur le libellé (spinner 7px + gap 6px) */
 .row {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 8px;

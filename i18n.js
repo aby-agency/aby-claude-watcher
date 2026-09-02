@@ -131,6 +131,7 @@ settings_title: 'Paramètres',
 
       // Island
       island_empty: 'aucune session',
+      island_more_agents: '+{n} autre{s}',
       island_reste: 'reste {t}',
       island_update: 'Mise à jour {version}',
       island_update_install: 'Installer',
@@ -297,6 +298,7 @@ settings_title: 'Settings',
 
       // Island
       island_empty: 'no sessions',
+      island_more_agents: '+{n} more',
       island_reste: '{t} left',
       island_update: 'Update {version}',
       island_update_install: 'Install',

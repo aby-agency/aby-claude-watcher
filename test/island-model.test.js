@@ -1,5 +1,5 @@
 // Tests for island-model.js. Run: node test/island-model.test.js
-const { buildIsland, islandLayout, bannerPayload, updateNotice } = require('../island-model.js');
+const { buildIsland, islandLayout, bannerPayload, updateNotice, ISLAND_MAX_SUBROWS } = require('../island-model.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -108,6 +108,18 @@ test('rows default to empty subagents/workflows when absent', () => {
   const r = buildIsland([sess('running')], {}).rows[0];
   assertEq(r.subagents, []);
   assertEq(r.workflows, []);
+  assertEq(r.subagentsMore, 0);
+});
+test('subagents are capped per session in the island, the rest is counted (fan-out of 20 audits)', () => {
+  const s = sess('running');
+  s.subagents = Array.from({ length: 20 }, (_, i) => ({ agentId: 'a' + i, description: 'Audit ' + i }));
+  const r = buildIsland([s], {}).rows[0];
+  assertEq(r.subagents.length, ISLAND_MAX_SUBROWS);
+  assertEq(r.subagents[0].label, 'Audit 0');
+  assertEq(r.subagentsMore, 20 - ISLAND_MAX_SUBROWS);
+  // Exactly at the cap → nothing hidden, no « +0 autres ».
+  s.subagents = s.subagents.slice(0, ISLAND_MAX_SUBROWS);
+  assertEq(buildIsland([s], {}).rows[0].subagentsMore, 0);
 });
 
 console.log('\nrow minutes (durée d\'état):');

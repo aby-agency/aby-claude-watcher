@@ -40,7 +40,10 @@ function rowHtml(row) {
     <div class="subrow">
       <span class="subrow-spin"></span>
       <span class="subrow-label">${esc(a.label)}</span>
-    </div>`).join('');
+    </div>`).join('') + (row.subagentsMore > 0 ? `
+    <div class="subrow subrow-more">
+      <span class="subrow-label">${esc(window.i18n.t('island_more_agents', { n: row.subagentsMore }))}</span>
+    </div>` : '');
   return `
     <div class="row" data-session="${escAttr(row.sessionId)}" data-bg="${row.isBackground ? '1' : ''}">
       <span class="led${row.isBackground ? ' bg' : ''}" data-state="${escAttr(row.state)}"></span>

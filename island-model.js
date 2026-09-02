@@ -17,6 +17,12 @@ const NOTCH_GAP_MARGIN = 24;
 // transparente et click-through, le surplus est invisible et sans coût.
 // Clampée au display (petit écran externe).
 const WIN_H_MAX = 800;
+// Plafond de sous-lignes d'agents par session dans le volet. L'île est une
+// surface de coup d'œil : au-delà, on résume « +N autres » — la liste complète
+// vit sur la carte du dashboard. Sans plafond, un fan-out de 20 audits par
+// session (Etienne, 2026-09-02 : ~40 lignes sur deux sessions) poussait jauges
+// et pied sous le bord de la fenêtre de 800pt, sans scroll.
+const ISLAND_MAX_SUBROWS = 6;
 
 function islandLayout(display, notch, winW) {
   const h = Math.min(WIN_H_MAX, display.bounds.height);
@@ -147,9 +153,11 @@ function buildIsland(sessions, config, now) {
     isBackground: !!s.isBackground,
     // Sous-lignes : subagents actifs + runs de workflow (déjà filtrés
     // « running » par serializeSession).
-    subagents: (s.subagents || []).map((sa) => ({
+    subagents: (s.subagents || []).slice(0, ISLAND_MAX_SUBROWS).map((sa) => ({
       label: sa.description || sa.agentType || 'subagent',
     })),
+    // Nombre d'agents masqués par le plafond (0 = tout est affiché).
+    subagentsMore: Math.max(0, (s.subagents || []).length - ISLAND_MAX_SUBROWS),
     workflows: (s.workflows || []).map((wf) => ({
       name: wf.name, started: wf.started, done: wf.done, running: wf.running,
     })),
@@ -163,6 +171,6 @@ function buildIsland(sessions, config, now) {
   };
 }
 
-const api = { buildIsland, islandLayout, bannerPayload, updateNotice };
+const api = { buildIsland, islandLayout, bannerPayload, updateNotice, ISLAND_MAX_SUBROWS };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.islandModel = api;

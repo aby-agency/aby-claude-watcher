@@ -775,6 +775,15 @@ body.micro-mode .uring-text { font-size: 9px; }
   white-space: nowrap;
 }
 .compact-card-row .bg-chip { margin-left: 0; padding: 1px 6px; }
+/* Ligne dédiée serveurs / tâches (sous la ligne d'état) : icône de colonne
+   muted + chips à la suite, même gabarit que branche/session. */
+.compact-card-bg, .card-bg-line {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0;
+}
+.compact-card-bg .bg-chip { margin-left: 0; padding: 1px 6px; }
+.card-bg-line { margin: 8px 0 -4px; }
+.card-bg-line .bg-chip { margin-left: 0; }
+.card-bg-line .compact-card-branch-icon { display: inline-flex; color: var(--text-muted); }
 /* Spinner du chip « en fond » : même anneau que le badge d'état et les
    sous-lignes d'agents de l'île (bordure en arc, currentColor) — pas de SVG,
    le motif existe déjà partout dans l'app. Seul le chip bg tourne : un

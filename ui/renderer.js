@@ -21,6 +21,9 @@ const ICONS = {
   moreVertical: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>`,
   branch: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>`,
   model: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2L12 3z"/></svg>`,
+  // Ligne « process » (serveurs / tâches de fond) : icône activité, même
+  // gabarit 11px que branche/session/modèle.
+  process: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
   wrench: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
 };
 
@@ -959,6 +962,15 @@ function bgTaskTitle(list) {
     return parts.join(' — ');
   }).join('\n');
 }
+// Ligne dédiée aux process (serveurs / tâches), sous la ligne d'état, même
+// gabarit que branche/session : les chips n'y concurrencent plus le badge
+// (retour Paul 2026-09-07 : « 1 tâche » tombait seul sur une 2e ligne).
+// Chrome et « Dialogue ouvert » restent sur la ligne d'état, ils le qualifient.
+function bgLineHTML(s, cls) {
+  const chips = bgChipHTML(s);
+  if (!chips) return '';
+  return `<div class="${cls}"><span class="compact-card-branch-icon">${ICONS.process}</span>${chips}</div>`;
+}
 function bgChipHTML(s) {
   if (!s.bgTaskCount) return '';
   const list = Array.isArray(s.bgTasks) ? s.bgTasks : [];
@@ -1048,7 +1060,6 @@ function cardHTML(s) {
   const duration = formatDuration(s.startedAt);
   const tokens = formatTokens(s.tokens);
   const sid = escAttr(s.sessionId);
-  const bgChip = bgChipHTML(s);
 
   return `
     <div class="card${s.isBackground ? ' bg-session' : ''}" data-state="${stateName}" data-session="${sid}"
@@ -1072,7 +1083,8 @@ onclick="handleCardClick(event, '${sid}')">
       <div class="state-badge ${stateName}"${stateSinceTitle(s)}>
         ${isActiveState(stateName) ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
         ${stateLabel}${stateDurationHTML(s)}
-      </div>${bgChip}${dialogChipHTML(s)}${chromeChipHTML(s)}
+      </div>${dialogChipHTML(s)}${chromeChipHTML(s)}
+      ${bgLineHTML(s, 'card-bg-line')}
       <div class="card-details">
         <div class="detail">
           <span class="detail-label">${t('branch')}</span>
@@ -1180,8 +1192,9 @@ onclick="handleCardClick(event, '${sid}')">
         </span>
         <span class="compact-meta-sep">·</span>
         <span class="compact-card-tool">${toolDisplay}</span>
-        ${bgChipHTML(s)}${dialogChipHTML(s)}${chromeChipHTML(s)}
+        ${dialogChipHTML(s)}${chromeChipHTML(s)}
       </div>
+      ${bgLineHTML(s, 'compact-card-bg')}
       <div class="compact-card-branch">
         <span class="compact-card-branch-icon">${ICONS.branch || '⎇'}</span>
         <span class="branch-value">${esc(s.gitBranch || '—')}</span>

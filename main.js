@@ -45,6 +45,11 @@ function blockingForegroundAgent(session) {
 // Sans ça, la carte affichait « Inactif » en vert sous les lignes des agents
 // encore en cours, et la bannière needs-you partait pour rien.
 function delegatingNow(session) {
+  // Le CLI compte lui-même ses délégués (agents locaux ET distants, teammates
+  // in-process, workflows, monitors) dans son status busy : quand il le dit
+  // alors que le JSONL a vu la fin du tour, c'est une délégation, même si
+  // aucune ligne d'agent n'est visible dans <session>/subagents/.
+  if (session.presence && session.presence.status === 'busy') return true;
   const dir = sessionDirFor(session);
   if (!dir) return false;
   return hasLiveDelegation(
@@ -781,7 +786,8 @@ function serializeSession(session) {
   let state = session.state;
   if (state.name === 'pending' && hasBlockingForegroundAgent(subagents)) {
     state = STATES.RUNNING;
-  } else if (state.name === 'waiting' && hasLiveDelegation(subagents, workflows)) {
+  } else if (state.name === 'waiting'
+      && ((session.presence && session.presence.status === 'busy') || hasLiveDelegation(subagents, workflows))) {
     state = STATES.DELEGATING;
   }
 
@@ -808,7 +814,13 @@ function serializeSession(session) {
     isBackground: !!session.isBackground,
     // Tâches Bash `run_in_background` encore ouvertes → chip « N bg process »
     // sur la carte. Propriété orthogonale à l'état : la session est waiting.
-    bgTaskCount: session.bgTasks ? session.bgTasks.size : 0,
+    // Compte JSONL quand il l'a vu ; sinon la présence CLI (`status: shell`)
+    // dit « au moins une » → 1.
+    bgTaskCount: (session.bgTasks && session.bgTasks.size) || (session.shellBusy ? 1 : 0),
+    // Présence CLI : menu/dialogue local ouvert (chip vert, pas d'action) et
+    // libellé brut du dialogue bloquant (tooltip du badge pending).
+    dialogOpen: !!session.dialogOpen,
+    waitingFor: session.waitingFor || null,
     // Usage récent de l'extension Claude in Chrome → chip « Chrome » sur la
     // carte (renderer.js, expiration côté ticker). L'île le reçoit sans le
     // consommer.

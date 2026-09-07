@@ -776,6 +776,11 @@ body.micro-mode .uring-text { font-size: 9px; }
 }
 .compact-card-row .bg-chip { margin-left: 0; padding: 1px 6px; }
 
+/* Chip « Dialogue ouvert » : même gabarit que bg-chip, teinte verte alignée
+   sur le badge waiting — un menu ouvert n'appelle aucune action. Décliné sur
+   background/color uniquement (.bg-chip n'a ni border ni box-shadow). */
+.dialog-chip { background: rgba(34, 197, 94, 0.14); color: #22c55e; }
+
 /* Chip Chrome : même gabarit que bg-chip (famille « ça se passe ailleurs »),
    teinte cyan légèrement distincte pour le différencier d'un bg process.
    .bg-chip ne pose ni border ni box-shadow (background + color seulement) —

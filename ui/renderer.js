@@ -920,16 +920,22 @@ function stateDurationHTML(s) {
 }
 
 // Tooltip : horodatage absolu du passage dans l'état (« depuis 14:32 »,
-// date incluse au-delà de 24 h). Un timestamp absolu ne périme pas — posé
-// au render, pas de ticker.
+// date incluse au-delà de 24 h), préfixé du libellé brut du dialogue
+// bloquant quand l'état est pending (`waitingFor`, présence CLI). Un
+// timestamp absolu ne périme pas — posé au render, pas de ticker.
 function stateSinceTitle(s) {
-  if (typeof s.stateSince !== 'number') return '';
-  const d = new Date(s.stateSince);
-  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  const abs = (Date.now() - s.stateSince > 86_400_000)
-    ? `${d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' })} ${time}`
-    : time;
-  return ` title="${escAttr(t('state_since_abs', { t: abs }))}"`;
+  const parts = [];
+  if (s.state && s.state.name === 'pending' && s.waitingFor) parts.push(s.waitingFor);
+  if (typeof s.stateSince === 'number') {
+    const d = new Date(s.stateSince);
+    const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const abs = (Date.now() - s.stateSince > 86_400_000)
+      ? `${d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' })} ${time}`
+      : time;
+    parts.push(t('state_since_abs', { t: abs }));
+  }
+  if (!parts.length) return '';
+  return ` title="${escAttr(parts.join(' — '))}"`;
 }
 
 // Chip « N bg process » : des tâches Bash `run_in_background` sont encore
@@ -938,6 +944,14 @@ function stateSinceTitle(s) {
 function bgChipHTML(s) {
   if (!s.bgTaskCount) return '';
   return `<span class="bg-chip">${t('bg_chip').replace('{n}', s.bgTaskCount)}</span>`;
+}
+
+// Chip « Dialogue ouvert » : le CLI signale un menu/dialogue local ouvert
+// (/model, /config, « Session paused »…). Reste vert et muet — le plus
+// souvent c'est l'utilisateur qui l'a ouvert, rien n'est requis de lui.
+function dialogChipHTML(s) {
+  if (!s.dialogOpen) return '';
+  return `<span class="bg-chip dialog-chip">${t('dialog_chip')}</span>`;
 }
 
 // Chip « Chrome » : la session a piloté le navigateur il y a < 5 min. Même
@@ -1023,7 +1037,7 @@ onclick="handleCardClick(event, '${sid}')">
       <div class="state-badge ${stateName}"${stateSinceTitle(s)}>
         ${isActiveState(stateName) ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
         ${stateLabel}${stateDurationHTML(s)}
-      </div>${bgChip}${chromeChipHTML(s)}
+      </div>${bgChip}${dialogChipHTML(s)}${chromeChipHTML(s)}
       <div class="card-details">
         <div class="detail">
           <span class="detail-label">${t('branch')}</span>
@@ -1131,7 +1145,7 @@ onclick="handleCardClick(event, '${sid}')">
         </span>
         <span class="compact-meta-sep">·</span>
         <span class="compact-card-tool">${toolDisplay}</span>
-        ${bgChipHTML(s)}${chromeChipHTML(s)}
+        ${bgChipHTML(s)}${dialogChipHTML(s)}${chromeChipHTML(s)}
       </div>
       <div class="compact-card-branch">
         <span class="compact-card-branch-icon">${ICONS.branch || '⎇'}</span>

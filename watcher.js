@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const { EventEmitter } = require('events');
 const { log, DEBUG } = require('./logger');
+const { readPresence, presenceDecision } = require('./presence');
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const SESSIONS_DIR = path.join(CLAUDE_DIR, 'sessions');
@@ -129,9 +130,11 @@ class SessionWatcher extends EventEmitter {
     this.pendingTimers = new Map(); // deferred PENDING transitions from hook pings
     this.lastNotifTime = new Map(); // sessionId → timestamp of last notification
     this.scanTimer = null;
+    this.startedAt = Date.now();
   }
 
   start() {
+    this.startedAt = Date.now();
     // Restore persisted sessions
     if (this.config) {
       const saved = this.config.getSavedSessions();
@@ -164,6 +167,11 @@ class SessionWatcher extends EventEmitter {
           hasActivity: savedState.name !== 'error',
           agentDispatches: new Map(),
           stateSince: typeof data.stateSince === 'number' ? data.stateSince : null,
+          presence: null,
+          shellBusy: false,
+          dialogOpen: false,
+          waitingFor: null,
+          presenceMuted: false,
         });
         this.emit('session-added', this.sessions.get(id));
       }
@@ -361,6 +369,11 @@ class SessionWatcher extends EventEmitter {
               lastEventTime: Date.now(),
               hasActivity: false,
               agentDispatches: new Map(),
+              presence: null,
+              shellBusy: false,
+              dialogOpen: false,
+              waitingFor: null,
+              presenceMuted: false,
               // Pas Date.now() ici : ce pré-seed annulait l'amorce mtime de
               // fastInitialLoad pour toute session jamais persistée — l'état
               // déduit du JSONL égale souvent l'état initial (WAITING) → no-op,
@@ -374,6 +387,7 @@ class SessionWatcher extends EventEmitter {
               chromeLastUsedAt: null,
             });
             this.watchJsonl(effectiveId);
+            this.applyPresence(effectiveId, data);
             // Persist immediately so a fresh session that hasn't yet transitioned
             // state is known to config.sessions. Otherwise the startup orphan
             // purge would nuke its notif/name/order prefs on next launch.
@@ -405,6 +419,8 @@ class SessionWatcher extends EventEmitter {
               session.hasActivity = false;
               this.setState(effectiveId, STATES.WAITING, false, 'pid-revived');
             }
+
+            if (pidAlive) this.applyPresence(effectiveId, data);
 
             if (!this.fileWatchers.has(effectiveId)) {
               this.watchJsonl(effectiveId);
@@ -1137,6 +1153,60 @@ class SessionWatcher extends EventEmitter {
     }
   }
 
+  // Applique la présence publiée par le CLI (session.json) — l'autorité sur
+  // l'état gros grain quand elle existe. Décision pure dans presence.js ;
+  // ici les effets : flags de carte, transition via setState, bannière
+  // tardive quand un mute (shell / dialogue / délégation) se lève.
+  applyPresence(sessionId, data) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    const presence = readPresence(data);
+    session.presence = presence;
+    if (!presence) {
+      // CLI ancien : aucun flag ne doit rester d'une version précédente.
+      if (session.shellBusy || session.dialogOpen || session.waitingFor) {
+        session.shellBusy = false; session.dialogOpen = false; session.waitingFor = null;
+        this.emit('session-updated', session);
+      }
+      return;
+    }
+    const decision = presenceDecision({
+      presence,
+      currentState: session.state.name,
+      stateSince: session.stateSince ?? null,
+      watcherStartedAt: this.startedAt,
+    });
+    const flagsChanged = session.shellBusy !== decision.shell
+      || session.dialogOpen !== decision.dialogOpen
+      || (session.waitingFor || null) !== decision.waitingFor;
+    // Flags AVANT setState : le mute de notif les lit.
+    session.shellBusy = decision.shell;
+    session.dialogOpen = decision.dialogOpen;
+    session.waitingFor = decision.waitingFor;
+
+    if (decision.target) {
+      const target = Object.values(STATES).find(s => s.name === decision.target);
+      this.clearWaitingTimer(sessionId);
+      this.clearPendingTimer(sessionId);
+      this.setState(sessionId, target, decision.silent, decision.trigger, decision.at);
+    } else if (flagsChanged) {
+      // Rien dans le JSONL ne dira qu'un menu s'est ouvert ou qu'un shell
+      // s'est terminé : on émet nous-mêmes (même raison que sessionName).
+      this.emit('session-updated', session);
+    }
+
+    // Levée de mute : la session est redevenue vraiment inactive alors qu'une
+    // notif « Inactif » avait été tue (shell / dialogue / délégation) →
+    // bannière tardive, une seule fois (même logique que purgeStaleBgTasks).
+    if (presence.status === 'idle') {
+      if (session.presenceMuted && session.state.name === 'waiting' && !decision.target && !decision.silent) {
+        log.info(`[notif] ${sessionId.slice(0, 8)} mute levé (presence idle)`);
+        this.maybeNotifyWaiting(sessionId, session);
+      }
+      session.presenceMuted = false;
+    }
+  }
+
   setState(sessionId, newState, isInitial, trigger, at) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
@@ -1184,8 +1254,15 @@ class SessionWatcher extends EventEmitter {
       // (spam TrainBox du 2026-07-25 ; arbitrage Paul 2026-07-27 : badge vert +
       // chip, silence tant qu'un bg est ouvert). Une permission (pending)
       // notifie, elle : action requise, bg ou pas.
-      if (newState.name === 'waiting' && this.hasOpenBgTask(sessionId)) {
-        log.info(`[notif] ${sessionId.slice(0, 8)} muet (bg process ouvert)`);
+      const muteReason = newState.name !== 'waiting' ? null
+        : this.hasOpenBgTask(sessionId) ? 'bg process ouvert'
+        : session.shellBusy ? 'presence shell'
+        : session.dialogOpen ? 'presence dialog open'
+        : (session.presence && session.presence.status === 'busy') ? 'presence busy'
+        : null;
+      if (muteReason) {
+        log.info(`[notif] ${sessionId.slice(0, 8)} muet (${muteReason})`);
+        if (muteReason.startsWith('presence')) session.presenceMuted = true;
       } else {
         this.maybeNotifyWaiting(sessionId, session);
       }

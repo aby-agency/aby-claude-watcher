@@ -723,6 +723,108 @@ test('scan: kind bg/daemon → isBackground même avec entrypoint cli', () => {
   if (w.sessions.get('old-1').isBackground !== false) throw new Error('old-1 (no kind) should keep entrypoint rule');
 });
 
+section('scan() — présence CLI:');
+
+function presenceTree(status, extra = {}) {
+  const tree = makeFakeClaudeTree();
+  const now = Date.now();
+  writeSessionJsonRaw(tree.sessions, {
+    pid: 9200, sessionId: 'pres-1', cwd: '/tmp/pres', startedAt: now - 60_000, entrypoint: 'cli', kind: 'interactive',
+    status, statusUpdatedAt: extra.statusUpdatedAt ?? now, updatedAt: now, ...(extra.waitingFor ? { waitingFor: extra.waitingFor } : {}),
+  });
+  return tree;
+}
+
+test('présence waiting/permission prompt → pending + waitingFor, notif émise (postérieure au démarrage)', () => {
+  const tree = presenceTree('waiting', { waitingFor: 'permission prompt' });
+  const w = freshScanWatcher(tree.root);
+  w.startedAt = Date.now() - 5_000;
+  const notified = [];
+  w.on('session-waiting', (s) => notified.push(s.sessionId));
+  w.scan();
+  const s = w.sessions.get('pres-1');
+  if (s.state.name !== 'pending') throw new Error(`expected pending, got ${s.state.name}`);
+  if (s.waitingFor !== 'permission prompt') throw new Error(`waitingFor=${s.waitingFor}`);
+  if (notified.length !== 1) throw new Error(`expected 1 notif, got ${notified.length}`);
+});
+
+test('présence antérieure au démarrage → pending restauré SANS notif, stateSince = statusUpdatedAt', () => {
+  const ts = Date.now() - 60_000;
+  const tree = presenceTree('waiting', { waitingFor: 'permission prompt', statusUpdatedAt: ts });
+  const w = freshScanWatcher(tree.root);
+  w.startedAt = Date.now();
+  const notified = [];
+  w.on('session-waiting', (s) => notified.push(s.sessionId));
+  w.scan();
+  const s = w.sessions.get('pres-1');
+  if (s.state.name !== 'pending') throw new Error(`expected pending, got ${s.state.name}`);
+  if (notified.length !== 0) throw new Error('no retroactive notif expected');
+  if (s.stateSince !== ts) throw new Error(`stateSince should be statusUpdatedAt (${ts}), got ${s.stateSince}`);
+});
+
+test('présence waiting/dialog open → waiting + dialogOpen, jamais ambre, aucune notif', () => {
+  const tree = presenceTree('waiting', { waitingFor: 'dialog open' });
+  const w = freshScanWatcher(tree.root);
+  w.startedAt = Date.now() - 5_000;
+  const notified = [];
+  w.on('session-waiting', (s) => notified.push(s.sessionId));
+  w.scan();
+  const s = w.sessions.get('pres-1');
+  if (s.state.name !== 'waiting') throw new Error(`expected waiting, got ${s.state.name}`);
+  if (s.dialogOpen !== true) throw new Error('dialogOpen expected');
+  if (notified.length !== 0) throw new Error('dialog open must not notify');
+});
+
+test('présence busy sur un pending posé APRÈS statusUpdatedAt → reste pending ; postérieur → running', () => {
+  const tree = presenceTree('busy', { statusUpdatedAt: Date.now() - 10_000 });
+  const w = freshScanWatcher(tree.root);
+  w.startedAt = Date.now() - 20_000;
+  w.scan();
+  // Le hook pose un pending maintenant (plus récent que la présence busy).
+  w.setState('pres-1', STATES.PENDING, false, 'hook:PermissionRequest');
+  w.scan();
+  if (w.sessions.get('pres-1').state.name !== 'pending') throw new Error('older busy must not demote a newer pending');
+  // Le CLI réécrit busy APRÈS le pending : la question a été traitée.
+  const now = Date.now() + 1_000;
+  writeSessionJsonRaw(tree.sessions, { pid: 9200, sessionId: 'pres-1', cwd: '/tmp/pres', startedAt: now - 60_000, entrypoint: 'cli', kind: 'interactive', status: 'busy', statusUpdatedAt: now, updatedAt: now });
+  w.scan();
+  if (w.sessions.get('pres-1').state.name !== 'running') throw new Error('newer busy must resolve the pending');
+});
+
+test('présence shell → waiting + shellBusy ; puis idle → bannière tardive une seule fois', () => {
+  const tree = presenceTree('shell');
+  const w = freshScanWatcher(tree.root);
+  w.startedAt = Date.now() - 5_000;
+  const notified = [];
+  w.on('session-waiting', (s) => notified.push(s.sessionId));
+  w.scan();
+  // Partir d'un état actif pour qu'une transition muette ait lieu.
+  w.setState('pres-1', STATES.RUNNING, false, 'test');
+  w.scan();
+  const s = w.sessions.get('pres-1');
+  if (s.state.name !== 'waiting' || s.shellBusy !== true) throw new Error(`expected waiting+shell, got ${s.state.name}/${s.shellBusy}`);
+  if (notified.length !== 0) throw new Error('shell must mute the waiting notif');
+  const now = Date.now() + 1_000;
+  writeSessionJsonRaw(tree.sessions, { pid: 9200, sessionId: 'pres-1', cwd: '/tmp/pres', startedAt: now - 60_000, entrypoint: 'cli', kind: 'interactive', status: 'idle', statusUpdatedAt: now, updatedAt: now });
+  w.lastNotifTime.delete('pres-1');
+  w.scan();
+  if (notified.length !== 1) throw new Error(`expected late notif once, got ${notified.length}`);
+  if (s.shellBusy !== false) throw new Error('shellBusy should clear on idle');
+  w.lastNotifTime.delete('pres-1');
+  w.scan();
+  if (notified.length !== 1) throw new Error('late notif must fire only once');
+});
+
+test('CLI ancien (pas de status) → aucun champ de présence posé', () => {
+  const tree = makeFakeClaudeTree();
+  writeSessionJson(tree.sessions, 9300, 'old-2', '/tmp/old');
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  const s = w.sessions.get('old-2');
+  if (s.presence !== null) throw new Error('presence should be null without statusUpdatedAt');
+  if (s.shellBusy || s.dialogOpen || s.waitingFor) throw new Error('no presence flags expected');
+});
+
 // ─── readNewLines (lignes partielles) ──────────────────
 section('readNewLines (lignes partielles):');
 

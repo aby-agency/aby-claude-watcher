@@ -9,6 +9,7 @@ const { checkForUpdates, downloadAndInstall, abortActiveDownload, GITHUB_OWNER, 
 const config = require('./config');
 const i18n = require('./i18n');
 const { SubagentTracker, hasBlockingForegroundAgent, hasLiveDelegation } = require('./subagents');
+const { hasLiveBgTask } = require('./bg-task');
 const { trayGlance } = require('./tray-glance');
 const island = require('./island');
 const popover = require('./popover');
@@ -50,6 +51,10 @@ function delegatingNow(session) {
   // alors que le JSONL a vu la fin du tour, c'est une délégation, même si
   // aucune ligne d'agent n'est visible dans <session>/subagents/.
   if (session.presence && session.presence.status === 'busy') return true;
+  // Une TÂCHE de fond reconnue (build, tests — pas un serveur, pas une tâche
+  // anonyme) réveillera la session : c'est de la délégation aussi (Paul
+  // 2026-09-07). L'île la compte alors dans « ça bosse ».
+  if (hasLiveBgTask(watcher.bgTaskDetails(session))) return true;
   const dir = sessionDirFor(session);
   if (!dir) return false;
   return hasLiveDelegation(
@@ -783,11 +788,14 @@ function serializeSession(session) {
   // Overrides de présentation (réutilisent les scans déjà faits ci-dessus) :
   //  - bloquée sur un agent foreground → running, pas pending/orange ;
   //  - tour fini mais délégués au travail → delegating, pas waiting/« Inactif ».
+  const bgTasks = watcher.bgTaskDetails(session);
   let state = session.state;
   if (state.name === 'pending' && hasBlockingForegroundAgent(subagents)) {
     state = STATES.RUNNING;
   } else if (state.name === 'waiting'
-      && ((session.presence && session.presence.status === 'busy') || hasLiveDelegation(subagents, workflows))) {
+      && ((session.presence && session.presence.status === 'busy')
+        || hasLiveBgTask(bgTasks)
+        || hasLiveDelegation(subagents, workflows))) {
     state = STATES.DELEGATING;
   }
 
@@ -821,7 +829,7 @@ function serializeSession(session) {
     // ouverture) → chips « serveur » / « en fond » + tooltips, sous-lignes de
     // l'île. Vide quand seule la présence CLI (`shell`) signale un fond :
     // le renderer retombe sur le chip générique.
-    bgTasks: watcher.bgTaskDetails(session),
+    bgTasks,
     // Présence CLI : menu/dialogue local ouvert (chip vert, pas d'action) et
     // libellé brut du dialogue bloquant (tooltip du badge pending).
     dialogOpen: !!session.dialogOpen,

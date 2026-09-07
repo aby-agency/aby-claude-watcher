@@ -33,6 +33,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   fond » et son anneau. Le survol montre la description écrite par Claude,
   la commande et l'heure de lancement (et « parquée après timeout » quand
   la commande n'a pas été mise en fond exprès). Même distinction dans l'île.
+- **Une session qui attend son build n'est plus « Inactif ».** Un tour fini
+  pendant qu'une tâche de fond reconnue tourne encore passe en « Délégation »
+  (cyan), comme pour les agents : la tâche réveillera la session, et l'île la
+  compte dans « ça bosse ». Un serveur laissé tourner, ou une tâche dont on ne
+  sait rien, laisse la carte « Inactif » : on ne prétend pas que ça travaille
+  sans preuve.
 
 ### Fixed
 - Une session passée en arrière-plan (`Ctrl+B`, `/background`) n'affiche

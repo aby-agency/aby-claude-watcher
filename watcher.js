@@ -646,6 +646,9 @@ class SessionWatcher extends EventEmitter {
       command,
       since: opening.at,
       deliberate: opening.deliberate,
+      // Fiche établie depuis le JSONL (≠ tâche anonyme sans tool_use connu) :
+      // seule une fiche vaut preuve pour l'état « Délégation » (hasLiveBgTask).
+      known: true,
     };
   }
 
@@ -1246,7 +1249,7 @@ class SessionWatcher extends EventEmitter {
     if (!session || !session.bgTasks || !session.bgTasks.size) return [];
     const info = session.bgTaskInfo || new Map();
     return [...session.bgTasks].map((id) => info.get(id)
-      || { id, kind: 'task', description: '', command: '', since: null, deliberate: true });
+      || { id, kind: 'task', description: '', command: '', since: null, deliberate: true, known: false });
   }
 
   startWaitingTimer(sessionId, isInitial) {

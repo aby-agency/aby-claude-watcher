@@ -67,4 +67,15 @@ function bgTaskOpening(event) {
   };
 }
 
-module.exports = { classifyBgCommand, bgTaskOpening, SERVER_PATTERNS };
+// Un tour fini pendant qu'une TÂCHE de fond (build, tests…) tourne encore n'est
+// pas de l'inactivité : elle réveillera la session → « Délégation », comme les
+// agents (décision Paul 2026-09-07, révise l'arbitrage v2.8.0 pris quand on ne
+// savait pas distinguer un build d'un serveur). Un SERVEUR ne compte pas (la
+// conversation est vraiment libre), et une tâche SANS fiche non plus : sans
+// preuve, on ne prétend pas « ça tourne sans toi » — c'est le mensonge de
+// l'ex-état `job` (un serveur ne « complète » jamais) qu'on ne ressuscite pas.
+function hasLiveBgTask(details) {
+  return Array.isArray(details) && details.some((b) => b && b.known === true && b.kind === 'task');
+}
+
+module.exports = { classifyBgCommand, bgTaskOpening, hasLiveBgTask, SERVER_PATTERNS };

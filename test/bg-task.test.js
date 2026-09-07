@@ -2,7 +2,7 @@
 // serveur (tourne sans fin, ne « bosse » pas) vs tâche (finira).
 // Run via `node test/bg-task.test.js`.
 const assert = require('assert');
-const { classifyBgCommand, bgTaskOpening } = require('../bg-task');
+const { classifyBgCommand, bgTaskOpening, hasLiveBgTask } = require('../bg-task');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -89,6 +89,22 @@ test('sans backgroundTaskId → null ; sans tool_use_id → toolUseId null, at n
   assert.strictEqual(bgTaskOpening({ type: 'assistant', toolUseResult: { backgroundTaskId: 'x' } }), null);
   const o = bgTaskOpening({ type: 'user', message: { content: 'texte' }, toolUseResult: { backgroundTaskId: 'b3' } });
   assert.deepStrictEqual(o, { id: 'b3', toolUseId: null, at: null, deliberate: true });
+});
+
+console.log('\nhasLiveBgTask:');
+test('tâche reconnue (fiche) → délégation', () => {
+  assert.strictEqual(hasLiveBgTask([{ kind: 'task', known: true }]), true);
+  assert.strictEqual(hasLiveBgTask([{ kind: 'server', known: true }, { kind: 'task', known: true }]), true);
+});
+test('serveur seul → pas de délégation (la conversation est libre)', () => {
+  assert.strictEqual(hasLiveBgTask([{ kind: 'server', known: true }]), false);
+});
+test('tâche sans fiche (anonyme) → pas de délégation, on ne prétend rien', () => {
+  assert.strictEqual(hasLiveBgTask([{ kind: 'task', known: false }]), false);
+});
+test('liste vide / non liste → false', () => {
+  assert.strictEqual(hasLiveBgTask([]), false);
+  assert.strictEqual(hasLiveBgTask(null), false);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

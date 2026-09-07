@@ -1137,6 +1137,15 @@ class SessionWatcher extends EventEmitter {
       return;
     }
     const timer = setTimeout(() => {
+      // Le CLI dit busy alors que le JSONL a vu end_turn : des délégués
+      // (agents en arrière-plan, teammates, workflow) travaillent encore et
+      // réveilleront la session. On reste running ; la présence idle fera
+      // la transition (applyPresence). Sans présence : chemin historique.
+      const s = this.sessions.get(sessionId);
+      if (s && s.presence && s.presence.status === 'busy') {
+        log.info(`[state] ${sessionId.slice(0, 8)} end_turn ignoré (presence busy)`);
+        return;
+      }
       // Le trigger distingue dans main.log un tour vraiment fini d'un tour
       // suspendu à une tâche de fond (même état waiting, notif mutée).
       this.setState(sessionId, STATES.WAITING, false,

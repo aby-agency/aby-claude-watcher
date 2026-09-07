@@ -859,6 +859,29 @@ test('présence idle après un mute : la bannière tardive respecte encore un bg
   if (s.presenceMuted !== false) throw new Error('presenceMuted must still clear even when the late banner is skipped');
 });
 
+test('end_turn JSONL avec présence busy → reste running ; présence idle ensuite → waiting', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.startedAt = Date.now() - 5_000;
+  w.sessions.set('et-1', makeSession('et-1', {
+    state: STATES.RUNNING,
+    presence: { status: 'busy', waitingFor: undefined, statusUpdatedAt: Date.now() - 1_000 },
+    shellBusy: false, dialogOpen: false, waitingFor: null, presenceMuted: false,
+  }));
+  w.startWaitingTimer('et-1', false);
+  await sleep(2_300); // WAITING_DELAY = 2000
+  if (w.sessions.get('et-1').state.name !== 'running') throw new Error('end_turn must be ignored while presence is busy');
+  w.applyPresence('et-1', { status: 'idle', statusUpdatedAt: Date.now(), updatedAt: Date.now() });
+  if (w.sessions.get('et-1').state.name !== 'waiting') throw new Error('presence idle must release to waiting');
+});
+
+test('end_turn JSONL sans présence → waiting comme avant', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('et-2', makeSession('et-2', { state: STATES.RUNNING, presence: null }));
+  w.startWaitingTimer('et-2', false);
+  await sleep(2_300);
+  if (w.sessions.get('et-2').state.name !== 'waiting') throw new Error('legacy path must still reach waiting');
+});
+
 // ─── readNewLines (lignes partielles) ──────────────────
 section('readNewLines (lignes partielles):');
 

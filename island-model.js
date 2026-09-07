@@ -129,8 +129,8 @@ function bgGroups(list, count) {
   const items = Array.isArray(list) ? list : [];
   if (!items.length) return count > 0 ? [{ kind: 'task', count, title: '' }] : [];
   const out = [];
-  for (const kind of ['server', 'task']) {
-    const of = items.filter((b) => (b.kind === 'server' ? 'server' : 'task') === kind);
+  for (const kind of ['server', 'waiter', 'task']) {
+    const of = items.filter((b) => (b.kind === 'server' || b.kind === 'waiter' ? b.kind : 'task') === kind);
     if (!of.length) continue;
     out.push({
       kind,

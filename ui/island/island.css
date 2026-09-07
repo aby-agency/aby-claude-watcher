@@ -345,6 +345,8 @@ body.expanded .panel-inner {
 /* Serveur (site / watcher laissé tourner) : glyphe terminal statique à la place
    du spinner — même largeur que .subrow-spin (7px + gap) pour aligner les
    libellés. */
+/* Veille : le glyphe horloge n'est pas monospace, on le laisse à sa largeur. */
+.subrow-waiter .subrow-term { width: auto; font-family: inherit; font-size: 8px; }
 .subrow-term { width: 7px; flex: none; font-size: 9px; font-weight: 700; font-family: var(--font-mono); line-height: 1; }
 .subrow-spin {
   width: 7px; height: 7px; border-radius: 50%; flex: none;

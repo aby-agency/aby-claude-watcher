@@ -4,7 +4,7 @@ const os = require('os');
 const { EventEmitter } = require('events');
 const { log, DEBUG } = require('./logger');
 const { readPresence, presenceDecision } = require('./presence');
-const { classifyBgCommand, bgTaskOpening } = require('./bg-task');
+const { classifyBgCommand, bgTaskOpening, hasLiveBgTask } = require('./bg-task');
 
 // Nombre de tool_use Bash récents gardés par session pour relier une tâche de
 // fond (tool_result avec backgroundTaskId) à sa description/commande.
@@ -1284,6 +1284,22 @@ class SessionWatcher extends EventEmitter {
       || { id, kind: 'task', description: '', command: '', since: null, deliberate: true, known: false });
   }
 
+  // Ce qui, parmi les process de fond ouverts, justifie de taire la notif
+  // « Inactif » — et rien d'autre. Seul ce qui TRAVAILLE réveillera la session :
+  // un serveur laissé tourner (npm run dev) ou un veilleur (`until … sleep`)
+  // ne la réveillera jamais, et muter dessus rendait la session sourde jusqu'au
+  // garde-fou 45 min (aby-landing 2026-09-07 : « Délégation · 25 min » alors
+  // que le build attendu avait fini en erreur 40 min plus tôt, et la boucle
+  // pollait un fichier mort). Une ouverture SANS fiche reste mutée : sans
+  // preuve on garde le filet plutôt que de risquer le spam TrainBox — même
+  // prudence que hasLiveBgTask côté état.
+  bgMuteReason(session) {
+    const details = this.bgTaskDetails(session);
+    if (hasLiveBgTask(details)) return 'tâche de fond ouverte';
+    if (details.some((b) => !b.known)) return 'bg process non identifié';
+    return null;
+  }
+
   startWaitingTimer(sessionId, isInitial) {
     this.clearWaitingTimer(sessionId);
     if (isInitial) {
@@ -1383,7 +1399,7 @@ class SessionWatcher extends EventEmitter {
     // bannière tardive, une seule fois (même logique que purgeStaleBgTasks).
     if (presence.status === 'idle') {
       if (session.presenceMuted && session.state.name === 'waiting' && !decision.target && !decision.silent
-          && !this.hasOpenBgTask(sessionId)) {
+          && !this.bgMuteReason(session)) {
         log.info(`[notif] ${sessionId.slice(0, 8)} mute levé (presence idle)`);
         this.maybeNotifyWaiting(sessionId, session);
       }
@@ -1438,9 +1454,14 @@ class SessionWatcher extends EventEmitter {
       // (spam TrainBox du 2026-07-25 ; arbitrage Paul 2026-07-27 : badge vert +
       // chip, silence tant qu'un bg est ouvert). Une permission (pending)
       // notifie, elle : action requise, bg ou pas.
+      // Le mute est cadré par bgMuteReason : seul ce qui TRAVAILLE justifie le
+      // silence. Présence `shell` sans la moindre fiche = Bash de fond qu'on
+      // n'a pas vu passer (ouverture hors tail) → filet ; dès qu'on a des
+      // fiches, bgMuteReason tranche seul.
+      const bgMute = newState.name === 'waiting' ? this.bgMuteReason(session) : null;
       const muteReason = newState.name !== 'waiting' ? null
-        : this.hasOpenBgTask(sessionId) ? 'bg process ouvert'
-        : session.shellBusy ? 'presence shell'
+        : bgMute ? bgMute
+        : (session.shellBusy && !this.hasOpenBgTask(sessionId)) ? 'presence shell'
         : session.dialogOpen ? 'presence dialog open'
         : (session.presence && session.presence.status === 'busy') ? 'presence busy'
         : null;

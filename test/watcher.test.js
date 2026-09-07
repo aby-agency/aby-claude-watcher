@@ -989,6 +989,44 @@ test('parquée après timeout → deliberate false, kind task ; fermeture purge 
   if (s.bgTaskInfo.size !== 0) throw new Error('bgTaskInfo should be empty');
 });
 
+// Le mute « bg ouvert » ne vaut que pour ce qui TRAVAILLE : un serveur ou un
+// veilleur ne réveillera jamais la session, se taire dessus la rendait sourde
+// jusqu'au garde-fou 45 min (aby-landing 2026-09-07).
+test('serveur seul ouvert → la notif « Inactif » part quand même', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('bg-n1', makeSession('bg-n1', { state: STATES.RUNNING, recentBash: new Map(), bgTaskInfo: new Map() }));
+  const notified = [];
+  w.on('session-waiting', (s) => notified.push(s.sessionId));
+  w.processEvent('bg-n1', bashToolUse('tu1', 'Serveur dev', 'npm run dev', { run_in_background: true }), false);
+  w.processEvent('bg-n1', bgOpenResult('tu1', 'srv1'), false);
+  w.processEvent('bg-n1', endTurnEv(), false);
+  await sleep(2200);
+  if (w.sessions.get('bg-n1').state.name !== 'waiting') throw new Error('un serveur ouvert laisse waiting');
+  if (notified.length !== 1) throw new Error(`serveur ouvert ≠ silence, ${notified.length} notif(s)`);
+});
+
+test('veilleur seul ouvert → notif émise ; la tâche qu\'il attend la tait', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('bg-n2', makeSession('bg-n2', { state: STATES.RUNNING, recentBash: new Map(), bgTaskInfo: new Map() }));
+  const notified = [];
+  w.on('session-waiting', (s) => notified.push(s.sessionId));
+  // Le build tourne : le veilleur est légitime, la session ne t'attend pas.
+  w.processEvent('bg-n2', bashToolUse('tu1', 'Build', 'npm run build', { run_in_background: true }), false);
+  w.processEvent('bg-n2', bgOpenResult('tu1', 'build1'), false);
+  w.processEvent('bg-n2', bashToolUse('tu2', 'Attendre la fin du build', 'until [ -f /tmp/out ]; do sleep 5; done; cat /tmp/out', { run_in_background: true }), false);
+  w.processEvent('bg-n2', bgOpenResult('tu2', 'wait1'), false);
+  w.processEvent('bg-n2', endTurnEv(), false);
+  await sleep(2200);
+  if (notified.length !== 0) throw new Error(`build en cours → silence, ${notified.length} notif(s)`);
+  const [srv, wait] = w.bgTaskDetails(w.sessions.get('bg-n2'));
+  if (srv.kind !== 'task' || wait.kind !== 'waiter') throw new Error(`kinds: ${srv.kind}/${wait.kind}`);
+  // Le build se termine : il ne reste que le veilleur, qui attend dans le vide.
+  w.processEvent('bg-n2', { type: 'user', message: { content: '<task-notification><task-id>build1</task-id><status>failed</status></task-notification>' } }, false);
+  w.processEvent('bg-n2', endTurnEv(), false);
+  await sleep(2200);
+  if (notified.length !== 1) throw new Error(`veilleur seul → notif attendue, ${notified.length} émise(s)`);
+});
+
 test('tâche sans fiche (tool_use hors fenêtre) → détail anonyme kind task, compte cohérent', () => {
   const w = new SessionWatcher(makeMockConfig());
   w.sessions.set('bg-3', makeSession('bg-3', { bgTasks: new Set(['orphan']) }));

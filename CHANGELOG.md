@@ -4,6 +4,28 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0] — 2026-09-07
+
+### Fixed
+- **Une session qui t'attend ne s'affiche plus « Délégation ».** Claude Code
+  pose souvent une boucle d'attente en tâche de fond (« attendre la fin du
+  build ») ; si la chose attendue meurt ou finit en erreur, la boucle tourne
+  pour l'éternité et la session restait cyan, muette, jusqu'au garde-fou de
+  45 minutes. Deux cas vivants le jour de la sortie : une attente d'un build
+  Next terminé en erreur 40 min plus tôt, et une attente de Terraform dont le
+  test se comptait lui-même. Ces veilles sont désormais reconnues : la carte
+  redit « Inactif » et la notification part.
+- **Un serveur de dev laissé tourner ne rend plus sa session muette.** Le
+  silence des notifications ne vaut plus que pour ce qui travaille vraiment
+  (un build, des tests) — un `npm run dev` ouvert coupait toutes les
+  notifications de sa session jusqu'au garde-fou. Une tâche de fond non
+  identifiée reste muette, par prudence.
+
+### Added
+- Chip gris « N attente(s) » avec glyphe `◷`, à côté de « N serveur(s) » et
+  « N tâche(s) » : ça tourne, mais ça n'avance pas. Visible sur les cartes et
+  dans l'île ; le tooltip donne la commande.
+
 ## [2.13.0] — 2026-09-07
 
 ### Changed

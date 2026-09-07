@@ -44,14 +44,19 @@ function rowHtml(row) {
     <div class="subrow subrow-more">
       <span class="subrow-label">${esc(window.i18n.t('island_more_agents', { n: row.subagentsMore }))}</span>
     </div>` : '') + (row.bgGroups || []).map((g) => {
-      // Serveur : glyphe terminal statique (ça tourne, ça ne bosse pas) ;
-      // tâche : spinner. Tooltip = descriptions/commandes.
+      // Serveur (glyphe terminal) et veille (glyphe horloge) : statiques et
+      // gris, ça tourne sans avancer. Tâche : spinner cyan, ça travaille.
+      // Tooltip = descriptions/commandes.
       const server = g.kind === 'server';
-      const key = server ? 'server_chip' : 'bg_chip';
+      const waiter = g.kind === 'waiter';
+      const key = server ? 'server_chip' : waiter ? 'waiter_chip' : 'bg_chip';
       const label = window.i18n.t(g.count > 1 ? key + '_n' : key, { n: g.count });
+      const cls = server ? 'subrow-server' : waiter ? 'subrow-server subrow-waiter' : 'subrow-bg';
       return `
-    <div class="subrow ${server ? 'subrow-server' : 'subrow-bg'}"${g.title ? ` title="${escAttr(g.title)}"` : ''}>
-      ${server ? '<span class="subrow-term">&gt;_</span>' : '<span class="subrow-spin"></span>'}
+    <div class="subrow ${cls}"${g.title ? ` title="${escAttr(g.title)}"` : ''}>
+      ${server ? '<span class="subrow-term">&gt;_</span>'
+        : waiter ? '<span class="subrow-term">◷</span>'
+        : '<span class="subrow-spin"></span>'}
       <span class="subrow-label">${esc(label)}</span>
     </div>`;
     }).join('');

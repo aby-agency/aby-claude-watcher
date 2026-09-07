@@ -241,6 +241,19 @@ test('bgGroups : serveur puis tâches, comptes et titres', () => {
     { kind: 'task', count: 2, title: 'Build DMG · npm test' },
   ]);
 });
+test('bgGroups : la veille a son groupe, entre le serveur et les tâches', () => {
+  const bgTasks = [
+    { id: 'a', kind: 'task', description: 'Build DMG', command: 'npm run build' },
+    { id: 'b', kind: 'waiter', description: 'Attendre la fin du build', command: 'until [ -f x ]; do sleep 5; done' },
+    { id: 'c', kind: 'server', description: 'Dev', command: 'npm run dev' },
+  ];
+  const m = buildIsland([sess('waiting', { bgTaskCount: 3, bgTasks })], {});
+  assertEq(m.rows[0].bgGroups, [
+    { kind: 'server', count: 1, title: 'Dev' },
+    { kind: 'waiter', count: 1, title: 'Attendre la fin du build' },
+    { kind: 'task', count: 1, title: 'Build DMG' },
+  ]);
+});
 test('bgGroups : compte sans fiche (présence CLI seule) → une tâche anonyme', () => {
   const m = buildIsland([sess('waiting', { bgTaskCount: 1, bgTasks: [] })], {});
   assertEq(m.rows[0].bgGroups, [{ kind: 'task', count: 1, title: '' }]);

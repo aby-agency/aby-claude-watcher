@@ -806,6 +806,10 @@ body.micro-mode .uring-text { font-size: 9px; }
 /* Serveur en gris ardoise, tâche en cyan (famille « Délégation », ça travaille
    et ça réveillera la session) — deux couleurs pour deux natures (Paul). */
 .bg-chip.server-chip { background: rgba(148, 163, 184, 0.14); color: #94a3b8; }
+/* Veille (`until … sleep`, wait-on) : même gris que le serveur — ça tourne,
+   mais ça n'avance pas, donc surtout pas de cyan. Le glyphe horloge n'est pas
+   monospace : un poil plus large que le `>_` pour aligner les libellés. */
+.bg-chip.waiter-chip .bg-term { font-family: inherit; font-size: 11px; letter-spacing: 0; }
 
 /* Chip « Dialogue ouvert » : même gabarit que bg-chip, teinte verte alignée
    sur le badge waiting — un menu ouvert n'appelle aucune action. Décliné sur

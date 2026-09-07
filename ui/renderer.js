@@ -975,7 +975,8 @@ function bgChipHTML(s) {
   if (!s.bgTaskCount) return '';
   const list = Array.isArray(s.bgTasks) ? s.bgTasks : [];
   const servers = list.filter((b) => b.kind === 'server');
-  const tasks = list.filter((b) => b.kind !== 'server');
+  const waiters = list.filter((b) => b.kind === 'waiter');
+  const tasks = list.filter((b) => b.kind !== 'server' && b.kind !== 'waiter');
   // Présence CLI seule (pas de fiche) : chip générique, compte tel quel.
   if (!list.length) tasks.length = 0;
   const taskN = list.length ? tasks.length : s.bgTaskCount;
@@ -984,6 +985,12 @@ function bgChipHTML(s) {
   if (servers.length) {
     const label = t(servers.length > 1 ? 'server_chip_n' : 'server_chip', { n: servers.length });
     html += `<span class="bg-chip server-chip" title="${escAttr(bgTaskTitle(servers))}"><span class="bg-term">&gt;_</span>${esc(label)}</span>`;
+  }
+  // Veille : ça tourne mais ça n'avance pas — même gris statique que le
+  // serveur, le cyan est réservé à ce qui travaille.
+  if (waiters.length) {
+    const label = t(waiters.length > 1 ? 'waiter_chip_n' : 'waiter_chip', { n: waiters.length });
+    html += `<span class="bg-chip server-chip waiter-chip" title="${escAttr(bgTaskTitle(waiters))}"><span class="bg-term">◷</span>${esc(label)}</span>`;
   }
   if (taskN) {
     const label = t(taskN > 1 ? 'bg_chip_n' : 'bg_chip', { n: taskN });

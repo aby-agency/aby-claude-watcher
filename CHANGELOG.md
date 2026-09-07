@@ -22,6 +22,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   est ouvert dans la session ; jamais ambre, jamais de bannière.
 - Tooltip du badge « Action requise » : nature du dialogue (permission,
   elicitation MCP, sandbox, message d'une autre session…).
+- Le chip des tâches Bash de fond s'appelle désormais « en fond » (« 2 en
+  fond » au pluriel, ex-« N bg process ») et porte un anneau qui tourne : on
+  voit que ça travaille. L'île le montre aussi, en sous-ligne cyan sous la
+  session, comme les agents.
 
 ### Fixed
 - Une session passée en arrière-plan (`Ctrl+B`, `/background`) n'affiche

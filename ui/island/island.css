@@ -337,6 +337,9 @@ body.expanded .panel-inner {
   font-size: 11px; color: #8b93a7;
 }
 .subrow-wf { color: var(--state-thinking); }
+/* Tâche Bash de fond encore ouverte : même teinte cyan que le chip « en fond »
+   du dashboard (famille « ça tourne sans toi »). */
+.subrow-bg { color: var(--state-job, #06b6d4); }
 .subrow-spin {
   width: 7px; height: 7px; border-radius: 50%; flex: none;
   border: 1.5px solid currentColor;

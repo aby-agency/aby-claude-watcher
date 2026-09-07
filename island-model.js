@@ -151,6 +151,10 @@ function buildIsland(sessions, config, now) {
     state: s.state.name,
     minutes: minutesSince(s.stateSince, nowMs),
     isBackground: !!s.isBackground,
+    // Tâches Bash de fond encore ouvertes (JSONL, ou 1 si la présence CLI dit
+    // `shell`) → sous-ligne « en fond » avec spinner, même gabarit que les
+    // agents : on voit que ça bosse encore là-dessous (demande Paul 2026-09-07).
+    bgTaskCount: s.bgTaskCount || 0,
     // Sous-lignes : subagents actifs + runs de workflow (déjà filtrés
     // « running » par serializeSession).
     subagents: (s.subagents || []).slice(0, ISLAND_MAX_SUBROWS).map((sa) => ({

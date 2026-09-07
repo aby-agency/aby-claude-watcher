@@ -775,6 +775,18 @@ body.micro-mode .uring-text { font-size: 9px; }
   white-space: nowrap;
 }
 .compact-card-row .bg-chip { margin-left: 0; padding: 1px 6px; }
+/* Spinner du chip « en fond » : même anneau que le badge d'état et les
+   sous-lignes d'agents de l'île (bordure en arc, currentColor) — pas de SVG,
+   le motif existe déjà partout dans l'app. Seul le chip bg tourne : un
+   dialogue ouvert ou Chrome n'est pas du travail en cours. */
+.bg-chip .bg-spin {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  margin-right: 5px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent; border-right-color: transparent;
+  box-sizing: border-box;
+  animation: spin 0.8s linear infinite;
+}
 
 /* Chip « Dialogue ouvert » : même gabarit que bg-chip, teinte verte alignée
    sur le badge waiting — un menu ouvert n'appelle aucune action. Décliné sur

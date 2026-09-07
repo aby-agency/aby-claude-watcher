@@ -938,12 +938,15 @@ function stateSinceTitle(s) {
   return ` title="${escAttr(parts.join(' — '))}"`;
 }
 
-// Chip « N bg process » : des tâches Bash `run_in_background` sont encore
+// Chip « en fond » : des tâches Bash `run_in_background` sont encore
 // ouvertes. Orthogonal à l'état — la conversation est dispo (waiting), seul le
 // process tourne encore ; les notifs sont mutées côté watcher tant qu'il vit.
+// Spinner dans le chip (demande Paul 2026-09-07 : montrer que ça bosse) ;
+// compteur seulement au pluriel — la présence CLI ne dit que « au moins un ».
 function bgChipHTML(s) {
   if (!s.bgTaskCount) return '';
-  return `<span class="bg-chip">${t('bg_chip').replace('{n}', s.bgTaskCount)}</span>`;
+  const label = s.bgTaskCount > 1 ? t('bg_chip_n', { n: s.bgTaskCount }) : t('bg_chip');
+  return `<span class="bg-chip"><span class="bg-spin"></span>${esc(label)}</span>`;
 }
 
 // Chip « Dialogue ouvert » : le CLI signale un menu/dialogue local ouvert

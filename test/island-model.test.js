@@ -22,6 +22,7 @@ function sess(state, opts = {}) {
     lastEventTime: opts.lastEventTime !== undefined ? opts.lastEventTime : NOW - 120000,
     startedAt: new Date(NOW - (opts.age || n) * 60000).toISOString(),
     stateSince: opts.stateSince !== undefined ? opts.stateSince : null,
+    ...(opts.bgTaskCount !== undefined && { bgTaskCount: opts.bgTaskCount }),
   };
 }
 
@@ -212,6 +213,19 @@ test('pourcentage borné 0-100', () => {
 test('sans DMG pour cette architecture : bannière informative, canInstall false', () => {
   const n = updateNotice({ current: '2.5.0', latest: '2.6.0', canInstall: false, url: 'https://x' });
   assertEq([n.showBanner, n.canInstall, n.url], [true, false, 'https://x']);
+});
+
+console.log('\nbuildIsland — tâches de fond:');
+// Sous-ligne « en fond » sous la session : même gabarit que les agents /
+// workflows (spinner + libellé). Le compte vient de serializeSession
+// (bgTaskCount : JSONL, ou 1 si la présence CLI dit `shell`).
+test('bgTaskCount transmis tel quel sur la rangée, 0 par défaut', () => {
+  const m = buildIsland([sess('waiting', { bgTaskCount: 2 }), sess('waiting')], {});
+  assertEq(m.rows.map((r) => r.bgTaskCount), [2, 0]);
+});
+test('bgTaskCount présent aussi sur les rangées headless', () => {
+  const m = buildIsland([sess('waiting', { bg: true, bgTaskCount: 1 })], {});
+  assertEq(m.backgroundRows[0].bgTaskCount, 1);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

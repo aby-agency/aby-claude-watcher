@@ -4,6 +4,33 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **L'état de la carte vient désormais de Claude Code lui-même.** Le CLI
+  (≥ 2.1.260) publie sa présence dans `~/.claude/sessions/<pid>.json`
+  (`busy` / `idle` / `waiting` / `shell`) ; le watcher s'y fie pour
+  Inactif / Action requise / bg process, et ne déduit plus ces états du
+  seul journal de transcript. Conséquences : plus de pending fantôme, un
+  tour rendu pendant que des agents en arrière-plan travaillent reste
+  « Délégation » (ce que Claude Code fait par défaut depuis 2.1.232), et un
+  prompt de permission est restauré au redémarrage sans ancre locale.
+  Un CLI plus ancien garde le comportement précédent.
+
+### Added
+- Chip vert « Dialogue ouvert » quand un menu local (`/model`, `/config`…)
+  est ouvert dans la session ; jamais ambre, jamais de bannière.
+- Tooltip du badge « Action requise » : nature du dialogue (permission,
+  elicitation MCP, sandbox, message d'une autre session…).
+
+### Fixed
+- Une session passée en arrière-plan (`Ctrl+B`, `/background`) n'affiche
+  plus de carte figée pour l'original « parked » ; les workers pré-chauffés
+  de `claude agents` n'apparaissent plus.
+- Une bannière « Inactif » qui avait été tue pendant une délégation ou un
+  shell de fond ne part plus si une tâche Bash de fond est encore ouverte
+  au moment où le CLI redevient idle.
+
 ## [2.12.1] — 2026-09-02
 
 ### Fixed

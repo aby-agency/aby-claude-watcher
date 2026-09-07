@@ -43,11 +43,18 @@ function rowHtml(row) {
     </div>`).join('') + (row.subagentsMore > 0 ? `
     <div class="subrow subrow-more">
       <span class="subrow-label">${esc(window.i18n.t('island_more_agents', { n: row.subagentsMore }))}</span>
-    </div>` : '') + (row.bgTaskCount > 0 ? `
-    <div class="subrow subrow-bg">
-      <span class="subrow-spin"></span>
-      <span class="subrow-label">${esc(row.bgTaskCount > 1 ? window.i18n.t('bg_chip_n', { n: row.bgTaskCount }) : window.i18n.t('bg_chip'))}</span>
-    </div>` : '');
+    </div>` : '') + (row.bgGroups || []).map((g) => {
+      // Serveur : glyphe terminal statique (ça tourne, ça ne bosse pas) ;
+      // tâche : spinner. Tooltip = descriptions/commandes.
+      const server = g.kind === 'server';
+      const key = server ? 'server_chip' : 'bg_chip';
+      const label = g.count > 1 ? window.i18n.t(key + '_n', { n: g.count }) : window.i18n.t(key);
+      return `
+    <div class="subrow subrow-bg"${g.title ? ` title="${escAttr(g.title)}"` : ''}>
+      ${server ? '<span class="subrow-term">&gt;_</span>' : '<span class="subrow-spin"></span>'}
+      <span class="subrow-label">${esc(label)}</span>
+    </div>`;
+    }).join('');
   return `
     <div class="row" data-session="${escAttr(row.sessionId)}" data-bg="${row.isBackground ? '1' : ''}">
       <span class="led${row.isBackground ? ' bg' : ''}" data-state="${escAttr(row.state)}"></span>

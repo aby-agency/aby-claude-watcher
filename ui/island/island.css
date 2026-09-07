@@ -340,6 +340,10 @@ body.expanded .panel-inner {
 /* Tâche Bash de fond encore ouverte : même teinte cyan que le chip « en fond »
    du dashboard (famille « ça tourne sans toi »). */
 .subrow-bg { color: var(--state-job, #06b6d4); }
+/* Serveur (site / watcher laissé tourner) : glyphe terminal statique à la place
+   du spinner — même largeur que .subrow-spin (7px + gap) pour aligner les
+   libellés. */
+.subrow-term { width: 7px; flex: none; font-size: 9px; font-weight: 700; font-family: var(--font-mono); line-height: 1; }
 .subrow-spin {
   width: 7px; height: 7px; border-radius: 50%; flex: none;
   border: 1.5px solid currentColor;

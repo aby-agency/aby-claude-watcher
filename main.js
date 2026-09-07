@@ -817,6 +817,11 @@ function serializeSession(session) {
     // Compte JSONL quand il l'a vu ; sinon la présence CLI (`status: shell`)
     // dit « au moins une » → 1.
     bgTaskCount: (session.bgTasks && session.bgTasks.size) || (session.shellBusy ? 1 : 0),
+    // Fiches des tâches de fond (kind serveur/tâche, description, commande,
+    // ouverture) → chips « serveur » / « en fond » + tooltips, sous-lignes de
+    // l'île. Vide quand seule la présence CLI (`shell`) signale un fond :
+    // le renderer retombe sur le chip générique.
+    bgTasks: watcher.bgTaskDetails(session),
     // Présence CLI : menu/dialogue local ouvert (chip vert, pas d'action) et
     // libellé brut du dialogue bloquant (tooltip du badge pending).
     dialogOpen: !!session.dialogOpen,

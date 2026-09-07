@@ -23,6 +23,7 @@ function sess(state, opts = {}) {
     startedAt: new Date(NOW - (opts.age || n) * 60000).toISOString(),
     stateSince: opts.stateSince !== undefined ? opts.stateSince : null,
     ...(opts.bgTaskCount !== undefined && { bgTaskCount: opts.bgTaskCount }),
+    ...(opts.bgTasks !== undefined && { bgTasks: opts.bgTasks }),
   };
 }
 
@@ -226,6 +227,26 @@ test('bgTaskCount transmis tel quel sur la rangée, 0 par défaut', () => {
 test('bgTaskCount présent aussi sur les rangées headless', () => {
   const m = buildIsland([sess('waiting', { bg: true, bgTaskCount: 1 })], {});
   assertEq(m.backgroundRows[0].bgTaskCount, 1);
+});
+// Groupes par famille : serveur d'abord, puis tâches ; titres = descriptions.
+test('bgGroups : serveur puis tâches, comptes et titres', () => {
+  const bgTasks = [
+    { id: 'a', kind: 'task', description: 'Build DMG', command: 'npm run build' },
+    { id: 'b', kind: 'server', description: "Lancer l'app en mode dev", command: 'npm run dev' },
+    { id: 'c', kind: 'task', description: '', command: 'npm test' },
+  ];
+  const m = buildIsland([sess('waiting', { bgTaskCount: 3, bgTasks })], {});
+  assertEq(m.rows[0].bgGroups, [
+    { kind: 'server', count: 1, title: "Lancer l'app en mode dev" },
+    { kind: 'task', count: 2, title: 'Build DMG · npm test' },
+  ]);
+});
+test('bgGroups : compte sans fiche (présence CLI seule) → une tâche anonyme', () => {
+  const m = buildIsland([sess('waiting', { bgTaskCount: 1, bgTasks: [] })], {});
+  assertEq(m.rows[0].bgGroups, [{ kind: 'task', count: 1, title: '' }]);
+});
+test('bgGroups : rien sans tâche', () => {
+  assertEq(buildIsland([sess('waiting')], {}).rows[0].bgGroups, []);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

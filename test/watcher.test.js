@@ -948,6 +948,70 @@ test('F5 — worker spare qui réutilise le PID d\'une session déjà trackée �
 });
 
 // ─── readNewLines (lignes partielles) ──────────────────
+section('tâches de fond — fiches (serveur / tâche):');
+
+function bashToolUse(id, description, command, extra = {}) {
+  return { type: 'assistant', timestamp: '2026-09-07T10:00:00.000Z',
+    message: { model: 'claude-opus-5', stop_reason: 'tool_use', content: [{ type: 'tool_use', id, name: 'Bash', input: { description, command, ...extra } }] } };
+}
+function bgOpenResult(toolUseId, taskId, extraResult = {}) {
+  return { type: 'user', timestamp: '2026-09-07T10:00:05.000Z',
+    message: { content: [{ type: 'tool_result', tool_use_id: toolUseId, content: `Command running in background with ID: ${taskId}` }] },
+    toolUseResult: { backgroundTaskId: taskId, ...extraResult } };
+}
+
+test('trackBgTask relie la tâche au Bash qui l\'a lancée : kind, description, commande, since', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('bg-1', makeSession('bg-1', { recentBash: new Map(), bgTaskInfo: new Map() }));
+  const s = w.sessions.get('bg-1');
+  w.processEvent('bg-1', bashToolUse('tu1', "Lancer l'app en mode dev", 'npm run dev > /tmp/o 2>&1', { run_in_background: true }), false);
+  w.processEvent('bg-1', bgOpenResult('tu1', 'job1'), false);
+  const d = w.bgTaskDetails(s);
+  if (d.length !== 1) throw new Error(`expected 1 detail, got ${d.length}`);
+  const [b] = d;
+  if (b.kind !== 'server') throw new Error(`kind=${b.kind}`);
+  if (b.description !== "Lancer l'app en mode dev") throw new Error(`description=${b.description}`);
+  if (b.command !== 'npm run dev > /tmp/o 2>&1') throw new Error(`command=${b.command}`);
+  if (b.since !== Date.parse('2026-09-07T10:00:05.000Z')) throw new Error(`since=${b.since}`);
+  if (b.deliberate !== true) throw new Error('deliberate expected');
+});
+
+test('parquée après timeout → deliberate false, kind task ; fermeture purge la fiche', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('bg-2', makeSession('bg-2', { recentBash: new Map(), bgTaskInfo: new Map() }));
+  const s = w.sessions.get('bg-2');
+  w.processEvent('bg-2', bashToolUse('tu2', 'Suite de tests', 'npm test'), false);
+  w.processEvent('bg-2', bgOpenResult('tu2', 'job2', { timedOutAfterMs: 120000 }), false);
+  const [b] = w.bgTaskDetails(s);
+  if (b.kind !== 'task' || b.deliberate !== false) throw new Error(`kind=${b.kind} deliberate=${b.deliberate}`);
+  w.processEvent('bg-2', { type: 'user', message: { content: '<task-notification><task-id>job2</task-id><status>completed</status></task-notification>' } }, false);
+  if (w.bgTaskDetails(s).length !== 0) throw new Error('detail should be purged on close');
+  if (s.bgTaskInfo.size !== 0) throw new Error('bgTaskInfo should be empty');
+});
+
+test('tâche sans fiche (tool_use hors fenêtre) → détail anonyme kind task, compte cohérent', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('bg-3', makeSession('bg-3', { bgTasks: new Set(['orphan']) }));
+  const d = w.bgTaskDetails(w.sessions.get('bg-3'));
+  if (d.length !== 1 || d[0].kind !== 'task' || d[0].id !== 'orphan') throw new Error(JSON.stringify(d));
+});
+
+test('fastInitialLoad reconstruit les fiches depuis le tail (tool_use puis résultat)', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  const p = tmpJsonl('bgtail');
+  const lines = [
+    bashToolUse('tu9', 'Serveur de dev', 'npx vite --port 5173', { run_in_background: true }),
+    bgOpenResult('tu9', 'job9'),
+    { type: 'assistant', timestamp: '2026-09-07T10:00:06.000Z', message: { model: 'claude-opus-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] } },
+  ];
+  fs.writeFileSync(p, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  w.sessions.set('bg-9', makeSession('bg-9', { startedAt: new Date(Date.now() - 60_000).toISOString() }));
+  w.fastInitialLoad('bg-9', p);
+  const s = w.sessions.get('bg-9');
+  const d = w.bgTaskDetails(s);
+  if (d.length !== 1 || d[0].kind !== 'server' || d[0].description !== 'Serveur de dev') throw new Error(JSON.stringify(d));
+});
+
 section('readNewLines (lignes partielles):');
 
 function makeReadWatcher(events) {

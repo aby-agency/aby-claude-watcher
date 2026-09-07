@@ -943,10 +943,41 @@ function stateSinceTitle(s) {
 // process tourne encore ; les notifs sont mutées côté watcher tant qu'il vit.
 // Spinner dans le chip (demande Paul 2026-09-07 : montrer que ça bosse) ;
 // compteur seulement au pluriel — la présence CLI ne dit que « au moins un ».
+// Deux familles (retour Paul 2026-09-07) : « serveur » = site/watcher laissé
+// tourner exprès, icône terminal `>_` statique ; « en fond » = tâche qui
+// finira, spinner. Tooltip = description + commande + ouverture : la vérité
+// quand l'heuristique de bg-task.js se trompe d'icône.
+function bgTaskTitle(list) {
+  return list.map((b) => {
+    const parts = [];
+    if (b.description) parts.push(b.description);
+    if (b.command) parts.push(b.command.length > 90 ? b.command.slice(0, 87) + '…' : b.command);
+    if (typeof b.since === 'number') {
+      parts.push(t('bg_since', { t: new Date(b.since).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) }));
+    }
+    if (b.deliberate === false) parts.push(t('bg_parked'));
+    return parts.join(' — ');
+  }).join('\n');
+}
 function bgChipHTML(s) {
   if (!s.bgTaskCount) return '';
-  const label = s.bgTaskCount > 1 ? t('bg_chip_n', { n: s.bgTaskCount }) : t('bg_chip');
-  return `<span class="bg-chip"><span class="bg-spin"></span>${esc(label)}</span>`;
+  const list = Array.isArray(s.bgTasks) ? s.bgTasks : [];
+  const servers = list.filter((b) => b.kind === 'server');
+  const tasks = list.filter((b) => b.kind !== 'server');
+  // Présence CLI seule (pas de fiche) : chip générique, compte tel quel.
+  if (!list.length) tasks.length = 0;
+  const taskN = list.length ? tasks.length : s.bgTaskCount;
+  let html = '';
+  if (servers.length) {
+    const label = servers.length > 1 ? t('server_chip_n', { n: servers.length }) : t('server_chip');
+    html += `<span class="bg-chip server-chip" title="${escAttr(bgTaskTitle(servers))}"><span class="bg-term">&gt;_</span>${esc(label)}</span>`;
+  }
+  if (taskN) {
+    const label = taskN > 1 ? t('bg_chip_n', { n: taskN }) : t('bg_chip');
+    const title = tasks.length ? ` title="${escAttr(bgTaskTitle(tasks))}"` : '';
+    html += `<span class="bg-chip"${title}><span class="bg-spin"></span>${esc(label)}</span>`;
+  }
+  return html;
 }
 
 // Chip « Dialogue ouvert » : le CLI signale un menu/dialogue local ouvert

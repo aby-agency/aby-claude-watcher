@@ -120,6 +120,27 @@ const BUSY_STATES = ['running', 'thinking', 'delegating'];
 // Durée d'état des rangées du volet : minutes entières depuis stateSince,
 // null sous la minute (pas de « 0 min »). Champ `minutes` réintroduit —
 // retiré lors du compactage des rangées, il revient porté par stateSince.
+// Fiches de tâches de fond (serializeSession.bgTasks) → groupes par famille,
+// dans l'ordre serveur puis tâche : [{ kind, count, title }]. `title` = les
+// descriptions (ou commandes) jointes par « · », pour le tooltip de la
+// sous-ligne. Sans fiche mais avec un compte (présence CLI `shell` seule) :
+// une tâche anonyme. Pur, testé.
+function bgGroups(list, count) {
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) return count > 0 ? [{ kind: 'task', count, title: '' }] : [];
+  const out = [];
+  for (const kind of ['server', 'task']) {
+    const of = items.filter((b) => (b.kind === 'server' ? 'server' : 'task') === kind);
+    if (!of.length) continue;
+    out.push({
+      kind,
+      count: of.length,
+      title: of.map((b) => b.description || b.command || '').filter(Boolean).join(' · '),
+    });
+  }
+  return out;
+}
+
 function minutesSince(sinceMs, now) {
   if (typeof sinceMs !== 'number' || !isFinite(sinceMs)) return null;
   const m = Math.floor((now - sinceMs) / 60000);
@@ -155,6 +176,10 @@ function buildIsland(sessions, config, now) {
     // `shell`) → sous-ligne « en fond » avec spinner, même gabarit que les
     // agents : on voit que ça bosse encore là-dessous (demande Paul 2026-09-07).
     bgTaskCount: s.bgTaskCount || 0,
+    // Regroupées par famille pour une sous-ligne par famille : serveur (site /
+    // watcher laissé tourner, glyphe terminal statique) et tâche (spinner).
+    // Sans fiche (présence CLI seule) : une tâche anonyme, comme le chip.
+    bgGroups: bgGroups(s.bgTasks, s.bgTaskCount || 0),
     // Sous-lignes : subagents actifs + runs de workflow (déjà filtrés
     // « running » par serializeSession).
     subagents: (s.subagents || []).slice(0, ISLAND_MAX_SUBROWS).map((sa) => ({

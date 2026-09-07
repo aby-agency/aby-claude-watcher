@@ -787,6 +787,13 @@ body.micro-mode .uring-text { font-size: 9px; }
   box-sizing: border-box;
   animation: spin 0.8s linear infinite;
 }
+/* Chip « serveur » : un site / watcher laissé tourner exprès — icône terminal
+   `>_` STATIQUE (ça tourne, ça ne « bosse » pas), même teinte que « en fond ».
+   Distinction demandée par Paul 2026-09-07 : deux sessions « en fond » se
+   ressemblaient alors que l'une servait un site et l'autre attendait un build. */
+.bg-chip .bg-term {
+  margin-right: 5px; font-weight: 700; letter-spacing: -0.5px; text-transform: none;
+}
 
 /* Chip « Dialogue ouvert » : même gabarit que bg-chip, teinte verte alignée
    sur le badge waiting — un menu ouvert n'appelle aucune action. Décliné sur

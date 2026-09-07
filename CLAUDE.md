@@ -16,6 +16,13 @@ npm run build    # DMG — REQUIERT Node ≥ 20.19 (cf. .nvmrc: 22)
 > `require()` casse (`ERR_REQUIRE_ESM`) sur Node < 20.19. `nvm use` lit le `.nvmrc`
 > (Node 22). Le champ `engines` du package.json documente la contrainte.
 
+> **PIÈGE `build.files` (liste blanche electron-builder).** Tout nouveau module
+> racine chargé par `require('./x')` DOIT être ajouté à `build.files` dans
+> package.json, sinon `npm run dev` marche mais l'app installée plante au
+> démarrage (« Cannot find module './x' », visible seulement dans main.log —
+> DMG 2.13.0 cassé avant release, presence.js / bg-task.js oubliés).
+> `test/build-files.test.js` vérifie la fermeture transitive depuis main.js.
+
 ## Architecture
 
 - `main.js` — Electron main process, window, IPC, tray

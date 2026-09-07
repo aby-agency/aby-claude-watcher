@@ -40,6 +40,8 @@ function readPresence(data) {
 //   shell      : une tâche Bash de fond tourne (chip « bg process »)
 //   dialogOpen : menu/dialogue local ouvert (chip « Dialogue ouvert », vert)
 //   waitingFor : libellé brut du dialogue bloquant (tooltip), sinon null
+//   reason     : non null quand la garde d'ordre a supprimé la transition
+//                (target/trigger annulés) — sert au log watcher.js (F2)
 function presenceDecision({ presence, currentState, stateSince, watcherStartedAt }) {
   const base = {
     target: null,
@@ -50,37 +52,54 @@ function presenceDecision({ presence, currentState, stateSince, watcherStartedAt
     shell: false,
     dialogOpen: false,
     waitingFor: null,
+    reason: null,
   };
-  // Garde d'ordre : un pending posé par le hook APRÈS l'écriture de cette
-  // présence ne doit pas être dégradé par elle (race hook → scan).
-  if (currentState === 'pending' && typeof stateSince === 'number'
-      && presence.statusUpdatedAt < stateSince) {
-    return base;
-  }
 
+  let decision;
   switch (presence.status) {
     case 'idle':
-      if (currentState !== 'waiting') return { ...base, target: 'waiting', trigger: 'presence:idle' };
-      return base;
+      decision = currentState !== 'waiting'
+        ? { ...base, target: 'waiting', trigger: 'presence:idle' }
+        : base;
+      break;
     case 'shell':
-      if (currentState !== 'waiting') return { ...base, target: 'waiting', trigger: 'presence:shell', shell: true, mute: true };
-      return { ...base, shell: true, mute: true };
+      decision = currentState !== 'waiting'
+        ? { ...base, target: 'waiting', trigger: 'presence:shell', shell: true, mute: true }
+        : { ...base, shell: true, mute: true };
+      break;
     case 'waiting':
       if (presence.waitingFor === DIALOG_OPEN) {
-        if (currentState !== 'waiting') return { ...base, target: 'waiting', trigger: 'presence:dialog', dialogOpen: true, mute: true };
-        return { ...base, dialogOpen: true, mute: true };
+        decision = currentState !== 'waiting'
+          ? { ...base, target: 'waiting', trigger: 'presence:dialog', dialogOpen: true, mute: true }
+          : { ...base, dialogOpen: true, mute: true };
+      } else if (currentState !== 'pending') {
+        decision = { ...base, target: 'pending', trigger: 'presence:waiting', waitingFor: presence.waitingFor || null };
+      } else {
+        decision = { ...base, waitingFor: presence.waitingFor || null };
       }
-      if (currentState !== 'pending') {
-        return { ...base, target: 'pending', trigger: 'presence:waiting', waitingFor: presence.waitingFor || null };
-      }
-      return { ...base, waitingFor: presence.waitingFor || null };
+      break;
     case 'busy':
-      if (currentState === 'pending') return { ...base, target: 'running', trigger: 'presence:busy' };
-      if (currentState === 'waiting') return { ...base, mute: true };
-      return base; // thinking / running : le JSONL raffine déjà
+      if (currentState === 'pending') decision = { ...base, target: 'running', trigger: 'presence:busy' };
+      else if (currentState === 'waiting') decision = { ...base, mute: true };
+      else decision = base; // thinking / running : le JSONL raffine déjà
+      break;
     default:
-      return base;
+      decision = base;
   }
+
+  // Garde d'ordre : un pending posé par le hook APRÈS l'écriture de cette
+  // présence ne doit pas être dégradé par elle (race hook → scan). On annule
+  // SEULEMENT la transition (target/trigger) : les flags dérivés de cette
+  // présence (waitingFor, shell, dialogOpen, mute) restent renvoyés — sinon
+  // le tooltip « permission prompt » du pending en cours disparaît pendant
+  // toute la durée du prompt (cas réel : status: waiting écrit à T, hook pose
+  // le pending à T+1s, chaque scan voit statusUpdatedAt < stateSince).
+  if (currentState === 'pending' && typeof stateSince === 'number'
+      && presence.statusUpdatedAt < stateSince) {
+    return { ...decision, target: null, trigger: null, reason: 'antérieur au pending' };
+  }
+
+  return decision;
 }
 
 module.exports = { readPresence, presenceDecision, PRESENCE_STATUSES, DIALOG_OPEN };

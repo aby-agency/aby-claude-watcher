@@ -263,8 +263,20 @@ class SessionWatcher extends EventEmitter {
 
           // Worker pré-chauffé par l'agent view (`claude agents`) : PID vivant,
           // aucun JSONL, jamais d'activité — une carte fantôme que la purge
-          // « fichier disparu + PID mort » ne retirerait pas.
-          if (data.spare === true) continue;
+          // « fichier disparu + PID mort » ne retirerait pas. Un worker peut
+          // aussi être RÉUTILISÉ par le CLI pour une session déjà trackée par
+          // une version antérieure de l'app (spare écrit après coup) : sans ce
+          // retrait, la carte restait figée à vie (PID vivant → jamais purgée).
+          if (data.spare === true) {
+            for (const [id, s] of this.sessions) {
+              if (s.pid === pid && s.cwd === cwd) {
+                log.info(`[watcher] spare ${id.slice(0, 8)} masqué`);
+                this.removeSession(id);
+                break;
+              }
+            }
+            continue;
+          }
 
           // Session passée en arrière-plan (Ctrl+B, /background, --bg) : le CLI
           // crée une COPIE sous un autre sid et laisse l'original « stalled »
@@ -387,6 +399,9 @@ class SessionWatcher extends EventEmitter {
               chromeLastUsedAt: null,
             });
             this.watchJsonl(effectiveId);
+            // Après watchJsonl : la présence prime sur l'état rejoué du tail. Si
+            // le JSONL n'existe pas encore, watchJsonl diffère le rejeu de 3 s —
+            // il peut écraser cet état, le scan suivant le remet.
             if (pidAlive) this.applyPresence(effectiveId, data);
             // Persist immediately so a fresh session that hasn't yet transitioned
             // state is known to config.sessions. Otherwise the startup orphan
@@ -420,11 +435,13 @@ class SessionWatcher extends EventEmitter {
               this.setState(effectiveId, STATES.WAITING, false, 'pid-revived');
             }
 
-            if (pidAlive) this.applyPresence(effectiveId, data);
-
             if (!this.fileWatchers.has(effectiveId)) {
               this.watchJsonl(effectiveId);
             }
+            // Après watchJsonl : la présence prime sur l'état rejoué du tail. Si
+            // le JSONL n'existe pas encore, watchJsonl diffère le rejeu de 3 s —
+            // il peut écraser cet état, le scan suivant le remet.
+            if (pidAlive) this.applyPresence(effectiveId, data);
           }
         } catch (e) {
           // skip malformed session files
@@ -931,6 +948,26 @@ class SessionWatcher extends EventEmitter {
     if (session && session.jsonlPath) this.readNewLines(sessionId, session.jsonlPath);
   }
 
+  // Garde symétrique (F3) : tant que le CLI dit `waiting` (dialogue bloquant
+  // — permission prompt, input needed…), un event JSONL ne doit pas dégrader
+  // l'état vers running/thinking. Le hook a posé pending À CAUSE de ce
+  // dialogue ; un tool_result/progress/queue-op qui suit dans le JSONL est le
+  // reliquat du tour précédent, pas la preuve que le dialogue s'est refermé —
+  // seule une nouvelle présence (`applyPresence`) peut lever le pending.
+  _blockedByPresence(session) {
+    return !!(session.presence && session.presence.status === 'waiting');
+  }
+
+  // Log throttlé : une ligne par statusUpdatedAt (pas une par event/scan),
+  // même mécanisme que la garde d'ordre presence.js (F2/applyPresence).
+  _logJsonlGuard(sessionId, session, type) {
+    const at = session.presence && session.presence.statusUpdatedAt;
+    if ((session._jsonlGuardLoggedAt || null) !== at) {
+      session._jsonlGuardLoggedAt = at;
+      log.info(`[state] ${sessionId.slice(0, 8)} event JSONL ${type} ignoré (presence waiting)`);
+    }
+  }
+
   processEvent(sessionId, event, isInitial) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
@@ -966,7 +1003,9 @@ class SessionWatcher extends EventEmitter {
         this.clearWaitingTimer(sessionId);
         const content = event.message && event.message.content;
         const isToolResult = Array.isArray(content) && content.some(c => c.type === 'tool_result');
-        if (isToolResult) {
+        if (this._blockedByPresence(session)) {
+          this._logJsonlGuard(sessionId, session, 'user');
+        } else if (isToolResult) {
           this.setState(sessionId, STATES.RUNNING, isInitial, 'tool_result');
         } else if (bgTaskClosed(event)) {
           // Reprise déclenchée par la fin d'un job, PAS par une frappe : router
@@ -980,12 +1019,14 @@ class SessionWatcher extends EventEmitter {
       case 'progress':
         // Any progress event means something is actively happening
         this.clearWaitingTimer(sessionId);
-        this.setState(sessionId, STATES.RUNNING, isInitial, 'progress');
+        if (this._blockedByPresence(session)) this._logJsonlGuard(sessionId, session, 'progress');
+        else this.setState(sessionId, STATES.RUNNING, isInitial, 'progress');
         break;
       case 'queue-operation':
         // Tool queue activity — session is actively executing
         this.clearWaitingTimer(sessionId);
-        this.setState(sessionId, STATES.RUNNING, isInitial, 'queue-op');
+        if (this._blockedByPresence(session)) this._logJsonlGuard(sessionId, session, 'queue-op');
+        else this.setState(sessionId, STATES.RUNNING, isInitial, 'queue-op');
         break;
       case 'attachment':
         // Attachments are message metadata (file refs, hook payloads) Claude
@@ -1071,7 +1112,14 @@ class SessionWatcher extends EventEmitter {
       }
       // lastToolUse is absent on streaming text/thinking messages that still
       // carry stop_reason:tool_use — fall back to the last known tool, or '?'.
-      this.setState(sessionId, STATES.RUNNING, isInitial, `tool_use:${session.lastTool || '?'}`);
+      // Garde symétrique (F3) : le CLI dit `waiting` (dialogue bloquant) → un
+      // tool_use qui suit dans le JSONL (résultat d'un outil lancé AVANT le
+      // dialogue) ne doit pas repasser la carte en running sous le pending.
+      if (this._blockedByPresence(session)) {
+        this._logJsonlGuard(sessionId, session, 'assistant');
+      } else {
+        this.setState(sessionId, STATES.RUNNING, isInitial, `tool_use:${session.lastTool || '?'}`);
+      }
     } else if (message.stop_reason === 'end_turn') {
       this.startWaitingTimer(sessionId, isInitial);
     } else if (hasThinking && !hasToolUse) {
@@ -1185,6 +1233,13 @@ class SessionWatcher extends EventEmitter {
       stateSince: session.stateSince ?? null,
       watcherStartedAt: this.startedAt,
     });
+    // Garde d'ordre déclenchée (presence.js) : logguer une fois par
+    // statusUpdatedAt, pas à chaque scan (2 s) pendant tout un prompt —
+    // sinon la ligne spamme main.log tant que le pending dure.
+    if (decision.reason && (session._presenceGuardLogged || null) !== presence.statusUpdatedAt) {
+      session._presenceGuardLogged = presence.statusUpdatedAt;
+      log.info(`[presence] ${sessionId.slice(0, 8)} status=${presence.status} waitingFor=${presence.waitingFor || '-'} ignoré (${decision.reason})`);
+    }
     const flagsChanged = session.shellBusy !== decision.shell
       || session.dialogOpen !== decision.dialogOpen
       || (session.waitingFor || null) !== decision.waitingFor;

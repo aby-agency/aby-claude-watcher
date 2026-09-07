@@ -158,6 +158,26 @@ test('garde inactive hors pending : idle antérieur sur running → waiting', ()
   const d = decide('idle', 'running', { statusUpdatedAt: T0 + 1_000, stateSince: T0 + 2_000 });
   assert.strictEqual(d.target, 'waiting');
 });
+test('F1 — garde d\'ordre sur waiting/permission prompt : target null MAIS waitingFor conservé + reason posé', () => {
+  const d = decide('waiting', 'pending', {
+    waitingFor: 'permission prompt', statusUpdatedAt: T0 + 1_000, stateSince: T0 + 2_000,
+  });
+  assert.strictEqual(d.target, null);
+  assert.strictEqual(d.trigger, null);
+  assert.strictEqual(d.waitingFor, 'permission prompt');
+  assert.notStrictEqual(d.reason, null);
+});
+test('F1 — garde d\'ordre busy/idle antérieurs : reason posé aussi (target déjà couvert plus haut)', () => {
+  const dBusy = decide('busy', 'pending', { statusUpdatedAt: T0 + 1_000, stateSince: T0 + 2_000 });
+  const dIdle = decide('idle', 'pending', { statusUpdatedAt: T0 + 1_000, stateSince: T0 + 2_000 });
+  assert.notStrictEqual(dBusy.reason, null);
+  assert.notStrictEqual(dIdle.reason, null);
+});
+test('F1 — reason null quand la garde ne s\'applique pas', () => {
+  assert.strictEqual(decide('busy', 'pending', { stateSince: T0 + 5_000 }).reason, null);
+  assert.strictEqual(decide('waiting', 'running', { waitingFor: 'permission prompt' }).reason, null);
+  assert.strictEqual(decide('idle', 'running', { statusUpdatedAt: T0 + 1_000, stateSince: T0 + 2_000 }).reason, null);
+});
 
 // at / silent
 test('at = statusUpdatedAt, jamais Date.now()', () => {

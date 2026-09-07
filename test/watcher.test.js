@@ -882,6 +882,71 @@ test('end_turn JSONL sans présence → waiting comme avant', async () => {
   if (w.sessions.get('et-2').state.name !== 'waiting') throw new Error('legacy path must still reach waiting');
 });
 
+test('F3 — garde symétrique : un event JSONL (tool_result) ne dégrade pas un pending que le CLI dit waiting', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  const now = Date.now();
+  w.sessions.set('f3-1', makeSession('f3-1', {
+    state: STATES.PENDING,
+    presence: { status: 'waiting', waitingFor: 'permission prompt', statusUpdatedAt: now },
+    shellBusy: false, dialogOpen: false, waitingFor: 'permission prompt', presenceMuted: false,
+  }));
+  w.processEvent('f3-1', { type: 'user', message: { content: [{ type: 'tool_result' }] } }, false);
+  if (w.sessions.get('f3-1').state.name !== 'pending') {
+    throw new Error(`expected pending (JSONL ignoré tant que presence=waiting), got ${w.sessions.get('f3-1').state.name}`);
+  }
+  // Le CLI dit maintenant busy (statusUpdatedAt postérieur) : le dialogue est
+  // refermé, la question a été traitée — la garde doit se lever.
+  w.applyPresence('f3-1', { status: 'busy', statusUpdatedAt: now + 1_000, updatedAt: now + 1_000 });
+  if (w.sessions.get('f3-1').state.name !== 'running') {
+    throw new Error(`expected running once presence says busy, got ${w.sessions.get('f3-1').state.name}`);
+  }
+});
+
+test('F4 — ordre d\'application (branche trackée de scan()) : applyPresence gagne sur le rejeu du tail par watchJsonl', () => {
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/f4';
+  // statusUpdatedAt largement postérieur : garantit qu'il reste plus récent
+  // que le stateSince que le stub watchJsonl posera pendant ce scan() (Date.now()
+  // au moment de l'appel, donc forcément antérieur à future).
+  const future = Date.now() + 60_000;
+  writeSessionJsonRaw(tree.sessions, {
+    pid: 9400, sessionId: 'f4-1', cwd, startedAt: Date.now() - 60_000, entrypoint: 'cli', kind: 'interactive',
+    status: 'waiting', waitingFor: 'permission prompt', statusUpdatedAt: future, updatedAt: Date.now(),
+  });
+  const w = freshScanWatcher(tree.root);
+  w.sessions.set('f4-1', makeSession('f4-1', {
+    pid: 9400, cwd, state: STATES.RUNNING, presence: null,
+    shellBusy: false, dialogOpen: false, waitingFor: null, presenceMuted: false,
+  }));
+  // freshScanWatcher stubbe watchJsonl en no-op ; ici on le remplace pour
+  // reproduire ce que fait fastInitialLoad en vrai — rejouer le tail JSONL et
+  // retransitionner la session (ici vers waiting, simulant un end_turn) AVANT
+  // qu'applyPresence n'ait son mot à dire. Si l'ordre scan() est mauvais
+  // (applyPresence AVANT le bloc watchJsonl), ce stub écrase le pending.
+  w.watchJsonl = (id) => { w.setState(id, STATES.WAITING, true, 'end_turn-initial'); };
+  w.scan();
+  const s = w.sessions.get('f4-1');
+  if (s.state.name !== 'pending') {
+    throw new Error(`expected pending (la présence doit gagner sur le rejeu du tail), got ${s.state.name}`);
+  }
+});
+
+test('F5 — worker spare qui réutilise le PID d\'une session déjà trackée → retirée (pas un fantôme à vie)', () => {
+  const tree = makeFakeClaudeTree();
+  const cwd = '/tmp/f5';
+  writeSessionJsonRaw(tree.sessions, { pid: 9500, sessionId: 'f5-1', cwd, startedAt: Date.now(), entrypoint: 'cli', kind: 'interactive' });
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  if (!w.sessions.has('f5-1')) throw new Error('expected f5-1 tracked after first scan');
+  // Le worker redevient spare (réutilisé par l'agent view) sous le même pid/cwd.
+  writeSessionJsonRaw(tree.sessions, { pid: 9500, sessionId: 'f5-1', cwd, startedAt: Date.now(), entrypoint: 'cli', kind: 'daemon-worker', spare: true });
+  const removed = [];
+  w.on('session-removed', (id) => removed.push(id));
+  w.scan();
+  if (w.sessions.has('f5-1')) throw new Error('expected f5-1 removed once spare');
+  if (removed[0] !== 'f5-1') throw new Error(`expected session-removed f5-1, got ${removed}`);
+});
+
 // ─── readNewLines (lignes partielles) ──────────────────
 section('readNewLines (lignes partielles):');
 

@@ -387,7 +387,7 @@ class SessionWatcher extends EventEmitter {
               chromeLastUsedAt: null,
             });
             this.watchJsonl(effectiveId);
-            this.applyPresence(effectiveId, data);
+            if (pidAlive) this.applyPresence(effectiveId, data);
             // Persist immediately so a fresh session that hasn't yet transitioned
             // state is known to config.sessions. Otherwise the startup orphan
             // purge would nuke its notif/name/order prefs on next launch.
@@ -1186,6 +1186,15 @@ class SessionWatcher extends EventEmitter {
 
     if (decision.target) {
       const target = Object.values(STATES).find(s => s.name === decision.target);
+      if (!target) {
+        // Cible inconnue (presence.js et watcher.js désynchronisés) : ne
+        // JAMAIS laisser setState déréférencer un `newState` undefined — la
+        // méthode tourne dans le catch muet de scan(), une exception ici
+        // gèlerait la session pour de bon sans aucune trace dans main.log.
+        log.warn(`[presence] ${sessionId.slice(0, 8)} cible inconnue ${decision.target} — ignorée`);
+        if (flagsChanged) this.emit('session-updated', session);
+        return;
+      }
       this.clearWaitingTimer(sessionId);
       this.clearPendingTimer(sessionId);
       this.setState(sessionId, target, decision.silent, decision.trigger, decision.at);
@@ -1199,7 +1208,8 @@ class SessionWatcher extends EventEmitter {
     // notif « Inactif » avait été tue (shell / dialogue / délégation) →
     // bannière tardive, une seule fois (même logique que purgeStaleBgTasks).
     if (presence.status === 'idle') {
-      if (session.presenceMuted && session.state.name === 'waiting' && !decision.target && !decision.silent) {
+      if (session.presenceMuted && session.state.name === 'waiting' && !decision.target && !decision.silent
+          && !this.hasOpenBgTask(sessionId)) {
         log.info(`[notif] ${sessionId.slice(0, 8)} mute levé (presence idle)`);
         this.maybeNotifyWaiting(sessionId, session);
       }

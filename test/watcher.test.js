@@ -825,6 +825,40 @@ test('CLI ancien (pas de status) → aucun champ de présence posé', () => {
   if (s.shellBusy || s.dialogOpen || s.waitingFor) throw new Error('no presence flags expected');
 });
 
+test('scan: présence ignorée à la découverte si le PID est mort (jamais de pending fantôme)', () => {
+  const tree = presenceTree('waiting', { waitingFor: 'permission prompt' });
+  const w = freshScanWatcher(tree.root);
+  w.isPidAlive = () => false; // avant le premier scan : le CLI a crashé, session.json traîne
+  w.startedAt = Date.now() - 5_000;
+  const notified = [];
+  w.on('session-waiting', (s) => notified.push(s.sessionId));
+  w.scan();
+  const s = w.sessions.get('pres-1');
+  if (s && s.state.name === 'pending') throw new Error('dead PID must not be promoted to pending by presence');
+  if (notified.length !== 0) throw new Error('dead PID must not notify');
+});
+
+test('présence idle après un mute : la bannière tardive respecte encore un bg process ouvert', () => {
+  const tree = presenceTree('shell');
+  const w = freshScanWatcher(tree.root);
+  w.startedAt = Date.now() - 5_000;
+  const notified = [];
+  w.on('session-waiting', (s) => notified.push(s.sessionId));
+  w.scan();
+  w.setState('pres-1', STATES.RUNNING, false, 'test');
+  w.scan();
+  const s = w.sessions.get('pres-1');
+  if (notified.length !== 0) throw new Error('shell must mute the waiting notif');
+  // Une tâche de fond s'ouvre pendant que le mute presence est actif.
+  s.bgTasks = new Set(['t1']);
+  const now = Date.now() + 1_000;
+  writeSessionJsonRaw(tree.sessions, { pid: 9200, sessionId: 'pres-1', cwd: '/tmp/pres', startedAt: now - 60_000, entrypoint: 'cli', kind: 'interactive', status: 'idle', statusUpdatedAt: now, updatedAt: now });
+  w.lastNotifTime.delete('pres-1');
+  w.scan();
+  if (notified.length !== 0) throw new Error(`bg process still open — late notif must stay muted, got ${notified.length}`);
+  if (s.presenceMuted !== false) throw new Error('presenceMuted must still clear even when the late banner is skipped');
+});
+
 // ─── readNewLines (lignes partielles) ──────────────────
 section('readNewLines (lignes partielles):');
 

@@ -364,6 +364,11 @@ function writeSessionJson(sessionsDir, pid, sessionId, cwd, updatedAt = Date.now
   fs.writeFileSync(path.join(sessionsDir, `${pid}.json`), JSON.stringify(data));
 }
 
+// Variante libre : écrit exactement `data` (présence, kind, parkedJobId…).
+function writeSessionJsonRaw(sessionsDir, data) {
+  fs.writeFileSync(path.join(sessionsDir, `${data.pid}.json`), JSON.stringify(data));
+}
+
 function writeJsonl(projectsDir, cwd, sessionId, mtime) {
   const slug = cwd.replace(/\//g, '-');
   const projDir = path.join(projectsDir, slug);
@@ -679,6 +684,43 @@ test('scan: migration preserves sessionOrder slot, custom name, notification pre
   // OLD's entries must be gone.
   if (config._data.customNames['OLD']) throw new Error('OLD customName must be cleared');
   if (config._data.notifications['OLD']) throw new Error('OLD notif prefs must be cleared');
+});
+
+section('scan() — kind / spare / parkedJobId:');
+
+test('scan: spare worker → jamais tracké', () => {
+  const tree = makeFakeClaudeTree();
+  writeSessionJsonRaw(tree.sessions, { pid: 9101, sessionId: 'spare-1', cwd: '/tmp/p', startedAt: Date.now(), entrypoint: 'cli', kind: 'daemon-worker', spare: true });
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  if (w.sessions.size !== 0) throw new Error(`expected 0 sessions, got ${w.sessions.size}`);
+});
+
+test('scan: parkedJobId → ligne ignorée ET session trackée retirée', () => {
+  const tree = makeFakeClaudeTree();
+  writeSessionJsonRaw(tree.sessions, { pid: 9102, sessionId: 'park-1', cwd: '/tmp/p', startedAt: Date.now(), entrypoint: 'cli', kind: 'interactive' });
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  if (!w.sessions.has('park-1')) throw new Error('expected park-1 tracked after first scan');
+  // La session passe en arrière-plan : le CLI pose parkedJobId sur l'original.
+  writeSessionJsonRaw(tree.sessions, { pid: 9102, sessionId: 'park-1', cwd: '/tmp/p', startedAt: Date.now(), entrypoint: 'cli', kind: 'interactive', parkedJobId: 'job-abc' });
+  const removed = [];
+  w.on('session-removed', (id) => removed.push(id)); // removeSession émet l'id (watcher.js:1293)
+  w.scan();
+  if (w.sessions.has('park-1')) throw new Error('expected park-1 removed once parked');
+  if (removed[0] !== 'park-1') throw new Error(`expected session-removed park-1, got ${removed}`);
+});
+
+test('scan: kind bg/daemon → isBackground même avec entrypoint cli', () => {
+  const tree = makeFakeClaudeTree();
+  writeSessionJsonRaw(tree.sessions, { pid: 9103, sessionId: 'bg-1', cwd: '/tmp/p', startedAt: Date.now(), entrypoint: 'cli', kind: 'bg' });
+  writeSessionJsonRaw(tree.sessions, { pid: 9104, sessionId: 'int-1', cwd: '/tmp/q', startedAt: Date.now(), entrypoint: 'cli', kind: 'interactive' });
+  writeSessionJsonRaw(tree.sessions, { pid: 9105, sessionId: 'old-1', cwd: '/tmp/r', startedAt: Date.now(), entrypoint: 'cli' });
+  const w = freshScanWatcher(tree.root);
+  w.scan();
+  if (w.sessions.get('bg-1').isBackground !== true) throw new Error('bg-1 should be background');
+  if (w.sessions.get('int-1').isBackground !== false) throw new Error('int-1 should be interactive');
+  if (w.sessions.get('old-1').isBackground !== false) throw new Error('old-1 (no kind) should keep entrypoint rule');
 });
 
 // ─── readNewLines (lignes partielles) ──────────────────

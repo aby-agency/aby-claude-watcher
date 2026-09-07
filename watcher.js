@@ -249,15 +249,36 @@ class SessionWatcher extends EventEmitter {
 
       for (const data of liveSessions) {
         try {
-          const { pid, sessionId, cwd, startedAt, entrypoint } = data;
+          const { pid, sessionId, cwd, startedAt, entrypoint, kind } = data;
 
           if (!sessionId) continue;
 
-          // Headless (`claude -p`, SDK, …) write entrypoint "sdk-cli"; interactive
-          // terminals write "cli". Unknown future entrypoints default to background
-          // (read-only + silent is the safe degradation). Absent field = old Claude
-          // Code version → keep the historical interactive behavior.
-          const isBackground = !!entrypoint && entrypoint !== 'cli';
+          // Worker pré-chauffé par l'agent view (`claude agents`) : PID vivant,
+          // aucun JSONL, jamais d'activité — une carte fantôme que la purge
+          // « fichier disparu + PID mort » ne retirerait pas.
+          if (data.spare === true) continue;
+
+          // Session passée en arrière-plan (Ctrl+B, /background, --bg) : le CLI
+          // crée une COPIE sous un autre sid et laisse l'original « stalled »
+          // avec parkedJobId, PID vivant. `claude agents` masque ces lignes ;
+          // sans ça la carte resterait figée sur le dernier état pour toujours.
+          if (data.parkedJobId !== undefined && data.parkedJobId !== null) {
+            for (const [id, s] of this.sessions) {
+              if (s.pid === pid && s.cwd === cwd) {
+                log.info(`[watcher] parked ${id.slice(0, 8)} masqué (job ${String(data.parkedJobId).slice(0, 12)})`);
+                this.removeSession(id);
+                break;
+              }
+            }
+            continue;
+          }
+
+          // Headless : `kind` (interactive | bg | daemon | daemon-worker) quand le
+          // CLI l'écrit, sinon la règle historique sur `entrypoint` ("cli" =
+          // terminal interactif, tout le reste = headless). Champ absent = CLI
+          // ancien → comportement historique.
+          const isBackground = (!!kind && kind !== 'interactive')
+            || (!!entrypoint && entrypoint !== 'cli');
 
           // Find any existing tracked session for this (pid, cwd) BEFORE
           // picking a target — once we've attributed a JSONL to a Claude

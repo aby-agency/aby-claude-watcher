@@ -996,6 +996,39 @@ test('tâche sans fiche (tool_use hors fenêtre) → détail anonyme kind task, 
   if (d.length !== 1 || d[0].kind !== 'task' || d[0].id !== 'orphan') throw new Error(JSON.stringify(d));
 });
 
+test('fastInitialLoad retrouve une tâche ouverte bien AVANT la fenêtre de tail (gros tool_results ensuite)', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  const p = tmpJsonl('bgfar');
+  const big = 'x'.repeat(200 * 1024); // 200 Ko de résultat d'outil, > MIN_TAIL 64 Ko
+  const lines = [
+    bashToolUse('tu7', 'Build long', 'npm run build', { run_in_background: true }),
+    bgOpenResult('tu7', 'job7'),
+    { type: 'assistant', timestamp: '2026-09-07T10:00:06.000Z', message: { model: 'claude-opus-5', stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'tu8', name: 'Read', input: { file_path: '/x' } }] } },
+    { type: 'user', timestamp: '2026-09-07T10:00:07.000Z', message: { content: [{ type: 'tool_result', tool_use_id: 'tu8', content: big }] } },
+    { type: 'assistant', timestamp: '2026-09-07T10:00:08.000Z', message: { model: 'claude-opus-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'fini' }] } },
+  ];
+  fs.writeFileSync(p, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  w.sessions.set('bg-7', makeSession('bg-7', { startedAt: new Date(Date.now() - 60_000).toISOString() }));
+  w.fastInitialLoad('bg-7', p);
+  const d = w.bgTaskDetails(w.sessions.get('bg-7'));
+  if (d.length !== 1 || d[0].kind !== 'task' || d[0].known !== true || d[0].description !== 'Build long') throw new Error(JSON.stringify(d));
+});
+
+test('fastInitialLoad : tâche fermée plus loin dans le fichier → pas de chip', () => {
+  const w = new SessionWatcher(makeMockConfig());
+  const p = tmpJsonl('bgclosed');
+  const lines = [
+    bashToolUse('tu5', 'Tests', 'npm test', { run_in_background: true }),
+    bgOpenResult('tu5', 'job5'),
+    { type: 'user', timestamp: '2026-09-07T10:00:09.000Z', message: { content: '<task-notification><task-id>job5</task-id><status>completed</status></task-notification>' } },
+    { type: 'assistant', timestamp: '2026-09-07T10:00:10.000Z', message: { model: 'claude-opus-5', stop_reason: 'end_turn', content: [{ type: 'text', text: 'ok' }] } },
+  ];
+  fs.writeFileSync(p, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  w.sessions.set('bg-5', makeSession('bg-5', { startedAt: new Date(Date.now() - 60_000).toISOString() }));
+  w.fastInitialLoad('bg-5', p);
+  if (w.bgTaskDetails(w.sessions.get('bg-5')).length !== 0) throw new Error('closed task must not survive');
+});
+
 test('fastInitialLoad reconstruit les fiches depuis le tail (tool_use puis résultat)', () => {
   const w = new SessionWatcher(makeMockConfig());
   const p = tmpJsonl('bgtail');

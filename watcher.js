@@ -9,6 +9,10 @@ const { classifyBgCommand, bgTaskOpening } = require('./bg-task');
 // Nombre de tool_use Bash récents gardés par session pour relier une tâche de
 // fond (tool_result avec backgroundTaskId) à sa description/commande.
 const RECENT_BASH_MAX = 30;
+// Passe de reconstruction des tâches de fond à l'attachement : depuis la fin du
+// JSONL, jusqu'à ce plafond (un fichier plus gros perd ses ouvertures les plus
+// anciennes — dégradation gracieuse, chip générique sans fiche).
+const BG_SCAN_MAX_BYTES = 64 * 1024 * 1024;
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const SESSIONS_DIR = path.join(CLAUDE_DIR, 'sessions');
@@ -646,9 +650,10 @@ class SessionWatcher extends EventEmitter {
       command,
       since: opening.at,
       deliberate: opening.deliberate,
-      // Fiche établie depuis le JSONL (≠ tâche anonyme sans tool_use connu) :
-      // seule une fiche vaut preuve pour l'état « Délégation » (hasLiveBgTask).
-      known: true,
+      // Fiche établie : le tool_use Bash a été retrouvé (commande connue). Sans
+      // lui (hors fenêtre de scan) on ne sait pas si c'est un serveur → pas de
+      // preuve, pas de « Délégation » (hasLiveBgTask).
+      known: !!bash.command,
     };
   }
 
@@ -764,15 +769,9 @@ class SessionWatcher extends EventEmitter {
       let readStart = 0;
       let scanned = false;
 
-      // Tâches de fond reconstruites DEPUIS LE TAIL SEUL, sans persistance : la
-      // fenêtre est un suffixe du fichier, donc si l'ouverture y est, sa
-      // fermeture éventuelle y est aussi (elle est écrite après) — une tâche
-      // « ouverte » reconstruite ici ne peut pas être un fantôme. Ouverture hors
-      // fenêtre = tâche oubliée → pas de chip et notifs normales : dégradation
-      // gracieuse.
-      let openJobs = new Set();
-      let openJobsInfo = new Map();
-
+      // Tâches de fond : reconstruites par rebuildBgTasks (passe dédiée sur tout
+      // le fichier, après ce tail) — le tail d'état s'arrête au premier
+      // `assistant` et ratait toute ouverture plus ancienne que 64 Ko.
       let tailSize = MIN_TAIL;
       while (!scanned) {
         readStart = Math.max(0, stat.size - tailSize);
@@ -781,9 +780,6 @@ class SessionWatcher extends EventEmitter {
         lastAssistant = null;
         lastUser = null;
         hasLastPrompt = false;
-        openJobs = new Set();
-        openJobsInfo = new Map();
-        session.recentBash = new Map();
 
         const fd = fs.openSync(jsonlPath, 'r');
         const buffer = Buffer.alloc(stat.size - readStart);
@@ -800,17 +796,8 @@ class SessionWatcher extends EventEmitter {
             if (event.slug) session.slug = event.slug;
             if (event.gitBranch) session.gitBranch = event.gitBranch;
 
-            const jobOpening = bgTaskOpening(event);
-            if (jobOpening) {
-              openJobs.add(jobOpening.id);
-              openJobsInfo.set(jobOpening.id, this._bgTaskRecord(session, jobOpening));
-            }
-            const jobClosed = bgTaskClosed(event);
-            if (jobClosed) { openJobs.delete(jobClosed); openJobsInfo.delete(jobClosed); }
-
             if (event.type === 'assistant') {
               lastAssistant = event;
-              this.captureBashCalls(session, event);
               if (event.message && isRealModel(event.message.model)) {
                 session.model = event.message.model;
               }
@@ -843,8 +830,7 @@ class SessionWatcher extends EventEmitter {
         }
       }
 
-      session.bgTasks = openJobs;
-      session.bgTaskInfo = openJobsInfo;
+      this.rebuildBgTasks(session, jsonlPath, stat.size);
 
       // Determine state from last events
       // Key insight: the LAST event type tells us the current state
@@ -869,7 +855,7 @@ class SessionWatcher extends EventEmitter {
         } else if (msg.stop_reason === 'tool_use') {
           computedState = STATES.RUNNING;
         } else if (msg.stop_reason === 'end_turn') {
-          // openJobs reste dans session.bgTasks : l'état est waiting dans tous
+          // Les tâches de fond restent dans session.bgTasks : l'état est waiting dans tous
           // les cas, les tâches ouvertes ne pilotent que le chip et le mute.
           computedState = STATES.WAITING;
         }
@@ -1239,6 +1225,52 @@ class SessionWatcher extends EventEmitter {
     if (closed && session.bgTasks && session.bgTasks.delete(closed)) changed = true;
     if (closed && session.bgTaskInfo) session.bgTaskInfo.delete(closed);
     if (changed && !isInitial) this.emit('session-updated', session);
+  }
+
+  // Reconstruit les tâches de fond ouvertes à l'attachement, en une passe
+  // dédiée sur TOUT le JSONL (plafonnée BG_SCAN_MAX_BYTES depuis la fin) — pas
+  // sur le tail d'état de fastInitialLoad, qui s'arrête au premier `assistant`
+  // (64 Ko) : une tâche ouverte 75 Ko avant la fin (foundx, 2026-09-07, gros
+  // tool_results) n'avait pas de fiche → chip générique, carte verte au lieu
+  // de « Délégation ». Préfiltre texte avant tout JSON.parse : ~7 ms de grep
+  // sur 5,8 Mo, le parse ne touche que les lignes utiles. Une fermeture
+  // ferme toujours une ouverture antérieure (ordre d'écriture), donc une passe
+  // avant suffit.
+  rebuildBgTasks(session, jsonlPath, fileSize) {
+    const open = new Set();
+    const info = new Map();
+    session.recentBash = new Map();
+    try {
+      const start = Math.max(0, fileSize - BG_SCAN_MAX_BYTES);
+      const fd = fs.openSync(jsonlPath, 'r');
+      const buffer = Buffer.alloc(fileSize - start);
+      fs.readSync(fd, buffer, 0, buffer.length, start);
+      fs.closeSync(fd);
+      const lines = buffer.toString('utf-8').split('\n');
+      for (let i = start > 0 ? 1 : 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line) continue;
+        const isBash = line.includes('"name":"Bash"');
+        const isOpen = line.includes('"backgroundTaskId"');
+        const isClose = line.includes('<task-notification>');
+        if (!isBash && !isOpen && !isClose) continue;
+        let event;
+        try { event = JSON.parse(line); } catch (e) { continue; }
+        if (isBash && event.type === 'assistant') this.captureBashCalls(session, event);
+        if (isOpen) {
+          const opening = bgTaskOpening(event);
+          if (opening) { open.add(opening.id); info.set(opening.id, this._bgTaskRecord(session, opening)); }
+        }
+        if (isClose) {
+          const closed = bgTaskClosed(event);
+          if (closed) { open.delete(closed); info.delete(closed); }
+        }
+      }
+    } catch (e) {
+      log.warn(`[watcher] rebuildBgTasks ${String(session.sessionId).slice(0, 8)} : ${e.message}`);
+    }
+    session.bgTasks = open;
+    session.bgTaskInfo = info;
   }
 
   // Fiches des tâches de fond ouvertes, pour serializeSession (main.js) :

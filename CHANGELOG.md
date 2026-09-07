@@ -22,15 +22,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   est ouvert dans la session ; jamais ambre, jamais de bannière.
 - Tooltip du badge « Action requise » : nature du dialogue (permission,
   elicitation MCP, sandbox, message d'une autre session…).
-- Le chip des tâches Bash de fond s'appelle désormais « en fond » (« 2 en
-  fond » au pluriel, ex-« N bg process ») et porte un anneau qui tourne : on
-  voit que ça travaille. L'île le montre aussi, en sous-ligne cyan sous la
-  session, comme les agents.
+- Le chip des tâches Bash de fond s'appelle désormais « N tâche(s) »
+  (ex-« N bg process ») et porte un anneau qui tourne : on voit que ça
+  travaille. L'île le montre aussi, en sous-ligne cyan sous la session,
+  comme les agents.
 - **Serveur ou tâche ?** Un site de dev laissé tourner et un build en cours
   affichaient le même chip. Une commande reconnue comme serveur (`npm run
   dev`, `vite`, `electron`, `docker compose up`, `tail -f`, `--watch`…) donne
-  un chip « serveur » avec une icône terminal fixe ; le reste garde « en
-  fond » et son anneau. Le survol montre la description écrite par Claude,
+  un chip gris « N serveur(s) » avec une icône terminal fixe ; le reste garde
+  le chip cyan « N tâche(s) » et son anneau. Le survol montre la description écrite par Claude,
   la commande et l'heure de lancement (et « parquée après timeout » quand
   la commande n'a pas été mise en fond exprès). Même distinction dans l'île.
 - **Une session qui attend son build n'est plus « Inactif ».** Un tour fini

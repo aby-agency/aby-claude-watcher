@@ -794,6 +794,9 @@ body.micro-mode .uring-text { font-size: 9px; }
 .bg-chip .bg-term {
   margin-right: 5px; font-weight: 700; letter-spacing: -0.5px; text-transform: none;
 }
+/* Serveur en gris ardoise, tâche en cyan (famille « Délégation », ça travaille
+   et ça réveillera la session) — deux couleurs pour deux natures (Paul). */
+.bg-chip.server-chip { background: rgba(148, 163, 184, 0.14); color: #94a3b8; }
 
 /* Chip « Dialogue ouvert » : même gabarit que bg-chip, teinte verte alignée
    sur le badge waiting — un menu ouvert n'appelle aucune action. Décliné sur

@@ -48,9 +48,9 @@ function rowHtml(row) {
       // tâche : spinner. Tooltip = descriptions/commandes.
       const server = g.kind === 'server';
       const key = server ? 'server_chip' : 'bg_chip';
-      const label = g.count > 1 ? window.i18n.t(key + '_n', { n: g.count }) : window.i18n.t(key);
+      const label = window.i18n.t(g.count > 1 ? key + '_n' : key, { n: g.count });
       return `
-    <div class="subrow subrow-bg"${g.title ? ` title="${escAttr(g.title)}"` : ''}>
+    <div class="subrow ${server ? 'subrow-server' : 'subrow-bg'}"${g.title ? ` title="${escAttr(g.title)}"` : ''}>
       ${server ? '<span class="subrow-term">&gt;_</span>' : '<span class="subrow-spin"></span>'}
       <span class="subrow-label">${esc(label)}</span>
     </div>`;

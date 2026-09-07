@@ -968,12 +968,13 @@ function bgChipHTML(s) {
   if (!list.length) tasks.length = 0;
   const taskN = list.length ? tasks.length : s.bgTaskCount;
   let html = '';
+  // Chiffre toujours affiché (« 1 serveur », « 2 tâches ») — demande Paul.
   if (servers.length) {
-    const label = servers.length > 1 ? t('server_chip_n', { n: servers.length }) : t('server_chip');
+    const label = t(servers.length > 1 ? 'server_chip_n' : 'server_chip', { n: servers.length });
     html += `<span class="bg-chip server-chip" title="${escAttr(bgTaskTitle(servers))}"><span class="bg-term">&gt;_</span>${esc(label)}</span>`;
   }
   if (taskN) {
-    const label = taskN > 1 ? t('bg_chip_n', { n: taskN }) : t('bg_chip');
+    const label = t(taskN > 1 ? 'bg_chip_n' : 'bg_chip', { n: taskN });
     const title = tasks.length ? ` title="${escAttr(bgTaskTitle(tasks))}"` : '';
     html += `<span class="bg-chip"${title}><span class="bg-spin"></span>${esc(label)}</span>`;
   }

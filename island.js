@@ -75,6 +75,11 @@ function create(display) {
     height: lastLayout.h, // toujours défini : create() n'est appelé qu'après islandLayout
 
     show: false,
+    // NSPanel non activant : un clic dans l'île ne doit PAS activer l'app,
+    // sinon macOS ramène toutes ses fenêtres devant (dashboard ouvert derrière
+    // cmux → il passait au premier plan AVANT le terminal visé, constaté par
+    // Paul le 2026-09-15). focusable:false seul n'empêche pas l'activation.
+    type: 'panel',
     frame: false,
     transparent: true,
     resizable: false,
@@ -185,10 +190,16 @@ function sendUpdateState(payload) {
   if (win && !win.isDestroyed() && win._loaded) win.webContents.send('island-update-state', payload);
 }
 
-function setHover(hovering) {
+let hovering = false;
+function setHover(h) {
+  hovering = !!h;
   if (!win || win.isDestroyed()) return;
   if (hovering) win.setIgnoreMouseEvents(false);
   else win.setIgnoreMouseEvents(true, { forward: true });
 }
+// Vrai tant que le curseur est sur l'île (pilule, panneau ou bannière) :
+// c'est ce que main.js consulte pour savoir si une activation de l'app vient
+// d'un clic dans l'île.
+function isHovering() { return hovering; }
 
-module.exports = { refresh, destroy, sendUpdate, sendBanner, sendUpdateState, setHover, window: () => win };
+module.exports = { refresh, destroy, sendUpdate, sendBanner, sendUpdateState, setHover, isHovering, window: () => win };

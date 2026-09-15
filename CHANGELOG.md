@@ -17,6 +17,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   le terminal qui y est attaché (iTerm2 en mode contrôle, ou cmux). Sans
   client attaché (session Remote Control), il en ouvre un — dans cmux s'il
   tourne, sinon un onglet iTerm2 en mode contrôle.
+- **Un clic dans l'île ne ramène plus le dashboard devant.** L'île est
+  désormais un panneau non activant : cliquer une session n'active plus
+  l'app, donc une fenêtre de dashboard ouverte derrière reste derrière et
+  seul le terminal visé passe au premier plan.
 
 ## [2.14.0] — 2026-09-07
 

@@ -950,9 +950,13 @@ app.whenReady().then(() => {
   setTimeout(checkAndNotify, 10_000);
   setInterval(checkAndNotify, 2 * 60 * 60 * 1000);
 
-  app.on('activate', () => {
+  app.on('activate', (_, hasVisibleWindows) => {
+    log.info(`[app] activate hasVisibleWindows=${hasVisibleWindows} islandHover=${island.isHovering()}`);
     if (!mainWindow) createWindow();
     else mainWindow.show();
+  });
+  app.on('did-become-active', () => {
+    log.info(`[app] did-become-active islandHover=${island.isHovering()} dashboardVisible=${!!(mainWindow && mainWindow.isVisible())}`);
   });
 });
 

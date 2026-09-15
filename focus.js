@@ -1,8 +1,22 @@
-const { exec, execSync } = require('child_process');
+const { exec, execFile, execSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const { log, DEBUG } = require('./logger');
+const mux = require('./terminal-mux');
 const dlog = (...args) => { if (DEBUG) log.debug('[focus]', ...args); };
+
+// cmux (https://cmux.com) — macOS terminal built on Ghostty, one surface per
+// terminal. Its bundled CLI talks to the app over a Unix socket (password
+// stored in the app's settings, read by the CLI itself — verified from a
+// process outside cmux's environment).
+const CMUX_BUNDLE_ID = 'com.cmuxterm.app';
+const CMUX_CLI_DEFAULT = '/Applications/cmux.app/Contents/Resources/bin/cmux';
+// Map session id → surface, written by cmux's own Claude Code hooks.
+const CMUX_HOOK_STORE = path.join(os.homedir(), '.cmuxterm', 'claude-hook-sessions.json');
+const TMUX_CANDIDATES = ['/opt/homebrew/bin/tmux', '/usr/local/bin/tmux', '/usr/bin/tmux'];
+const EXEC_TIMEOUT_MS = 3000;
 
 function sanitizePid(pid) {
   const n = parseInt(pid, 10);
@@ -24,7 +38,7 @@ function focusTerminal(session) {
   const cwd = sanitizePath(session.cwd);
 
   if (process.platform === 'darwin') {
-    return focusMac(terminalApp, terminalId, pid, cwd);
+    return focusMac(terminalApp, terminalId, pid, cwd, session.sessionId);
   } else if (process.platform === 'win32') {
     return focusWindows(pid, cwd);
   } else {
@@ -55,6 +69,9 @@ function detectTerminalFromPid(pid) {
       dlog(`step ${i}: pid=${ppid} comm="${comm}" command="${command.slice(0, 100)}"`);
 
       if (lc.includes('iterm')) return { app: 'iterm' };
+      // Before ghostty: cmux embeds Ghostty (TERM_PROGRAM=ghostty) but is its
+      // own app — the parent chain is zsh → login → cmux.
+      if (mux.isCmuxProcess(comm, command)) return { app: 'cmux' };
       if (lc.includes('warp')) return { app: 'warp' };
       if (lc.includes('wezterm')) return { app: 'wezterm' };
       if (lc.includes('alacritty')) return { app: 'alacritty' };
@@ -106,13 +123,30 @@ function activateByPid(pid) {
   `).catch(() => {});
 }
 
-function focusMac(terminalApp, terminalId, pid, cwd) {
+function focusMac(terminalApp, terminalId, pid, cwd, sessionId) {
   const hint = (terminalApp || '').toLowerCase();
+
+  // Multiplexers first, from the ENVIRONMENT of the Claude process: the
+  // parent chain is useless there (tmux server re-parented to launchd; cmux
+  // unknown to older builds) and the `cc` hint is misleading (cmux exports
+  // TERM_PROGRAM=ghostty, which would activate the standalone Ghostty app).
+  const env = readProcessEnv(pid);
+  const tmuxTarget = mux.tmuxTargetFromEnv(env);
+  if (tmuxTarget) {
+    log.info(`[focus] tmux socket=${tmuxTarget.socket} pane=${tmuxTarget.pane} (pid ${pid})`);
+    return focusTmux(tmuxTarget, cwd);
+  }
+  if (mux.isCmuxEnv(env)) {
+    log.info(`[focus] cmux via env (pid ${pid})`);
+    return focusCmux(sessionId, env, pid);
+  }
+
   const detected = detectTerminalFromPid(pid) || {};
   const app = hint || detected.app || '';
   const helperPid = detected.helperPid;
   dlog(`focusMac pid=${pid} cwd=${cwd} hint="${hint}" detected=${JSON.stringify(detected)} → app="${app}"`);
 
+  if (app === 'cmux') return focusCmux(sessionId, env, pid);
   if (app.includes('iterm')) return focusITerm2(pid, cwd);
   if (app.includes('warp')) return runAppleScript(`tell application "Warp" to activate`);
 
@@ -134,6 +168,167 @@ function focusMac(terminalApp, terminalId, pid, cwd) {
   if (app === 'terminal' || app.includes('apple_terminal')) return focusTerminalApp(pid, cwd);
 
   return focusITerm2(pid, cwd);
+}
+
+// ---------------------------------------------------------------------------
+// Multiplexers: cmux and tmux
+// ---------------------------------------------------------------------------
+
+function readProcessEnv(pid) {
+  if (!pid) return {};
+  try {
+    return mux.parseProcessEnv(execSync(`ps eww -o command= -p ${pid}`, { encoding: 'utf-8', timeout: 500 }));
+  } catch (e) {
+    dlog('readProcessEnv error', e.message);
+    return {};
+  }
+}
+
+function execFileP(file, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, { encoding: 'utf-8', timeout: EXEC_TIMEOUT_MS, ...opts }, (err, stdout, stderr) => {
+      if (err) {
+        const e = new Error((stderr || err.message || '').trim());
+        e.stderr = stderr;
+        return reject(e);
+      }
+      resolve(stdout);
+    });
+  });
+}
+
+function cmuxCli(env) {
+  const fromEnv = env && sanitizePath(env.CMUX_BUNDLED_CLI_PATH);
+  for (const p of [fromEnv, CMUX_CLI_DEFAULT]) {
+    if (p && fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+function tmuxBin() {
+  for (const p of TMUX_CANDIDATES) if (fs.existsSync(p)) return p;
+  return 'tmux';
+}
+
+function activateCmux() {
+  return runAppleScript(`tell application id "${CMUX_BUNDLE_ID}" to activate`);
+}
+
+function readCmuxHookStore() {
+  try {
+    return JSON.parse(fs.readFileSync(CMUX_HOOK_STORE, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+// Focus the cmux surface hosting the session: `surface.focus` selects the
+// workspace AND the surface (verified on 0.64.23), then the app is raised.
+// Surface id comes from cmux's hook store (session id → surface), else from
+// the env of the Claude process. A missing id still raises cmux.
+function focusCmux(sessionId, env, pid) {
+  const cli = cmuxCli(env);
+  const fromStore = mux.cmuxSurfaceForSession(readCmuxHookStore(), sessionId);
+  const surfaceId = (fromStore && fromStore.surfaceId) || mux.cmuxSurfaceFromEnv(env);
+  if (!cli || !surfaceId) {
+    log.info(`[focus] cmux: ${cli ? 'no surface for ' + (sessionId || pid) : 'CLI not found'} → activate only`);
+    return activateCmux();
+  }
+  log.info(`[focus] cmux surface ${surfaceId} (${fromStore ? 'hook store' : 'env'})`);
+  return focusCmuxSurface(cli, surfaceId).then(activateCmux, (err) => {
+    log.warn(`[focus] cmux surface.focus failed: ${err.message}`);
+    return activateCmux();
+  });
+}
+
+function focusCmuxSurface(cli, surfaceId) {
+  return execFileP(cli, ['rpc', 'surface.focus', JSON.stringify({ surface_id: surfaceId })]);
+}
+
+// tmux: select the pane's window in its session, then raise whatever hosts
+// an attached client. iTerm2 in control mode (`-CC`) mirrors the tmux current
+// window as its active tab, so `select-window` + activate is the whole job
+// there; under cmux we look up the surface hosting the client process.
+// No client attached (Remote Control session driven from a phone): open one —
+// in cmux when it runs, else an iTerm2 tab in control mode, as `rc` documents.
+async function focusTmux(target, cwd) {
+  const tmux = tmuxBin();
+  const base = ['-S', target.socket];
+  const run = (args) => execFileP(tmux, [...base, ...args]);
+
+  try {
+    await run(['select-window', '-t', target.pane]);
+    await run(['select-pane', '-t', target.pane]);
+  } catch (err) {
+    log.warn(`[focus] tmux select failed: ${err.message}`);
+    return focusFallback(cwd);
+  }
+
+  let clients = [];
+  try {
+    clients = mux.parseTmuxClients(await run(['list-clients', '-t', target.pane, '-F', '#{client_pid}\t#{client_tty}']));
+  } catch (err) {
+    dlog('tmux list-clients failed', err.message);
+  }
+
+  if (clients.length === 0) {
+    let sessionName = null;
+    try {
+      sessionName = (await run(['display-message', '-p', '-t', target.pane, '#{session_name}'])).trim();
+    } catch {}
+    log.info(`[focus] tmux: no client attached to ${target.pane} (session ${sessionName || '?'}) → opening one`);
+    return openTmuxClient(target.socket, sessionName, cwd);
+  }
+
+  const client = clients[0];
+  const host = detectTerminalFromPid(client.pid) || {};
+  log.info(`[focus] tmux client pid=${client.pid} tty=${client.tty} host=${host.app || 'unknown'}`);
+  if (host.app === 'cmux') {
+    const cli = cmuxCli(readProcessEnv(client.pid));
+    if (cli) {
+      try {
+        const surface = mux.cmuxSurfaceForPid(await execFileP(cli, ['top', '--all', '--processes', '--format', 'tsv']), client.pid);
+        if (surface) await focusCmuxSurface(cli, surface);
+      } catch (err) {
+        dlog('cmux surface lookup for tmux client failed', err.message);
+      }
+    }
+    return activateCmux();
+  }
+  if (host.app === 'iterm') return runAppleScript(`tell application "iTerm2" to activate`);
+  if (host.app === 'terminal') return runAppleScript(`tell application "Terminal" to activate`);
+  return activateByPid(client.pid);
+}
+
+function openTmuxClient(socket, sessionName, cwd) {
+  const cmuxRunning = (() => {
+    try { return execSync('pgrep -x cmux', { encoding: 'utf-8', timeout: 500 }).trim() !== ''; } catch { return false; }
+  })();
+  if (cmuxRunning) {
+    const cli = cmuxCli(null);
+    const command = mux.tmuxAttachCommand(socket, sessionName);
+    if (cli && command) {
+      const args = ['new-workspace', '--name', `${path.basename(cwd || '') || 'tmux'} · tmux`, '--command', command, '--focus', 'true'];
+      if (cwd) args.push('--cwd', cwd);
+      return execFileP(cli, args).then(activateCmux, (err) => {
+        log.warn(`[focus] cmux new-workspace failed: ${err.message}`);
+        return activateCmux();
+      });
+    }
+  }
+  const command = mux.tmuxAttachCommand(socket, sessionName, { controlMode: true });
+  if (!command) return focusFallback(cwd);
+  return runAppleScript(`
+    tell application "iTerm2"
+      activate
+      tell current window
+        create tab with default profile
+        tell current session
+          write text "${escapeForAppleScript(command)}"
+        end tell
+      end tell
+    end tell
+  `).catch(() => focusFallback(cwd));
 }
 
 // Activate the editor window that has `cwd` open as workspace.

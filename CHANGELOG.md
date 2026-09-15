@@ -4,6 +4,20 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Le clic sur une carte retrouve le terminal sous cmux et sous tmux.** Une
+  session lancée dans cmux activait iTerm2 (l'app n'était pas reconnue), et
+  une session dans tmux n'amenait rien de précis (le serveur tmux n'a pas
+  de terminal parent). Le watcher lit désormais l'environnement du process
+  Claude : sous cmux il sélectionne le workspace et la surface exacts via le
+  CLI de cmux (correspondance session → surface tenue par les hooks de
+  cmux) ; sous tmux il sélectionne la fenêtre et le pane, puis amène devant
+  le terminal qui y est attaché (iTerm2 en mode contrôle, ou cmux). Sans
+  client attaché (session Remote Control), il en ouvre un — dans cmux s'il
+  tourne, sinon un onglet iTerm2 en mode contrôle.
+
 ## [2.14.0] — 2026-09-07
 
 ### Fixed

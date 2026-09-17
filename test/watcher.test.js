@@ -1675,6 +1675,77 @@ test('Notification sans type (CLI ancien) → comportement historique : pending'
   if (w.sessions.get('P7').state.name !== 'pending') throw new Error('sans type, une Notification reste un pending');
 });
 
+section('pendingRequest — « Action requise » dit ce qu\'elle demande');
+
+test('la cible du hook est portée par la session une fois le pending posé', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('R1', makeSession('R1', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000 }));
+  w.markPending('R1', 'PermissionRequest', 'Bash', false, null, 'supprimer node_modules');
+  await sleep(1200);
+  const s = w.sessions.get('R1');
+  if (s.state.name !== 'pending') throw new Error(`attendu pending, obtenu ${s.state.name}`);
+  if (!s.pendingRequest) throw new Error('pendingRequest manquant');
+  if (s.pendingRequest.tool !== 'Bash') throw new Error(`tool = ${s.pendingRequest.tool}`);
+  if (s.pendingRequest.target !== 'supprimer node_modules') throw new Error(`target = ${s.pendingRequest.target}`);
+});
+
+test('sortir du pending purge la demande (elle ne survit pas à la réponse)', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('R2', makeSession('R2', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000 }));
+  w.markPending('R2', 'PermissionRequest', 'Bash', false, null, 'supprimer node_modules');
+  await sleep(1200);
+  w.setState('R2', STATES.RUNNING, false, 'test');
+  const s = w.sessions.get('R2');
+  if (s.pendingRequest) throw new Error('pendingRequest aurait dû être purgé');
+});
+
+test('idle_prompt ne pose aucune demande : ce n\'est pas une question, c\'est un rappel', async () => {
+  const w = new SessionWatcher(makeMockConfig());
+  w.sessions.set('R3', makeSession('R3', { state: STATES.RUNNING, lastEventTime: Date.now() - 10000 }));
+  w.markPending('R3', 'Notification', null, false, 'idle_prompt');
+  await sleep(1200);
+  const s = w.sessions.get('R3');
+  if (s.state.name !== 'waiting') throw new Error(`attendu waiting, obtenu ${s.state.name}`);
+  if (s.pendingRequest) throw new Error('un rappel idle ne demande rien');
+});
+
+test('la trace disque porte l\'outil DEMANDÉ, pas le dernier outil vu dans le JSONL', () => {
+  const cfg = makeMockConfig();
+  const w = new SessionWatcher(cfg);
+  const session = makeSession('R4', { state: STATES.PENDING, lastTool: 'Read', jsonlPath: __filename });
+  session.pendingRequest = { tool: 'Bash', target: 'supprimer node_modules' };
+  w.sessions.set('R4', session);
+  w.markPendingPersisted('R4', session);
+  const mark = cfg._data.pendingMarks.R4;
+  if (!mark) throw new Error('aucune trace écrite');
+  if (mark.tool !== 'Bash') throw new Error(`la trace dit ${mark.tool}, le JSONL disait Read`);
+  if (mark.target !== 'supprimer node_modules') throw new Error(`target = ${mark.target}`);
+});
+
+test('au redémarrage, la demande revient avec le pending restauré', () => {
+  const cfg = makeMockConfig();
+  const w = new SessionWatcher(cfg);
+  const session = makeSession('R5', { state: STATES.RUNNING });
+  w.sessions.set('R5', session);
+  cfg._data.pendingMarks.R5 = { mtimeMs: 1000, tool: 'Bash', target: 'supprimer node_modules', at: 900 };
+  const restored = w.restorePending('R5', { mtimeMs: 1000 });
+  if (!restored) throw new Error('le pending aurait dû être restauré (mtime inchangé)');
+  const s = w.sessions.get('R5');
+  if (!s.pendingRequest || s.pendingRequest.target !== 'supprimer node_modules') {
+    throw new Error(`demande non restaurée : ${JSON.stringify(s.pendingRequest)}`);
+  }
+});
+
+test('une trace périmée (JSONL réécrit app éteinte) ne restaure aucune demande', () => {
+  const cfg = makeMockConfig();
+  const w = new SessionWatcher(cfg);
+  w.sessions.set('R6', makeSession('R6', { state: STATES.RUNNING }));
+  cfg._data.pendingMarks.R6 = { mtimeMs: 1000, tool: 'Bash', target: 'supprimer node_modules', at: 900 };
+  const restored = w.restorePending('R6', { mtimeMs: 2000 });
+  if (restored) throw new Error('mtime plus récent = la question a été traitée');
+  if (w.sessions.get('R6').pendingRequest) throw new Error('aucune demande ne doit survivre');
+});
+
 section('findJsonlPath — plusieurs dossiers projet pour un même sid');
 
 test('le journal le plus récemment écrit gagne (dossier projet renommé → copie périmée dans l\'ancien slug)', () => {

@@ -88,6 +88,9 @@ class SocketServer extends EventEmitter {
           sessionId: msg.sessionId,
           hookEvent: msg.hookEvent,
           toolName: msg.toolName || null,
+          // Ce que la demande vise, résumé par le hook (description d'un Bash,
+          // fichier d'un Edit, question posée…) — borné à 200 car. à la source.
+          toolTarget: typeof msg.toolTarget === 'string' && msg.toolTarget ? msg.toolTarget : null,
           idle: !!msg.idle, // Notification idle reminder (not a permission)
           notificationType: typeof msg.notificationType === 'string' && msg.notificationType ? msg.notificationType : null,
         });

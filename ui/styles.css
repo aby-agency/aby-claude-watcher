@@ -1146,6 +1146,44 @@ body.micro-mode .uring-text { font-size: 9px; }
   align-self: flex-start;
 }
 
+/* Ligne « ce que la demande réclame », sous l'état, en pending seulement.
+   Ambre comme le badge — c'est la même information, pas un contexte de plus —
+   mais sans halo : l'attention est déjà portée par le badge. */
+.card-pending-ask,
+.compact-card-pending-ask {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--state-pending, #f59e0b);
+  min-width: 0;
+  /* stretch, PAS flex-start (le gabarit de la ligne modèle) : cette ligne-ci
+     porte un texte long, et une boîte en flex-start prend sa largeur
+     intrinsèque — l'ellipsis ne mord alors jamais et la carte déborde. */
+  align-self: stretch;
+}
+
+.card-pending-ask { margin: 8px 0 -4px; }
+
+.card-pending-ask .compact-card-branch-icon,
+.compact-card-pending-ask .compact-card-branch-icon {
+  display: inline-flex;
+  flex: none;
+  opacity: 0.85;
+}
+
+.pending-ask-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Un flex item ne rétrécit pas sous sa largeur intrinsèque sans min-width:0 :
+     sans lui, l'ellipsis ne mord jamais et une cible longue POUSSE la carte
+     (mesuré au CDP à 400 px : +28 px de débordement sur un chemin de fichier). */
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 /* Ligne modèle de la vue compacte — même gabarit que la branche/session, en
    plus discret : c'est une info de contexte, pas une info d'état. */
 .compact-card-model {

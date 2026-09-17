@@ -481,7 +481,7 @@ function setupSocket() {
   });
 
   socketServer.on('permission-pending', (data) => {
-    if (data.sessionId) watcher.markPending(data.sessionId, data.hookEvent, data.toolName, data.idle, data.notificationType);
+    if (data.sessionId) watcher.markPending(data.sessionId, data.hookEvent, data.toolName, data.idle, data.notificationType, data.toolTarget);
   });
 
   // Resolve pending registrations when sessions are discovered
@@ -830,6 +830,10 @@ function serializeSession(session) {
     // l'île. Vide quand seule la présence CLI (`shell`) signale un fond :
     // le renderer retombe sur le chip générique.
     bgTasks,
+    // Ce que la demande en attente réclame ({tool, target}), depuis le hook
+    // PermissionRequest — le JSONL n'en dit rien tant qu'on n'a pas répondu.
+    // Ancré sur disque avec le pending, donc restauré au redémarrage.
+    pendingRequest: session.pendingRequest || null,
     // Présence CLI : menu/dialogue local ouvert (chip vert, pas d'action) et
     // libellé brut du dialogue bloquant (tooltip du badge pending).
     dialogOpen: !!session.dialogOpen,

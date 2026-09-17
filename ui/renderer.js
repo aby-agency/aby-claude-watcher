@@ -23,6 +23,7 @@ const ICONS = {
   model: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2L12 3z"/></svg>`,
   // Ligne « process » (serveurs / tâches de fond) : icône activité, même
   // gabarit 11px que branche/session/modèle.
+  pendingAsk: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
   process: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
   wrench: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
 };
@@ -966,6 +967,18 @@ function bgTaskTitle(list) {
 // gabarit que branche/session : les chips n'y concurrencent plus le badge
 // (retour Paul 2026-09-07 : « 1 tâche » tombait seul sur une 2e ligne).
 // Chrome et « Dialogue ouvert » restent sur la ligne d'état, ils le qualifient.
+// Ce que réclame la demande en attente, sous la ligne d'état : « Action
+// requise » seule oblige à ouvrir la session pour savoir de quoi il s'agit.
+// N'apparaît que sur l'état pending RÉELLEMENT affiché (un pending masqué par
+// un agent foreground est rendu « running » : rien à demander à l'écran).
+function pendingLineHTML(s, cls) {
+  if (!s.state || s.state.name !== 'pending') return '';
+  const label = window.pendingLabel.pendingLabel(s.pendingRequest);
+  if (!label) return ''; // hook d'une version antérieure : badge seul, rien d'inventé
+  return `<div class="${cls}" title="${escAttr(label.title)}">`
+    + `<span class="compact-card-branch-icon">${ICONS.pendingAsk || ICONS.process}</span>`
+    + `<span class="pending-ask-value">${esc(label.text)}</span></div>`;
+}
 function bgLineHTML(s, cls) {
   const chips = bgChipHTML(s);
   if (!chips) return '';
@@ -1091,6 +1104,7 @@ onclick="handleCardClick(event, '${sid}')">
         ${isActiveState(stateName) ? '<span class="spinner"></span>' : '<span class="dot"></span>'}
         ${stateLabel}${stateDurationHTML(s)}
       </div>${dialogChipHTML(s)}${chromeChipHTML(s)}
+      ${pendingLineHTML(s, 'card-pending-ask')}
       ${bgLineHTML(s, 'card-bg-line')}
       <div class="card-details">
         <div class="detail">
@@ -1201,6 +1215,7 @@ onclick="handleCardClick(event, '${sid}')">
         <span class="compact-card-tool">${toolDisplay}</span>
         ${dialogChipHTML(s)}${chromeChipHTML(s)}
       </div>
+      ${pendingLineHTML(s, 'compact-card-pending-ask')}
       ${bgLineHTML(s, 'compact-card-bg')}
       <div class="compact-card-branch">
         <span class="compact-card-branch-icon">${ICONS.branch || '⎇'}</span>

@@ -1429,7 +1429,11 @@ class SessionWatcher extends EventEmitter {
       // tant que l'utilisateur n'a pas répondu) → on l'ancre sur disque, sinon
       // un redémarrage le perd définitivement (cf. config.setPendingMark).
       if (newState.name === 'pending') this.markPendingPersisted(sessionId, session);
-      else if (oldState.name === 'pending') this.clearPendingPersisted(sessionId);
+      else if (oldState.name === 'pending') {
+        this.clearPendingPersisted(sessionId);
+        // La question a reçu sa réponse : son libellé n'a plus rien à dire.
+        session.pendingRequest = null;
+      }
     } else if (session.stateSince == null && typeof at === 'number') {
       // No-op d'AMORÇAGE : l'état déduit au démarrage est le même que celui
       // restauré depuis config.sessions, mais la session n'a aucun horodatage
@@ -1622,7 +1626,7 @@ class SessionWatcher extends EventEmitter {
   // ambre tant qu'aucun agent n'était « running » frais (Etienne, 2026-09-02).
   // Le hook installé est désormais PermissionRequest ; un PreToolUse résiduel
   // (settings.local.json per-projet posé par un ancien `cc`) est ignoré ici.
-  markPending(sessionId, hookEvent, toolName, idle = false, notificationType = null) {
+  markPending(sessionId, hookEvent, toolName, idle = false, notificationType = null, toolTarget = null) {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     if (hookEvent === 'PreToolUse') return;
@@ -1659,6 +1663,10 @@ class SessionWatcher extends EventEmitter {
       // Final check: did an event arrive since we scheduled?
       if (Date.now() - (s.lastEventTime || 0) < 1000) return;
       this.clearWaitingTimer(sessionId);
+      // Ce que Claude demande, posé AVANT le setState : la carte et la trace
+      // disque le lisent toutes deux depuis la session. Un rappel idle ne
+      // demande rien — il ne pose donc aucune demande.
+      if (!idle && toolName) s.pendingRequest = { tool: toolName, target: toolTarget || null };
       this.setState(sessionId, target, false, trigger);
     }, 1000);
     this.pendingTimers.set(sessionId, timer);
@@ -1672,9 +1680,15 @@ class SessionWatcher extends EventEmitter {
     if (!jsonlPath) return;
     try {
       const st = fs.statSync(jsonlPath);
+      // `pendingRequest` vient du hook : c'est l'outil dont la permission est
+      // demandée. `lastTool` (dernier tool_use du JSONL) n'est qu'un repli —
+      // le JSONL n'écrit rien tant que l'utilisateur n'a pas répondu, donc il
+      // désigne l'outil PRÉCÉDENT.
+      const req = (session && session.pendingRequest) || null;
       this.config.setPendingMark(sessionId, {
         mtimeMs: st.mtimeMs,
-        tool: (session && session.lastTool) || null,
+        tool: (req && req.tool) || (session && session.lastTool) || null,
+        target: (req && req.target) || null,
         at: Date.now(),
       });
     } catch (e) {
@@ -1697,6 +1711,10 @@ class SessionWatcher extends EventEmitter {
       this.clearPendingPersisted(sessionId);
       return false;
     }
+    // La question est toujours posée : son libellé revient avec elle, sinon
+    // l'app relancée afficherait un ambre muet.
+    const session = this.sessions.get(sessionId);
+    if (session && mark.tool) session.pendingRequest = { tool: mark.tool, target: mark.target || null };
     return true;
   }
 

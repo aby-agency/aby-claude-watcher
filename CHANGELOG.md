@@ -17,6 +17,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   apparaît en même temps que lui, et elle revient telle quelle si l'app est
   relancée pendant qu'une question attend.
 
+- **Nouveau réglage : laisser les sessions cmux à cockpit.** Quand cockpit
+  (le poste Stream Deck) signale déjà une session, le watcher n'a pas besoin
+  d'alerter pour la même chose. Le réglage fait taire bannière et
+  notification pour les seules sessions qui tournent dans cmux ; leur état
+  reste affiché comme avant, et tout ce qui tourne ailleurs continue de
+  notifier normalement. Désactivé par défaut.
+
 ### Fixed
 - **Un nom d'outil contenant un guillemet ne casse plus le signal du hook.**
   Le message envoyé par le hook était assemblé à la main ; il est désormais

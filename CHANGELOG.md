@@ -4,6 +4,24 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.0] — 2026-09-17
+
+### Added
+- **« Action requise » dit maintenant ce qu'elle demande.** Le badge ambre
+  signalait qu'une réponse était attendue, sans jamais dire à quoi : il
+  fallait ouvrir la session pour l'apprendre. La carte affiche désormais la
+  demande sous le badge — « Bash · supprimer node_modules », le fichier visé
+  pour une modification, la question posée, l'opération pour un outil MCP —
+  avec le détail complet au survol. En vue grille comme en vue compacte.
+  L'information vient du même signal que le badge lui-même, donc elle
+  apparaît en même temps que lui, et elle revient telle quelle si l'app est
+  relancée pendant qu'une question attend.
+
+### Fixed
+- **Un nom d'outil contenant un guillemet ne casse plus le signal du hook.**
+  Le message envoyé par le hook était assemblé à la main ; il est désormais
+  produit par un vrai encodeur JSON, sur les deux chemins (jq et son repli).
+
 ## [2.15.0] — 2026-09-15
 
 ### Fixed

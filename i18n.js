@@ -86,6 +86,8 @@ settings_title: 'Paramètres',
       tray_popover_hint: 'Clic sur le tray = mini-panneau ; désactivé, le clic ouvre directement le dashboard',
       perm_hook_label: 'Détecter les demandes de permission',
       perm_hook_hint: 'Installe un hook dans ~/.claude/settings.json pour que les sessions en attente de ton approbation apparaissent « en attente » (tous projets)',
+      cockpit_handoff_label: 'Laisser les sessions cmux à cockpit',
+      cockpit_handoff_hint: 'Les sessions qui tournent dans cmux sont déjà signalées par les touches Stream Deck de cockpit : le watcher continue d\'afficher leur état mais n\'alerte plus pour elles',
 
       // Settings — notifications
       volume_label: 'Volume',
@@ -261,6 +263,8 @@ settings_title: 'Settings',
       tray_popover_hint: 'Click the tray to open the mini panel; off opens the dashboard directly',
       perm_hook_label: 'Detect permission prompts',
       perm_hook_hint: 'Installs a hook in ~/.claude/settings.json so sessions waiting for your approval show as “waiting” (all projects)',
+      cockpit_handoff_label: 'Leave cmux sessions to cockpit',
+      cockpit_handoff_hint: 'Sessions running inside cmux are already signalled by cockpit\'s Stream Deck keys: the watcher keeps showing their state but stops alerting for them',
 
       // Settings — notifications
       volume_label: 'Volume',

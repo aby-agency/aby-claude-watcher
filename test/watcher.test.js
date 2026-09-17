@@ -1746,6 +1746,74 @@ test('une trace périmée (JSONL réécrit app éteinte) ne restaure aucune dema
   if (w.sessions.get('R6').pendingRequest) throw new Error('aucune demande ne doit survivre');
 });
 
+section('hand-off cockpit — ne pas notifier deux fois la même chose');
+
+const SURF_ID = 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE';
+function withCmuxStore(w, sessionIds) {
+  const sessions = {};
+  for (const id of sessionIds) sessions[id] = { surfaceId: SURF_ID, pid: process.pid };
+  w.readCmuxStore = () => ({ sessions });
+}
+
+test('par défaut (toggle off), une session cmux notifie comme avant', () => {
+  const cfg = makeMockConfig();
+  const w = new SessionWatcher(cfg);
+  withCmuxStore(w, ['C1']);
+  w.sessions.set('C1', makeSession('C1', { state: STATES.WAITING }));
+  let notified = 0;
+  w.on('session-waiting', () => { notified++; });
+  w.maybeNotifyWaiting('C1', w.sessions.get('C1'));
+  if (notified !== 1) throw new Error(`le défaut ne doit rien changer, notified=${notified}`);
+});
+
+test('toggle on : une session vue par cockpit ne notifie plus', () => {
+  const cfg = makeMockConfig();
+  cfg._data.cockpitHandoff = true;
+  const w = new SessionWatcher(cfg);
+  withCmuxStore(w, ['C2']);
+  w.sessions.set('C2', makeSession('C2', { state: STATES.WAITING }));
+  let notified = 0;
+  w.on('session-waiting', () => { notified++; });
+  w.maybeNotifyWaiting('C2', w.sessions.get('C2'));
+  if (notified !== 0) throw new Error('cockpit couvre cette session : le watcher doit se taire');
+});
+
+test('toggle on : une session HORS cmux notifie toujours (cockpit ne la voit pas)', () => {
+  const cfg = makeMockConfig();
+  cfg._data.cockpitHandoff = true;
+  const w = new SessionWatcher(cfg);
+  withCmuxStore(w, ['autre']);
+  w.sessions.set('C3', makeSession('C3', { state: STATES.WAITING }));
+  let notified = 0;
+  w.on('session-waiting', () => { notified++; });
+  w.maybeNotifyWaiting('C3', w.sessions.get('C3'));
+  if (notified !== 1) throw new Error('hors cmux, personne d\'autre ne signale : il faut notifier');
+});
+
+test('toggle on : le pending aussi se tait (c\'est LUI le doublon)', () => {
+  const cfg = makeMockConfig();
+  cfg._data.cockpitHandoff = true;
+  const w = new SessionWatcher(cfg);
+  withCmuxStore(w, ['C4']);
+  w.sessions.set('C4', makeSession('C4', { state: STATES.PENDING }));
+  let notified = 0;
+  w.on('session-waiting', () => { notified++; });
+  w.maybeNotifyWaiting('C4', w.sessions.get('C4'));
+  if (notified !== 0) throw new Error('la touche Approuver signale déjà : pas de bannière en plus');
+});
+
+test('toggle on, store illisible → on notifie (jamais de silence sans preuve)', () => {
+  const cfg = makeMockConfig();
+  cfg._data.cockpitHandoff = true;
+  const w = new SessionWatcher(cfg);
+  w.readCmuxStore = () => null; // cmux absent, store corrompu…
+  w.sessions.set('C5', makeSession('C5', { state: STATES.WAITING }));
+  let notified = 0;
+  w.on('session-waiting', () => { notified++; });
+  w.maybeNotifyWaiting('C5', w.sessions.get('C5'));
+  if (notified !== 1) throw new Error('sans preuve que cockpit couvre, le watcher garde la main');
+});
+
 section('findJsonlPath — plusieurs dossiers projet pour un même sid');
 
 test('le journal le plus récemment écrit gagne (dossier projet renommé → copie périmée dans l\'ancien slug)', () => {

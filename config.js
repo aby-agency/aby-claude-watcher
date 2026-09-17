@@ -30,6 +30,7 @@ let config = {
   islandShowHeadless: true, // afficher les sessions headless (aile droite + volet) dans l'île
   trayPopoverEnabled: true, // clic tray → popover ; off → clic tray ouvre le dashboard directement
   permissionHookEnabled: true, // installe le hook global ~/.claude/settings.json (détection « en attente »)
+  cockpitHandoff: false, // laisser cockpit (Stream Deck) signaler les sessions cmux : le watcher n'alerte plus pour elles
   pendingMarks: {},     // { [sessionId]: { mtimeMs, tool, at } } — pending survit au redémarrage
 };
 
@@ -108,6 +109,11 @@ function setTrayPopoverEnabled(value) {
 
 function setPermissionHookEnabled(value) {
   config.permissionHookEnabled = !!value;
+  save();
+}
+
+function setCockpitHandoff(value) {
+  config.cockpitHandoff = !!value;
   save();
 }
 
@@ -271,6 +277,7 @@ module.exports = {
   setIslandShowHeadless,
   setTrayPopoverEnabled,
   setPermissionHookEnabled,
+  setCockpitHandoff,
   setAlwaysOnTop,
   setVolume,
   setWindowTransparencyEnabled,

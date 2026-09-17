@@ -45,6 +45,7 @@ let islandEnabled = true;
 let islandShowHeadless = true;
 let trayPopoverEnabled = true;
 let permissionHookEnabled = true;
+let cockpitHandoff = false;
 let windowTransparencyEnabled = false;
 let windowOpacity = 0.85;
 let searchQuery = '';
@@ -101,6 +102,7 @@ async function init() {
   islandShowHeadless = config.islandShowHeadless !== false;
   trayPopoverEnabled = config.trayPopoverEnabled !== false;
   permissionHookEnabled = config.permissionHookEnabled !== false;
+  cockpitHandoff = config.cockpitHandoff === true;
   windowTransparencyEnabled = !!config.windowTransparencyEnabled;
   windowOpacity = config.windowOpacity ?? 0.85;
   sessionOrder = config.sessionOrder || [];
@@ -119,6 +121,7 @@ async function init() {
   updateIslandHeadlessToggle();
   updateTrayPopoverToggle();
   updatePermHookToggle();
+  updateCockpitHandoffToggle();
   $volumeSlider.value = Math.round(volume * 100);
   $volumeValue.textContent = `${Math.round(volume * 100)}%`;
   updateTransparencyControls();
@@ -240,6 +243,8 @@ async function init() {
 
   const permHookBtn = document.getElementById('permHookToggle');
   if (permHookBtn) permHookBtn.addEventListener('click', togglePermHook);
+  const cockpitBtn = document.getElementById('cockpitHandoffToggle');
+  if (cockpitBtn) cockpitBtn.addEventListener('click', toggleCockpitHandoff);
 
   // Language picker
   document.querySelectorAll('.language-btn').forEach(btn => {
@@ -512,6 +517,20 @@ function toggleTrayPopover() {
   trayPopoverEnabled = !trayPopoverEnabled;
   window.api.setTrayPopoverEnabled(trayPopoverEnabled);
   updateTrayPopoverToggle();
+}
+
+function updateCockpitHandoffToggle() {
+  const btn = document.getElementById('cockpitHandoffToggle');
+  if (btn) {
+    btn.classList.toggle('on', cockpitHandoff);
+    btn.setAttribute('aria-checked', String(cockpitHandoff));
+  }
+}
+
+function toggleCockpitHandoff() {
+  cockpitHandoff = !cockpitHandoff;
+  window.api.setCockpitHandoff(cockpitHandoff);
+  updateCockpitHandoffToggle();
 }
 
 function updatePermHookToggle() {

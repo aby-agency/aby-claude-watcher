@@ -679,6 +679,11 @@ ipcMain.handle('set-session-order', (_, order) => {
     applyPermissionHook(); // installe ou retire le hook global immédiatement
   });
 
+  ipcMain.handle('set-cockpit-handoff', (_e, value) => {
+    config.setCockpitHandoff(value);
+    return true;
+  });
+
   ipcMain.handle('set-language', (_, lang) => {
     config.setLanguage(lang);
     applyLanguage();

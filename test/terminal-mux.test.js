@@ -11,6 +11,7 @@ const {
   cmuxSurfaceForPid,
   tmuxAttachCommand,
   isCmuxProcess,
+  sessionInCmux,
 } = require('../terminal-mux.js');
 
 let passed = 0, failed = 0;
@@ -158,6 +159,50 @@ test('control mode flag for iTerm2', () => {
 test('rejects a session name with shell metacharacters', () => {
   assertEq(tmuxAttachCommand('/tmp/s', 'a;b'), null);
   assertEq(tmuxAttachCommand('/tmp/s', ''), null);
+});
+
+
+
+// ---------------------------------------------------------------------------
+// sessionInCmux — « cockpit voit-il cette session ? ». Sert au réglage
+// anti-doublon de notif : cockpit ne couvre QUE ce qui tourne dans cmux.
+const SURF = 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE';
+const alive = () => true;
+const dead = () => false;
+
+console.log('\nsessionInCmux:');
+
+test('une session du store, process vivant → couverte', () => {
+  const store = { sessions: { s1: { surfaceId: SURF, pid: 4242 } } };
+  assertEq(sessionInCmux(store, 's1', alive), true);
+});
+
+test('une session absente du store → pas couverte', () => {
+  const store = { sessions: { s1: { surfaceId: SURF, pid: 4242 } } };
+  assertEq(sessionInCmux(store, 'autre', alive), false);
+});
+
+test('entrée fantôme (process mort) → pas couverte', () => {
+  // cmux quitté sans SessionEnd laisse l'entrée figée (leur LRN-016) : sans ce
+  // filtre, un id recyclé ferait taire une session qui n'est plus dans cmux.
+  const store = { sessions: { s1: { surfaceId: SURF, pid: 4242 } } };
+  assertEq(sessionInCmux(store, 's1', dead), false);
+});
+
+test('entrée sans pid → couverte (on ne peut pas prouver la mort)', () => {
+  const store = { sessions: { s1: { surfaceId: SURF } } };
+  assertEq(sessionInCmux(store, 's1', dead), true);
+});
+
+test('surface trouvée via activeSessionsBySurface', () => {
+  const store = { activeSessionsBySurface: { [SURF]: { sessionId: 's9' } } };
+  assertEq(sessionInCmux(store, 's9', alive), true);
+});
+
+test('store absent ou illisible → pas couverte (jamais de mute sans preuve)', () => {
+  assertEq(sessionInCmux(null, 's1', alive), false);
+  assertEq(sessionInCmux({}, 's1', alive), false);
+  assertEq(sessionInCmux({ sessions: {} }, '', alive), false);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

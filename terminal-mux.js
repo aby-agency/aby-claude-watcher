@@ -95,6 +95,21 @@ function cmuxSurfaceForSession(store, sessionId) {
   return null;
 }
 
+// « cockpit voit-il cette session ? » — vrai quand elle vit dans une surface
+// cmux. Sert au réglage anti-doublon de notification : cockpit ne couvre QUE
+// ce qui tourne dans cmux, donc c'est exactement la frontière du hand-off.
+// Le store garde des entrées figées quand un process meurt sans SessionEnd
+// (cmux quitté, socket muet — cf. leur LRN-016), d'où le filtre sur pid
+// vivant ; une entrée SANS pid est gardée : on ne peut pas prouver sa mort,
+// et on préfère un doublon à une alerte perdue.
+function sessionInCmux(store, sessionId, isAlive) {
+  if (!cmuxSurfaceForSession(store, sessionId)) return false;
+  const rec = store.sessions && store.sessions[sessionId];
+  const pid = rec && rec.pid;
+  if (typeof pid !== 'number' || !Number.isFinite(pid) || pid <= 0) return true;
+  return typeof isAlive === 'function' ? !!isAlive(pid) : true;
+}
+
 // `tmux list-clients -F '#{client_pid}\t#{client_tty}'` → [{ pid, tty }]
 function parseTmuxClients(output) {
   const out = [];
@@ -161,6 +176,7 @@ module.exports = {
   isCmuxEnv,
   isCmuxProcess,
   cmuxSurfaceForSession,
+  sessionInCmux,
   parseTmuxClients,
   cmuxSurfaceForPid,
   tmuxAttachCommand,

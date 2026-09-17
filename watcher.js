@@ -5,6 +5,11 @@ const { EventEmitter } = require('events');
 const { log, DEBUG } = require('./logger');
 const { readPresence, presenceDecision } = require('./presence');
 const { classifyBgCommand, bgTaskOpening, hasLiveBgTask } = require('./bg-task');
+const mux = require('./terminal-mux');
+
+// Store cmux : session Claude → surface. Écrit par les hooks Claude de cmux,
+// déjà lu par focus.js pour ramener le bon terminal devant.
+const CMUX_HOOK_STORE = path.join(os.homedir(), '.cmuxterm', 'claude-hook-sessions.json');
 
 // Nombre de tool_use Bash récents gardés par session pour relier une tâche de
 // fond (tool_result avec backgroundTaskId) à sa description/commande.
@@ -1300,6 +1305,33 @@ class SessionWatcher extends EventEmitter {
     return null;
   }
 
+  // Store cmux (session → surface), relu à la volée : une notif n'arrive pas
+  // assez souvent pour mériter un cache, et un cache mentirait le temps qu'une
+  // session entre ou sorte de cmux. Surchargée dans les tests.
+  readCmuxStore() {
+    try {
+      return JSON.parse(fs.readFileSync(CMUX_HOOK_STORE, 'utf-8'));
+    } catch {
+      return null;
+    }
+  }
+
+  // Hand-off cockpit : quand le réglage est actif, une session que cockpit voit
+  // (donc qui tourne dans une surface cmux) est signalée par SA touche Stream
+  // Deck — la doubler d'une bannière est exactement le doublon qui a fait
+  // écrire « quitter le Watcher » chez eux. Révise, SOUS CE TOGGLE SEULEMENT,
+  // la règle « une permission pending notifie toujours » : c'est « Action
+  // requise » qui double, l'épargner viderait le réglage de son sens. Défaut
+  // off → comportement historique inchangé pour qui n'active rien. Aucune
+  // preuve que cockpit couvre (store illisible, cmux absent) = on notifie.
+  cockpitMuteReason(session) {
+    if (!this.config || !this.config.get) return null;
+    if (!this.config.get().cockpitHandoff) return null;
+    const store = this.readCmuxStore();
+    if (!mux.sessionInCmux(store, session.sessionId, (pid) => this.isPidAlive(pid))) return null;
+    return 'cockpit couvre cette session (cmux)';
+  }
+
   startWaitingTimer(sessionId, isInitial) {
     this.clearWaitingTimer(sessionId);
     if (isInitial) {
@@ -1494,6 +1526,11 @@ class SessionWatcher extends EventEmitter {
     if (session.isBackground && this.config) {
       const p = this.config.getNotificationPrefs(sessionId);
       if (!p.modal && !p.sound) return;
+    }
+    const handoff = this.cockpitMuteReason(session);
+    if (handoff) {
+      log.info(`[notif] ${sessionId.slice(0, 8)} muet — ${handoff}`);
+      return;
     }
     const lastNotif = this.lastNotifTime.get(sessionId) || 0;
     if (Date.now() - lastNotif > 30000) {

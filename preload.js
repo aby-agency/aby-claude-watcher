@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('api', {
   setIslandShowHeadless: (value) => ipcRenderer.invoke('set-island-show-headless', value),
   setTrayPopoverEnabled: (value) => ipcRenderer.invoke('set-tray-popover-enabled', value),
   setPermissionHookEnabled: (value) => ipcRenderer.invoke('set-permission-hook-enabled', value),
+  setCockpitHandoff: (value) => ipcRenderer.invoke('set-cockpit-handoff', value),
   checkUpdates: (force) => ipcRenderer.invoke('check-updates', force),
   downloadUpdate: (release) => ipcRenderer.invoke('download-update', release),
   abortUpdate: () => ipcRenderer.invoke('abort-update'),

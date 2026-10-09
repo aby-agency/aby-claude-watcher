@@ -4,6 +4,21 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.0] — 2026-10-09
+
+### Changed
+- **Un seul nom par projet, le même partout.** Les cartes affichent
+  désormais le nom court que le registre du Cockpit donne au projet — le
+  même que sur le Stream Deck, l'app Hublot et les titres cmux — au lieu du
+  nom du dossier. Un projet absent du registre (ou un poste sans Cockpit)
+  garde le nom du dossier, comme avant ; un nom donné à la session ou un
+  renommage local restent prioritaires.
+
+### Added
+- **Losange « ◇ » pour l'avant-vente.** Les projets rangés dans le groupe
+  commercial du registre portent un petit losange après leur nom, en vue
+  grille et compacte, dans les toasts et le popover. L'île n'en porte pas.
+
 ## [2.16.0] — 2026-09-17
 
 ### Added

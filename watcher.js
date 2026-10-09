@@ -6,6 +6,11 @@ const { log, DEBUG } = require('./logger');
 const { readPresence, presenceDecision } = require('./presence');
 const { classifyBgCommand, bgTaskOpening, hasLiveBgTask } = require('./bg-task');
 const mux = require('./terminal-mux');
+const { createRegistryReader } = require('./cockpit-registry');
+
+// Nom court et groupe du projet d'un dossier, lus dans le registre du Cockpit (09/10/2026, un seul nom
+// partout) ; hors registre, le basename du dossier comme avant.
+const cockpitRegistry = createRegistryReader();
 
 // Store cmux : session Claude → surface. Écrit par les hooks Claude de cmux,
 // déjà lu par focus.js pour ramener le bon terminal devant.
@@ -165,7 +170,9 @@ class SessionWatcher extends EventEmitter {
           sessionId: id,
           pid: data.pid || null,
           cwd: data.cwd || null,
-          projectName: data.projectName || 'Unknown',
+          // Le registre prime sur le nom gardé : un projet renommé (nom court) l'est aussi au redémarrage.
+          projectName: data.cwd ? this.extractProjectName(data.cwd) : (data.projectName || 'Unknown'),
+          projectGroup: this.extractProjectGroup(data.cwd),
           sessionName: data.sessionName || null,
           slug: data.slug || '',
           state: savedState,
@@ -382,6 +389,7 @@ class SessionWatcher extends EventEmitter {
               pid,
               cwd,
               projectName,
+              projectGroup: this.extractProjectGroup(cwd),
               sessionName: explicitSessionName(data),
               slug: '',
               state: STATES.WAITING,
@@ -598,7 +606,15 @@ class SessionWatcher extends EventEmitter {
 
   extractProjectName(cwd) {
     if (!cwd) return 'Unknown';
-    return path.basename(cwd);
+    const id = cockpitRegistry.identityForCwd(cwd);
+    return id ? id.name : path.basename(cwd);
+  }
+
+  // Le groupe du registre du Cockpit (« commercial » porte un marqueur dans l'UI), ou null hors registre.
+  extractProjectGroup(cwd) {
+    if (!cwd) return null;
+    const id = cockpitRegistry.identityForCwd(cwd);
+    return id ? id.group : null;
   }
 
   // Record every Agent tool_use we see, with its run_in_background flag and the

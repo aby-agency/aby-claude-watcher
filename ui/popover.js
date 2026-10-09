@@ -49,7 +49,7 @@ function renderPopover(sessions, config) {
     return `
       <div class="pop-item" data-session="${esc(s.sessionId)}" data-state="${esc(stateName)}">
         ${indicator}
-        <span class="pop-name">${esc(displayName)}</span>
+        <span class="pop-name">${esc(displayName)}</span>${s.projectGroup === 'commercial' ? '<span class="pop-commercial" title="Commercial" aria-label="commercial"></span>' : ''}
         <span class="pop-state">${esc(window.i18n.t('state_' + s.state.name))}</span>
       </div>
     `;

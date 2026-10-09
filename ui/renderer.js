@@ -898,6 +898,12 @@ function sessionLabel(s) {
   return (s && (s.customName || s.sessionName || s.projectName)) || '';
 }
 
+// Marqueur d'un projet du groupe « commercial » du registre du Cockpit (09/10/2026) : un seul nom court
+// par projet (« PEC » client et « PEC » commercial), la différence se dessine à côté, jamais dans le nom.
+function commercialMarkHTML(s) {
+  return s && s.projectGroup === 'commercial' ? '<span class="commercial-mark" title="Commercial" aria-label="commercial"></span>' : '';
+}
+
 function getSortedSessions() {
   let arr = Array.from(sessions.values());
 
@@ -1108,7 +1114,7 @@ onclick="handleCardClick(event, '${sid}')">
       <div class="card-header">
         <div class="card-title">
           <div class="project-name editable-name" onclick="event.stopPropagation(); startInlineRename(event, '${sid}')" title="${t('action_rename_hint')}">
-            <span class="project-name-text">${esc(sessionLabel(s))}</span>
+            <span class="project-name-text">${esc(sessionLabel(s))}</span>${commercialMarkHTML(s)}
             <span class="edit-hint">${ICONS.edit}</span>
           </div>
         </div>
@@ -1216,7 +1222,7 @@ function compactItemHTML(s) {
 onclick="handleCardClick(event, '${sid}')">
       <div class="compact-card-header">
         <div class="compact-card-name editable-name" onclick="event.stopPropagation(); startInlineRename(event, '${sid}')" title="${t('action_rename_hint')}">
-          <span class="project-name-text">${esc(sessionLabel(s))}</span>
+          <span class="project-name-text">${esc(sessionLabel(s))}</span>${commercialMarkHTML(s)}
           <span class="edit-hint">${ICONS.edit}</span>
         </div>
         <div class="compact-card-actions">
@@ -1502,7 +1508,7 @@ function showToast(data) {
   const bell = ICONS.bellRing.replace('width="14"', 'width="13"').replace('height="14"', 'height="13"');
   toast.innerHTML = `
     <span class="toast-bell">${bell}</span>
-    <span class="toast-name">${esc(sessionLabel(data))}</span>
+    <span class="toast-name">${esc(sessionLabel(data))}</span>${commercialMarkHTML(data)}
     <span class="toast-arrow">→</span>
     <span class="toast-state">${stateLabel}</span>
     <button class="toast-close" title="${t('close')}" aria-label="${t('close')}">${ICONS.x}</button>

@@ -144,6 +144,15 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    /* Projet commercial : losange après le nom, comme « PEC ◇ » dans cmux (09/10/2026). */
+    .pop-commercial {
+      flex-shrink: 0;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .pop-commercial::before {
+      content: "◇";
+    }
     .pop-state {
       font-size: 10px;
       font-family: var(--font-mono);

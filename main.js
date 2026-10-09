@@ -141,6 +141,7 @@ function notifyWorkflowDone(session, wf) {
   sendToRenderer('show-notification', {
     sessionId: session.sessionId,
     projectName: session.projectName,
+    projectGroup: session.projectGroup || null,
     sessionName: session.sessionName || null,
     customName: config.getCustomName(session.sessionId),
     slug: session.slug,
@@ -428,6 +429,7 @@ function setupWatcher() {
     sendToRenderer('show-notification', {
       sessionId: session.sessionId,
       projectName: session.projectName,
+      projectGroup: session.projectGroup || null,
       sessionName: session.sessionName || null,
       customName: config.getCustomName(session.sessionId),
       slug: session.slug,
@@ -807,6 +809,7 @@ function serializeSession(session) {
   return {
     sessionId: session.sessionId,
     projectName: session.projectName,
+    projectGroup: session.projectGroup || null,
     // Nom explicite de la session côté Claude Code (`claude -n`, `/name`) : il
     // prime sur le dossier, sans écraser le renommage local (customName).
     sessionName: session.sessionName || null,

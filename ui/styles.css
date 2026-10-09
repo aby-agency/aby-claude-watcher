@@ -632,6 +632,18 @@ body.micro-mode .uring-text { font-size: 9px; }
   min-width: 0;
 }
 
+/* Projet commercial (groupe du registre du Cockpit) : un losange à côté du nom, le même signe que
+   « PEC ◇ » dans les titres cmux. Il ne rétrécit pas : le nom se coupe avant lui. */
+.commercial-mark {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 0.8em;
+  line-height: 1;
+}
+.commercial-mark::before {
+  content: "◇";
+}
+
 .editable-name .edit-hint {
   display: inline-flex;
   opacity: 0;

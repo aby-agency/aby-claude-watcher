@@ -23,6 +23,37 @@ npm run build    # DMG — REQUIERT Node ≥ 20.19 (cf. .nvmrc: 22)
 > DMG 2.13.0 cassé avant release, presence.js / bg-task.js oubliés).
 > `test/build-files.test.js` vérifie la fermeture transitive depuis main.js.
 
+## Tickets et worktrees
+
+- Tickets : issues GitHub du dépôt (gabarit `.github/ISSUE_TEMPLATE/ticket.md`, labels fermés `epic:…`, `taille:XS|S|M|L|XL`, `bloqué`, `backlog`). Une session = une issue, prise par assignation (`gh issue edit N --add-assignee @me`), branche `ticket/N-slug`, commits `feat(#N): …` / `fix(#N): …`, PR dont la description porte `Closes #N`, fusion quand les critères sont cochés. Lecture par `gh` filtré (`--label`, `--state`, `--limit`, `--json`), jamais sans filtre, jamais le serveur MCP GitHub.
+- Commits en français ; dates `YYYY-MM-DD`.
+- Worktrees : un par ticket, `~/Aby/.worktrees/aby-claude-watcher/<ticket>` depuis `origin/main`, jamais à côté du dépôt ; retiré dès que la PR est fusionnée ou fermée ; six vivants au plus.
+
+## Règles non-négociables
+
+- Aucune signature Claude/AI dans le code, les commits, les PR (constitution Aby § 2).
+- Ne jamais renommer ou supprimer le cwd de la session Claude en cours (constitution § 2).
+- Pas de fallback silencieux : si une étape échoue, escalader (constitution § 2).
+- `main` doit toujours builder.
+- Critères de succès des tickets : binaires + mesurables + conditions d'arrêt. On coche, on ne « sent » pas.
+- Une demande d'Etienne donnée en conversation s'écrit dans l'issue, citée et datée, avant d'être codée ; on ne « rétablit » jamais un état disparu sans avoir vérifié qu'il ne vient pas d'une de ses demandes (issues, journal).
+- Les minutes d'intégration continue sont comptées (3 000 par mois pour tous les dépôts d'Aby Agency) : vérifications locales AVANT toute poussée, une poussée par lot cohérent, aucun rejeu réflexe d'un run rouge, et un commit qui ne touche que `docs/` ou `registres/` ne déclenche aucune chaîne (message terminé par `[skip ci]`).
+
+## Registres
+
+- Décisions : `registres/ADR.md` (sommaire complet en tête jusqu'à la ligne `---`, puis le texte du trimestre courant ; trimestres passés dans `registres/archives/`).
+- Apprentissages : `registres/LRN.md` (sommaire + 80 entrées actives au plus).
+- Plans en cours et blocages > 30 min : `registres/TASKS.md` (l'ouvert seulement, 60 Ko au plus). Le récit d'une session va au journal, pas ici.
+- Journal des sessions : `registres/journal.md` (mois courant) · Hypothèses : `registres/experiments.md`.
+- Titres datés : `## ADR-NNN - AAAA-MM-JJ - titre`, `## AAAA-MM-JJ - titre - STATUT` (TASKS, journal) ; c'est la date du titre qui fait tourner les registres.
+- Bornes : le hook de démarrage lance `node scripts/registres.mjs check --quiet` ; s'il dit « consolidation due », `node scripts/registres.mjs rotate` (déplace, ne supprime jamais) puis commit `docs: rotation des registres`.
+- Démarrage de session : lire le sommaire d'ADR, le sommaire de LRN et les sections ouvertes de TASKS ; ouvrir une entrée par son numéro (`grep -rn "## ADR-0xx" registres/`), jamais un registre entier. Close-out : décidé (ADR), appris (LRN), coincé (TASKS), une entrée de journal.
+
+## Sources externes
+
+- Dépôt : https://github.com/aby-agency/aby-claude-watcher
+- Doctrine Aby : `~/Aby/doctrine/` (constitution, usage, registres), sur le poste d'Etienne seulement. Codex lit `AGENTS.md`, qui renvoie ici.
+
 ## Architecture
 
 - `main.js` — Electron main process, window, IPC, tray

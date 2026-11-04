@@ -16,6 +16,9 @@ function create() {
     width: 320,
     height: 360,
     show: false,
+    // Caché jusqu'au premier clic sur le tray : sans ça Chromium peint
+    // la page cachée et ses spinners tournent pour rien (~6 % de GPU mesuré).
+    paintWhenInitiallyHidden: false,
     frame: false,
     resizable: false,
     movable: false,

@@ -120,7 +120,7 @@ body.expanded .pill {
 .led.bg { width: 6px; height: 6px; opacity: .55; box-shadow: none; }
 /* Attention pulse — autonomous, like the needs-you banner below. */
 .led[data-state="pending"], .led[data-state="error"] {
-  animation: led-pulse 1.2s ease-in-out infinite;
+  animation: led-pulse 1.2s steps(6) infinite;
 }
 @keyframes led-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
@@ -138,8 +138,13 @@ body.expanded .pill {
   border-right-color: transparent;
   box-sizing: border-box;
   box-shadow: none;
-  animation: led-spin .8s linear infinite;
+  animation: led-spin .8s steps(8) infinite;
 }
+/* Animations infinies en steps() et jamais en courbe continue : une animation
+   fluide fait recomposer la fenêtre à chaque rafraîchissement d'écran (120 Hz),
+   et l'île, transparente et toujours affichée, tient alors le processus GPU
+   d'Electron à ~25 % en permanence (mesuré au CDP le 2026-11-04 : île 24 %,
+   dashboard ouvert 33 %, popover jamais montré 6 % ; en steps : ~5 % chacun). */
 @keyframes led-spin { to { transform: rotate(360deg); } }
 /* Badge d'état (ailes de la pilule) : pastille couleur d'état, chiffre
    sombre centré dedans, façon badge iOS. */
@@ -187,7 +192,7 @@ body.expanded .pill {
   border: 2px solid var(--led);
   border-top-color: transparent;
   border-right-color: transparent;
-  animation: led-spin .8s linear infinite;
+  animation: led-spin .8s steps(8) infinite;
 }
 
 /* Bannière needs-you — PILE de notifications sous la pilule : chaque ligne
@@ -353,7 +358,7 @@ body.expanded .panel-inner {
   border: 1.5px solid currentColor;
   border-top-color: transparent; border-right-color: transparent;
   box-sizing: border-box;
-  animation: led-spin .8s linear infinite;
+  animation: led-spin .8s steps(8) infinite;
 }
 .subrow-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .subrow-meta { margin-left: auto; flex: none; font-size: 10px; font-family: var(--font-mono); }

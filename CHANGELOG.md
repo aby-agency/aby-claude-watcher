@@ -4,6 +4,16 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.1] — 2026-11-04
+
+### Fixed
+- **L'app ne fait plus chauffer le Mac.** Le processus graphique d'Electron
+  tenait 45 à 50 % de CPU en continu : les anneaux qui tournent et les
+  pastilles qui respirent redessinaient l'île, toujours affichée, à chaque
+  rafraîchissement d'écran. Les animations avancent désormais par crans,
+  comme le spinner de macOS, et le popover ne se dessine plus tant qu'il est
+  fermé. Mesuré : de 19-30 % à environ 3 %.
+
 ## [2.17.0] — 2026-10-09
 
 ### Changed

@@ -285,6 +285,95 @@ test('snapshot returns all running subagents (foreground + background)', () => {
   }
 });
 
+section('scanSession avec cache (#3):');
+
+// Compte les lectures de fichiers d'agents faites par subagents.js.
+function countReads(fn) {
+  const orig = { readFileSync: fs.readFileSync, openSync: fs.openSync };
+  let reads = 0;
+  fs.readFileSync = function (p, ...rest) { if (String(p).includes('agent-')) reads++; return orig.readFileSync.call(fs, p, ...rest); };
+  fs.openSync = function (p, ...rest) { if (String(p).includes('agent-')) reads++; return orig.openSync.call(fs, p, ...rest); };
+  try { fn(); } finally { Object.assign(fs, orig); }
+  return reads;
+}
+
+test('un second passage sur un dossier inchangé ne relit aucun fichier d\'agent', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 'c1', events: [{ type: 'assistant', message: { stop_reason: 'end_turn' } }] },
+    { id: 'c2', events: [{ type: 'assistant', message: { stop_reason: null } }] },
+  ]});
+  const cache = new Map();
+  const first = scanSession(sessionDir, new Map(), cache);
+  let second;
+  const reads = countReads(() => { second = scanSession(sessionDir, new Map(), cache); });
+  if (reads !== 0) throw new Error(`expected 0 reads, got ${reads}`);
+  const strip = (r) => JSON.stringify(r.map(({ agentId, state, description }) => ({ agentId, state, description })).sort((a, b) => a.agentId.localeCompare(b.agentId)));
+  if (strip(first) !== strip(second)) throw new Error(`résultat différent : ${strip(second)}`);
+});
+
+test('un fichier d\'agent qui grossit est relu et son nouvel état remonte', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 'g1', events: [{ type: 'assistant', message: { stop_reason: null } }] },
+  ]});
+  const cache = new Map();
+  if (scanSession(sessionDir, new Map(), cache)[0].state !== 'running') throw new Error('expected running');
+  fs.appendFileSync(path.join(sessionDir, 'subagents', 'agent-g1.jsonl'),
+    JSON.stringify({ type: 'assistant', message: { stop_reason: 'end_turn' } }) + '\n');
+  const r = scanSession(sessionDir, new Map(), cache);
+  if (r[0].state !== 'completed') throw new Error(`expected completed, got ${r[0].state}`);
+});
+
+test('un mtime qui change invalide le cache (running → stale)', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 's1', events: [{ type: 'assistant', message: { stop_reason: null } }] },
+  ]});
+  const cache = new Map();
+  scanSession(sessionDir, new Map(), cache);
+  // Le fichier vieillit sans changer de contenu : seul le mtime recule.
+  const jsonl = path.join(sessionDir, 'subagents', 'agent-s1.jsonl');
+  const old = (Date.now() - 60 * 1000) / 1000;
+  fs.utimesSync(jsonl, old, old);
+  const r = scanSession(sessionDir, new Map(), cache);
+  if (r[0].state !== 'stale') throw new Error(`expected stale, got ${r[0].state}`);
+});
+
+test('un agent sans meta.json n\'est pas mis en cache : il apparaît dès que la méta arrive', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 'm1', events: [{ type: 'assistant', message: { stop_reason: null } }] },
+  ]});
+  const metaPath = path.join(sessionDir, 'subagents', 'agent-m1.meta.json');
+  const meta = fs.readFileSync(metaPath, 'utf-8');
+  fs.unlinkSync(metaPath);
+  const cache = new Map();
+  if (scanSession(sessionDir, new Map(), cache).length !== 0) throw new Error('expected 0 sans méta');
+  fs.writeFileSync(metaPath, meta);
+  if (scanSession(sessionDir, new Map(), cache).length !== 1) throw new Error('expected 1 après la méta');
+});
+
+test('un fichier d\'agent disparu sort du cache', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 'p1', events: [{ type: 'assistant', message: { stop_reason: 'end_turn' } }] },
+    { id: 'p2', events: [{ type: 'assistant', message: { stop_reason: 'end_turn' } }] },
+  ]});
+  const cache = new Map();
+  scanSession(sessionDir, new Map(), cache);
+  fs.unlinkSync(path.join(sessionDir, 'subagents', 'agent-p2.jsonl'));
+  const r = scanSession(sessionDir, new Map(), cache);
+  if (r.length !== 1) throw new Error(`expected 1, got ${r.length}`);
+  const inner = cache.get(path.join(sessionDir, 'subagents'));
+  if (!inner || inner.size !== 1) throw new Error(`cache non purgé : ${inner && inner.size}`);
+});
+
+test('SubagentTracker garde son cache d\'un snapshot à l\'autre', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 't1', events: [{ type: 'assistant', message: { stop_reason: null } }] },
+  ]});
+  const tracker = new SubagentTracker();
+  tracker.snapshotForSession(sessionDir, new Map());
+  const reads = countReads(() => tracker.snapshotForSession(sessionDir, new Map()));
+  if (reads !== 0) throw new Error(`expected 0 reads, got ${reads}`);
+});
+
 section('hasBlockingForegroundAgent:');
 
 test('true when a running foreground agent is present (parent is blocked)', () => {

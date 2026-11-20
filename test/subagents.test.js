@@ -337,6 +337,23 @@ test('un mtime qui change invalide le cache (running → stale)', () => {
   if (r[0].state !== 'stale') throw new Error(`expected stale, got ${r[0].state}`);
 });
 
+test('l\'état est recalculé sans relecture quand le temps passe (running → stale)', () => {
+  const sessionDir = setupSessionDir({ agents: [
+    { id: 'tt', events: [{ type: 'assistant', message: { stop_reason: null } }] },
+  ]});
+  const cache = new Map();
+  if (scanSession(sessionDir, new Map(), cache)[0].state !== 'running') throw new Error('expected running');
+  const realNow = Date.now;
+  const later = realNow() + 60 * 1000;
+  Date.now = () => later;
+  let r;
+  try {
+    const reads = countReads(() => { r = scanSession(sessionDir, new Map(), cache); });
+    if (reads !== 0) throw new Error(`expected 0 reads, got ${reads}`);
+  } finally { Date.now = realNow; }
+  if (r[0].state !== 'stale') throw new Error(`expected stale, got ${r[0].state}`);
+});
+
 test('un agent sans meta.json n\'est pas mis en cache : il apparaît dès que la méta arrive', () => {
   const sessionDir = setupSessionDir({ agents: [
     { id: 'm1', events: [{ type: 'assistant', message: { stop_reason: null } }] },

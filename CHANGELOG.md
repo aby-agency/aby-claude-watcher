@@ -4,6 +4,16 @@ All notable changes to Aby Claude Watcher are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.2] — 2026-11-20
+
+### Fixed
+- **Moins de CPU quand les sessions délèguent beaucoup.** Le processus
+  principal relisait, à chaque mise à jour d'une session, tous les fichiers
+  de ses sous-agents, y compris ceux terminés depuis longtemps (215 dans une
+  seule session). Un fichier qui n'a pas changé n'est plus relu. Mesuré : un
+  passage tombe de 29,7 ms à 0,9 ms ; les pics relevés montaient à 22 % de
+  CPU avec sept sessions ouvertes.
+
 ## [2.17.1] — 2026-11-04
 
 ### Fixed

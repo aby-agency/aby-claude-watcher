@@ -159,12 +159,21 @@ function scanWorkflows(sessionDir, stateCache, nowMs = Date.now()) {
   return out;
 }
 
-function scanSession(sessionDir, dispatches) {
+// `cache` (optionnel) : Map subDir → Map(entry → {size, mtimeMs, meta, lastEvent}).
+// Les fichiers d'agents terminés ne sont jamais purgés par le CLI (215 dans une
+// session le 2026-11-20) : sans cache, chaque passage relisait méta + fin de
+// fichier de tous, 28 ms synchrones à chaque mise à jour de session (#3). Un
+// fichier dont taille et mtime n'ont pas bougé n'est pas relu ; l'état, lui, est
+// recalculé à chaque passage car il dépend de l'heure.
+function scanSession(sessionDir, dispatches, cache) {
   const out = [];
   const subDir = path.join(sessionDir, 'subagents');
   let entries;
   try { entries = fs.readdirSync(subDir); }
-  catch { return out; }
+  catch { if (cache) cache.delete(subDir); return out; }
+
+  const prev = cache ? cache.get(subDir) : null;
+  const next = new Map();
 
   for (const entry of entries) {
     if (!entry.startsWith('agent-') || !entry.endsWith('.jsonl')) continue;
@@ -172,13 +181,21 @@ function scanSession(sessionDir, dispatches) {
     const jsonlPath = path.join(subDir, entry);
     const metaPath = path.join(subDir, `agent-${agentId}.meta.json`);
 
-    const meta = readMeta(metaPath);
-    if (!meta) continue;
-
     let stat;
     try { stat = fs.statSync(jsonlPath); } catch { continue; }
 
-    const lastEvent = readLastEvent(jsonlPath);
+    let rec = prev && prev.get(entry);
+    if (!rec || rec.size !== stat.size || rec.mtimeMs !== stat.mtimeMs) {
+      const meta = (rec && rec.meta) || readMeta(metaPath);
+      if (!meta) continue; // pas mis en cache : retenté au prochain passage
+      const ev = readLastEvent(jsonlPath);
+      // Seul stop_reason sert à deriveState : on ne garde pas l'event entier
+      // (un dernier event peut porter un gros tool_result).
+      const lastEvent = ev ? { message: { stop_reason: (ev.message || {}).stop_reason } } : null;
+      rec = { size: stat.size, mtimeMs: stat.mtimeMs, meta, lastEvent };
+    }
+    next.set(entry, rec);
+    const { meta, lastEvent } = rec;
     const state = deriveState(lastEvent, stat.mtimeMs);
 
     const dispatch = dispatches.get(meta.toolUseId);
@@ -194,6 +211,7 @@ function scanSession(sessionDir, dispatches) {
       state,
     });
   }
+  if (cache) cache.set(subDir, next);
   return out;
 }
 
@@ -202,6 +220,7 @@ function scanSession(sessionDir, dispatches) {
 class SubagentTracker {
   constructor() {
     this.workflowStateCache = new Map();
+    this.agentFileCache = new Map();
   }
 
   snapshotForSession(sessionDir, dispatches) {
@@ -209,7 +228,7 @@ class SubagentTracker {
     // view). 'stale' (silence 30s–5min, long thinking) reste affiché : seul
     // hasBlockingForegroundAgent exige du 'running' frais.
     // Completed/errored agents are still excluded.
-    return scanSession(sessionDir, dispatches)
+    return scanSession(sessionDir, dispatches, this.agentFileCache)
       .filter(sa => sa.state === 'running' || sa.state === 'stale');
   }
 
